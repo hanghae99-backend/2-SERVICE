@@ -175,8 +175,6 @@ classDiagram
 erDiagram
     USER {
         uuid user_id PK
-        varchar name
-        varchar email
         timestamp created_at
         timestamp updated_at
     }

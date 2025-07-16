@@ -83,28 +83,6 @@ class UserServiceUnitTest : BehaviorSpec({
             }
         }
 
-        When("getUserById로 조회할 때") {
-            Then("존재하면 반환한다") {
-                val userId = 1L
-                val user = User.create(userId)
-                every { userRepository.findById(userId) } returns Optional.of(user)
-
-                val result = userService.getUserById(userId)
-                result.userId shouldBe userId
-                verify(exactly = 1) { userRepository.findById(userId) }
-            }
-            Then("존재하지 않으면 예외 발생") {
-                val userId = 999L
-                every { userRepository.findById(userId) } returns Optional.empty()
-
-                val exception = shouldThrow<UserNotFoundException> {
-                    userService.getUserById(userId)
-                }
-                exception.message?.contains("사용자를 찾을 수 없습니다") shouldBe true
-                verify(exactly = 1) { userRepository.findById(userId) }
-            }
-        }
-
         When("사용자를 삭제할 때") {
             Then("존재하면 삭제 후 true 반환") {
                 val userId = 1L

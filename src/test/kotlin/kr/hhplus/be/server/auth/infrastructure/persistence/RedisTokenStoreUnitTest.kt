@@ -171,6 +171,33 @@ class RedisTokenStoreUnitTest : BehaviorSpec({
                 size shouldBe expectedSize
             }
         }
+        `when`("대기열에서 토큰의 위치를 조회할 때") {
+            then("해당 토큰의 대기 순서가 반환된다") {
+                // given
+                val targetToken = "user-token-123"
+                val expectedPosition = 5L // 6번째 (0부터 시작)
+                every { listOps.indexOf("waiting_queue", targetToken) } returns expectedPosition
+
+                // when
+                val position = redisTokenStore.getQueuePosition(targetToken)
+
+                // then
+                position shouldBe expectedPosition.toInt()
+            }
+        }
+        `when`("대기열에 없는 토큰의 위치를 조회할 때") {
+            then("-1이 반환된다") {
+                // given
+                val nonExistentToken = "non-existent-token"
+                every { listOps.indexOf("waiting_queue", nonExistentToken) } returns null
+
+                // when
+                val position = redisTokenStore.getQueuePosition(nonExistentToken)
+
+                // then
+                position shouldBe -1
+            }
+        }
     }
 
     given("RedisTokenStore - 콘서트 예약 만료 토큰 처리") {

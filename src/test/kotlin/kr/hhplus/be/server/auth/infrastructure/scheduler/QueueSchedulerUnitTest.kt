@@ -7,7 +7,6 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
-import kr.hhplus.be.server.auth.infrastructure.QueueScheduler
 import kr.hhplus.be.server.auth.service.QueueStatusResponse
 import kr.hhplus.be.server.auth.service.TokenService
 

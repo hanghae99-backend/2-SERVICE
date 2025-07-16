@@ -2,12 +2,11 @@ package kr.hhplus.be.server.auth.service
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.mockk.*
-import kr.hhplus.be.server.auth.aggregate.WaitingToken
-import kr.hhplus.be.server.auth.aggregate.TokenStatus
+import kr.hhplus.be.server.auth.entity.TokenStatus
+import kr.hhplus.be.server.auth.entity.WaitingToken
 import kr.hhplus.be.server.auth.repository.TokenStore
 
 class TokenLifecycleManagerUnitTest : BehaviorSpec({

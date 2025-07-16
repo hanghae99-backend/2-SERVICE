@@ -20,6 +20,7 @@ interface TokenStore {
     fun addToWaitingQueue(token: String)
     fun getNextTokensFromQueue(count: Int): List<String>
     fun getQueueSize(): Long
+    fun getQueuePosition(token: String): Int // 대기 순서 조회 (0부터 시작)
     
     // 콘서트 예약 특화
     fun findExpiredActiveTokens(): List<String>

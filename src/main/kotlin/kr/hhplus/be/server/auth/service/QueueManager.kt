@@ -14,14 +14,14 @@ class QueueManager(
     companion object {
         private const val MAX_ACTIVE_TOKENS = 100L
     }
-    
+
     /**
      * 토큰을 대기열에 추가
      */
     fun addToQueue(token: String) {
         tokenStore.addToWaitingQueue(token)
     }
-    
+
     /**
      * 가용 슬롯 계산
      */
@@ -29,7 +29,7 @@ class QueueManager(
         val currentActiveCount = tokenStore.countActiveTokens()
         return (MAX_ACTIVE_TOKENS - currentActiveCount).toInt()
     }
-    
+
     /**
      * 대기열에서 다음 토큰들 가져오기
      */
@@ -40,14 +40,14 @@ class QueueManager(
             emptyList()
         }
     }
-    
+
     /**
      * 토큰을 활성화
      */
     fun activateToken(token: String) {
         tokenStore.activateToken(token)
     }
-    
+
     /**
      * 자동으로 대기열 처리 (가용 슬롯만큼 활성화)
      */
@@ -65,7 +65,7 @@ class QueueManager(
             }
         }
     }
-    
+
     /**
      * 큐 상태 조회
      */
@@ -73,12 +73,19 @@ class QueueManager(
         val queueSize = tokenStore.getQueueSize()
         val activeCount = tokenStore.countActiveTokens()
         val availableSlots = MAX_ACTIVE_TOKENS - activeCount
-        
+
         return QueueStatusResponse(
             queueSize = queueSize,
             activeTokens = activeCount,
             maxActiveTokens = MAX_ACTIVE_TOKENS,
             availableSlots = availableSlots
         )
+    }
+
+    /**
+     * 대기 순서 조회
+     */
+    fun getQueuePosition(token: String): Int {
+        return tokenStore.getQueuePosition(token)
     }
 }

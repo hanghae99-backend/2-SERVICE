@@ -112,6 +112,12 @@ class RedisTokenStore(
         return redisTemplate.opsForList().size(WAITING_QUEUE) ?: 0L
     }
 
+    override fun getQueuePosition(token: String): Int {
+        // Redis의 LPOS 명령어를 사용하여 대기열에서 토큰의 위치를 찾음
+        val position = redisTemplate.opsForList().indexOf(WAITING_QUEUE, token)
+        return position?.toInt() ?: -1 // 찾지 못했으면 -1 반환
+    }
+
     // ===== 콘서트 예약 서비스 특화 =====
     
     override fun findExpiredActiveTokens(): List<String> {

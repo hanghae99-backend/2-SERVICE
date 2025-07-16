@@ -40,7 +40,7 @@ class TokenService(
     
     /**
      * 토큰 상태 조회 플로우 조정
-     * 1. 토큰 존재 확인 -> 2. 상태 조회 -> 3. 사용자 친화적 메시지 변환
+     * 1. 토큰 존재 확인 -> 2. 상태 조회 -> 3. 사용자 친화적 메시지 변환 -> 4. 대기 순서 조회 (WAITING 상태인 경우)
      */
     fun getTokenStatus(token: String): TokenStatusResponse {
         // 1. 토큰 존재 확인
@@ -57,7 +57,15 @@ class TokenService(
             TokenStatus.EXPIRED -> "토큰이 만료되었습니다"
         }
         
-        return TokenStatusResponse(status, message)
+        // 4. 대기 순서 조회 (WAITING 상태인 경우만)
+        val queuePosition = if (status == TokenStatus.WAITING) {
+            val position = queueManager.getQueuePosition(token)
+            if (position >= 0) position + 1 else null // 1부터 시작하도록 +1, 찾지 못하면 null
+        } else {
+            null
+        }
+        
+        return TokenStatusResponse(status, message, queuePosition)
     }
     
     /**
@@ -122,7 +130,8 @@ class TokenService(
 
 data class TokenStatusResponse(
     val status: TokenStatus,
-    val message: String
+    val message: String,
+    val queuePosition: Int? = null // 대기 순서 (WAITING 상태일 때만 제공)
 )
 
 data class QueueStatusResponse(

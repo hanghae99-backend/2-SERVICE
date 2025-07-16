@@ -136,5 +136,36 @@ class QueueManagerUnitTest : BehaviorSpec({
                 verify(exactly = 1) { tokenStore.countActiveTokens() }
             }
         }
+
+        `when`("대기 순서 조회를 요청받으면") {
+            then("TokenStore에 위임하여 토큰의 대기 순서를 반환한다") {
+                // given
+                val token = "user-token-123"
+                val expectedPosition = 5 // 6번째 대기자
+                every { tokenStore.getQueuePosition(token) } returns expectedPosition
+
+                // when
+                val position = queueManager.getQueuePosition(token)
+
+                // then - QueueManager의 책임: 대기 순서 조회 위임
+                position shouldBe expectedPosition
+                verify(exactly = 1) { tokenStore.getQueuePosition(token) }
+            }
+        }
+
+        `when`("대기열에 없는 토큰의 순서를 조회할 때") {
+            then("-1을 반환한다") {
+                // given
+                val nonExistentToken = "non-existent-token"
+                every { tokenStore.getQueuePosition(nonExistentToken) } returns -1
+
+                // when
+                val position = queueManager.getQueuePosition(nonExistentToken)
+
+                // then - QueueManager의 책임: 존재하지 않는 토큰 처리
+                position shouldBe -1
+                verify(exactly = 1) { tokenStore.getQueuePosition(nonExistentToken) }
+            }
+        }
     }
 })

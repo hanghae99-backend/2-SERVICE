@@ -87,6 +87,7 @@ class TokenServiceUnitTest : BehaviorSpec({
                 
                 every { tokenLifecycleManager.findToken(token) } returns waitingToken
                 every { tokenLifecycleManager.getTokenStatus(token) } returns TokenStatus.WAITING
+                every { queueManager.getQueuePosition(token) } returns 0
 
                 // when
                 val result = tokenService.getTokenStatus(token)
@@ -219,6 +220,7 @@ class TokenServiceUnitTest : BehaviorSpec({
                 val token = "test-token"
                 val waitingToken = WaitingToken(token, 1L)
                 every { tokenLifecycleManager.findToken(token) } returns waitingToken
+                every { queueManager.getQueuePosition(token) } returns 0
 
                 // WAITING 상태 테스트
                 every { tokenLifecycleManager.getTokenStatus(token) } returns TokenStatus.WAITING
@@ -234,6 +236,72 @@ class TokenServiceUnitTest : BehaviorSpec({
                 every { tokenLifecycleManager.getTokenStatus(token) } returns TokenStatus.EXPIRED
                 val expiredResponse = tokenService.getTokenStatus(token)
                 expiredResponse.message shouldBe "토큰이 만료되었습니다"
+            }
+        }
+
+        `when`("WAITING 상태인 토큰의 상태를 조회하면") {
+            then("대기 순서가 포함된 응답을 반환한다") {
+                // given
+                val token = "waiting-token"
+                val waitingToken = WaitingToken(token, 1L)
+                val queuePosition = 5 // 6번째 대기자
+                
+                every { tokenLifecycleManager.findToken(token) } returns waitingToken
+                every { tokenLifecycleManager.getTokenStatus(token) } returns TokenStatus.WAITING
+                every { queueManager.getQueuePosition(token) } returns queuePosition
+
+                // when
+                val response = tokenService.getTokenStatus(token)
+
+                // then - TokenService의 책임: 대기 순서 정보 포함
+                response.status shouldBe TokenStatus.WAITING
+                response.message shouldBe "대기 중입니다"
+                response.queuePosition shouldBe queuePosition + 1 // 1부터 시작
+                
+                verify(exactly = 1) { queueManager.getQueuePosition(token) }
+            }
+        }
+
+        `when`("ACTIVE 상태인 토큰의 상태를 조회하면") {
+            then("대기 순서 없이 응답을 반환한다") {
+                // given
+                val token = "active-token"
+                val waitingToken = WaitingToken(token, 1L)
+                
+                every { tokenLifecycleManager.findToken(token) } returns waitingToken
+                every { tokenLifecycleManager.getTokenStatus(token) } returns TokenStatus.ACTIVE
+
+                // when
+                val response = tokenService.getTokenStatus(token)
+
+                // then - TokenService의 책임: 활성 토큰은 대기 순서 불필요
+                response.status shouldBe TokenStatus.ACTIVE
+                response.message shouldBe "예약 가능합니다"
+                response.queuePosition shouldBe null
+                
+                verify(exactly = 0) { queueManager.getQueuePosition(any()) }
+            }
+        }
+
+        `when`("대기열에서 찾을 수 없는 WAITING 토큰의 상태를 조회하면") {
+            then("대기 순서 없이 응답을 반환한다") {
+                // given
+                val token = "not-found-in-queue-token"
+                val waitingToken = WaitingToken(token, 1L)
+                
+                every { tokenLifecycleManager.findToken(token) } returns waitingToken
+                every { tokenLifecycleManager.getTokenStatus(token) } returns TokenStatus.WAITING
+                every { queueManager.getQueuePosition(token) } returns -1 // 대기열에서 찾을 수 없음
+
+                // when
+                val response = tokenService.getTokenStatus(token)
+
+                // then - TokenService의 책임: 대기열에서 찾을 수 없는 경우 처리
+                response.status shouldBe TokenStatus.WAITING
+                response.message shouldBe "대기 중입니다"
+                response.queuePosition shouldBe null
+                
+                verify(exactly = 1) { queueManager.getQueuePosition(token) }
             }
         }
     }

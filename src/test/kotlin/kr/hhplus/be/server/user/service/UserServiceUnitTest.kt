@@ -89,28 +89,6 @@ class UserServiceUnitTest : BehaviorSpec({
                 }
             }
 
-            When("사용자를 삭제할 때") {
-                Then("존재하면 삭제 후 true 반환") {
-                    val userId = 1L
-                    every { userRepository.existsById(userId) } returns true
-                    every { userRepository.deleteById(userId) } just Runs
-
-                    val result = userService.deleteUser(userId)
-                    result shouldBe true
-                    verify(exactly = 1) { userRepository.existsById(userId) }
-                    verify(exactly = 1) { userRepository.deleteById(userId) }
-                }
-                Then("존재하지 않으면 false 반환") {
-                    val userId = 999L
-                    every { userRepository.existsById(userId) } returns false
-
-                    val result = userService.deleteUser(userId)
-                    result shouldBe false
-                    verify(exactly = 1) { userRepository.existsById(userId) }
-                    verify(exactly = 0) { userRepository.deleteById(any()) }
-                }
-            }
-
             When("모든 사용자를 조회할 때") {
                 Then("전체 리스트를 반환한다") {
                     val users = listOf(User.create(1L), User.create(2L))

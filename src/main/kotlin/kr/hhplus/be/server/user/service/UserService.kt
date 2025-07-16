@@ -30,27 +30,12 @@ class UserService(
     fun getAllUsers(): List<User> {
         return userRepository.findAll()
     }
-    
-    @Transactional
-    fun deleteUser(userId: Long): Boolean {
-        return if (userRepository.existsById(userId)) {
-            userRepository.deleteById(userId)
-            true
-        } else {
-            false
-        }
-    }
-    
+
     fun existsById(userId: Long): Boolean {
         return userRepository.existsById(userId)
     }
     
     fun getUserCount(): Long {
         return userRepository.count()
-    }
-    
-    fun getUserById(userId: Long): User {
-        return userRepository.findById(userId)
-            .orElseThrow { UserNotFoundException("사용자를 찾을 수 없습니다: $userId") }
     }
 }

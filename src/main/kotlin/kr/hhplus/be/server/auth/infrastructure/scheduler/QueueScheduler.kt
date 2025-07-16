@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.auth.infrastructure
+package kr.hhplus.be.server.auth.infrastructure.scheduler
 
 import kr.hhplus.be.server.auth.service.TokenService
 import org.springframework.scheduling.annotation.Scheduled

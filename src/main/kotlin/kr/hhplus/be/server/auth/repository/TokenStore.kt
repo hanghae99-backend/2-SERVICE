@@ -1,7 +1,7 @@
-package kr.hhplus.be.server.auth.store
+package kr.hhplus.be.server.auth.repository
 
-import kr.hhplus.be.server.auth.WaitingToken
-import kr.hhplus.be.server.auth.TokenStatus
+import kr.hhplus.be.server.auth.entity.WaitingToken
+import kr.hhplus.be.server.auth.entity.TokenStatus
 
 interface TokenStore {
     // 기본 CRUD

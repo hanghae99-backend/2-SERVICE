@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.auth
+package kr.hhplus.be.server.auth.entity
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
@@ -11,7 +11,7 @@ class WaitingTokenUnitTest : BehaviorSpec({
                 val token = "test-token"
                 val userId = 1L
                 val waitingToken = WaitingToken(token, userId)
-                
+
                 waitingToken.token shouldBe token
                 waitingToken.userId shouldBe userId
             }
@@ -34,10 +34,10 @@ class WaitingTokenUnitTest : BehaviorSpec({
             Then("정상적으로 생성된다") {
                 val token1 = WaitingToken("token1", 1L)
                 token1.userId shouldBe 1L
-                
+
                 val token2 = WaitingToken("token2", 999L)
                 token2.userId shouldBe 999L
-                
+
                 val token3 = WaitingToken("token3", Long.MAX_VALUE)
                 token3.userId shouldBe Long.MAX_VALUE
             }
@@ -47,7 +47,7 @@ class WaitingTokenUnitTest : BehaviorSpec({
                 val originalToken = WaitingToken("test-token", 1L)
                 val newUserId = 2L
                 val copiedToken = originalToken.copy(userId = newUserId)
-                
+
                 copiedToken.userId shouldBe newUserId
                 copiedToken.token shouldBe originalToken.token
             }

@@ -3,6 +3,7 @@ package kr.hhplus.be.server.user
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.nulls.shouldNotBeNull
+import kr.hhplus.be.server.user.entity.User
 import java.time.LocalDateTime
 
 class UserUnitTest : BehaviorSpec({

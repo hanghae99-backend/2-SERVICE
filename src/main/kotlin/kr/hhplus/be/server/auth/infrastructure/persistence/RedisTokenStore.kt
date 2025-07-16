@@ -1,8 +1,9 @@
-package kr.hhplus.be.server.auth.store
+package kr.hhplus.be.server.auth.infrastructure.persistence
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import kr.hhplus.be.server.auth.WaitingToken
-import kr.hhplus.be.server.auth.TokenStatus
+import kr.hhplus.be.server.auth.entity.TokenStatus
+import kr.hhplus.be.server.auth.entity.WaitingToken
+import kr.hhplus.be.server.auth.repository.TokenStore
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 import java.time.Duration

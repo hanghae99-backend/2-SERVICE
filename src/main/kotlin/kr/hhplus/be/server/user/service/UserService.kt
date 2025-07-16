@@ -1,8 +1,11 @@
-package kr.hhplus.be.server.user
+package kr.hhplus.be.server.user.service
 
+import kr.hhplus.be.server.user.entity.User
+import kr.hhplus.be.server.user.entity.UserNotFoundException
+import kr.hhplus.be.server.user.entity.UserAlreadyExistsException
+import kr.hhplus.be.server.user.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.util.*
 
 @Service
 @Transactional(readOnly = true)
@@ -51,6 +54,3 @@ class UserService(
             .orElseThrow { UserNotFoundException("사용자를 찾을 수 없습니다: $userId") }
     }
 }
-
-class UserNotFoundException(message: String) : RuntimeException(message)
-class UserAlreadyExistsException(message: String) : RuntimeException(message)

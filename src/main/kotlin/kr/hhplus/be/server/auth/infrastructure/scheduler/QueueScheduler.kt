@@ -1,5 +1,6 @@
-package kr.hhplus.be.server.auth
+package kr.hhplus.be.server.auth.infrastructure
 
+import kr.hhplus.be.server.auth.service.TokenService
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 

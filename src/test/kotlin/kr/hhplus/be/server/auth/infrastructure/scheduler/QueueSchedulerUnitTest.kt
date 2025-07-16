@@ -1,8 +1,15 @@
-package kr.hhplus.be.server.auth
+package kr.hhplus.be.server.auth.infrastructure.scheduler
 
 import io.kotest.core.spec.style.BehaviorSpec
-import io.kotest.matchers.shouldBe
-import io.mockk.*
+import io.mockk.Runs
+import io.mockk.clearMocks
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.verify
+import kr.hhplus.be.server.auth.infrastructure.QueueScheduler
+import kr.hhplus.be.server.auth.service.QueueStatusResponse
+import kr.hhplus.be.server.auth.service.TokenService
 
 class QueueSchedulerUnitTest : BehaviorSpec({
     lateinit var tokenService: TokenService

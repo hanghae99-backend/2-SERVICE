@@ -20,12 +20,6 @@ class BalanceController(
         return ResponseEntity.ok(BalanceResponse.from(point))
     }
     
-    @PostMapping("/use")
-    fun use(@RequestBody request: UseBalanceRequest): ResponseEntity<BalanceResponse> {
-        val point = balanceService.deductBalance(request.userId, request.amount)
-        return ResponseEntity.ok(BalanceResponse.from(point))
-    }
-    
     @GetMapping("/history/{userId}")
     fun history(@PathVariable userId: Long): ResponseEntity<List<PointHistoryResponse>> {
         val histories = balanceService.getPointHistory(userId)

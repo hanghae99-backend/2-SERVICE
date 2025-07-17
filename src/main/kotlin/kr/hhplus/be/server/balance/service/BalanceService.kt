@@ -14,29 +14,40 @@ import java.math.BigDecimal
 class BalanceService(
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
-    private val userService: UserService
+    private val userService: UserService,
+    private val parameterValidator: BalanceParameterValidator,
+    private val domainValidator: BalanceDomainValidator
 ) {
     
     @Transactional
     fun chargeBalance(userId: Long, amount: BigDecimal): Point {
-        if (amount <= BigDecimal.ZERO) {
-            throw InvalidPointAmountException("충전 금액은 0보다 커야 합니다: $amount")
-        }
+        // 1. 파라미터 검증
+        parameterValidator.validateUserId(userId)
+        parameterValidator.validateAmount(amount)
         
-        // 사용자 존재 확인
+        // 2. 비즈니스 규칙 검증
+        domainValidator.validateMinChargeAmount(amount)
+        
+        // 3. 사용자 존재 확인
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }
         
-        // 기존 포인트 조회 또는 새로 생성
+        // 4. 기존 포인트 조회 또는 새로 생성
         val currentPoint = pointRepository.findByUserId(userId)
             ?: Point.create(userId, BigDecimal.ZERO)
         
-        // 포인트 충전
+        // 5. 도메인 상태 검증
+        domainValidator.validatePointStatus(currentPoint)
+        
+        // 6. 최대 잔액 한도 검증
+        domainValidator.validateMaxBalanceLimit(currentPoint.amount, amount)
+        
+        // 7. 포인트 충전
         val chargedPoint = currentPoint.charge(amount)
         val savedPoint = pointRepository.save(chargedPoint)
         
-        // 충전 이력 저장
+        // 8. 충전 이력 저장
         val history = PointHistory.charge(userId, amount, "포인트 충전")
         pointHistoryRepository.save(history)
         
@@ -44,7 +55,10 @@ class BalanceService(
     }
     
     fun getBalance(userId: Long): Point {
-        // 사용자 존재 확인
+        // 1. 파라미터 검증
+        parameterValidator.validateUserId(userId)
+        
+        // 2. 사용자 존재 확인
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }
@@ -55,23 +69,30 @@ class BalanceService(
     
     @Transactional
     fun deductBalance(userId: Long, amount: BigDecimal): Point {
-        if (amount <= BigDecimal.ZERO) {
-            throw InvalidPointAmountException("차감 금액은 0보다 커야 합니다: $amount")
-        }
+        // 1. 파라미터 검증
+        parameterValidator.validateUserId(userId)
+        parameterValidator.validateAmount(amount)
         
-        // 사용자 존재 확인
+        // 2. 사용자 존재 확인
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }
         
+        // 3. 포인트 조회
         val currentPoint = pointRepository.findByUserId(userId)
-            ?: throw PointNotFoundException("포인트 정보를 찾을 수 없습니다: $userId")
+        domainValidator.validatePointExists(currentPoint)
         
-        // 포인트 차감
+        // 4. 도메인 상태 검증
+        domainValidator.validatePointStatus(currentPoint!!)
+        
+        // 5. 잔액 충분성 검증
+        domainValidator.validateSufficientBalance(currentPoint, amount)
+        
+        // 6. 포인트 차감
         val deductedPoint = currentPoint.deduct(amount)
         val savedPoint = pointRepository.save(deductedPoint)
         
-        // 사용 이력 저장
+        // 7. 사용 이력 저장
         val history = PointHistory.usage(userId, amount, "포인트 사용")
         pointHistoryRepository.save(history)
         
@@ -79,6 +100,10 @@ class BalanceService(
     }
     
     fun checkBalance(userId: Long, amount: BigDecimal): Boolean {
+        // 1. 파라미터 검증
+        parameterValidator.validateUserId(userId)
+        parameterValidator.validateAmount(amount)
+        
         val point = pointRepository.findByUserId(userId)
             ?: return false
         
@@ -86,7 +111,10 @@ class BalanceService(
     }
     
     fun getPointHistory(userId: Long): List<PointHistory> {
-        // 사용자 존재 확인
+        // 1. 파라미터 검증
+        parameterValidator.validateUserId(userId)
+        
+        // 2. 사용자 존재 확인
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }

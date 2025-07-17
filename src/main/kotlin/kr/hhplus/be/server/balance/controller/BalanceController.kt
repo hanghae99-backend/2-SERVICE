@@ -3,7 +3,6 @@ package kr.hhplus.be.server.balance.controller
 import kr.hhplus.be.server.balance.dto.BalanceResponse
 import kr.hhplus.be.server.balance.dto.ChargeBalanceRequest
 import kr.hhplus.be.server.balance.dto.PointHistoryResponse
-import kr.hhplus.be.server.balance.dto.UseBalanceRequest
 import kr.hhplus.be.server.balance.service.BalanceService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*

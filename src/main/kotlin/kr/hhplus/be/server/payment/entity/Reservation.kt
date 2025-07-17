@@ -32,12 +32,12 @@ data class Reservation(
 ) {
     
     companion object {
-        fun create(userId: Long, seatId: Long): Reservation {
+        fun create(userId: Long, seatId: Long, expiresAt: LocalDateTime = LocalDateTime.now().plusMinutes(5)): Reservation {
             return Reservation(
                 userId = userId,
                 seatId = seatId,
                 status = ReservationStatus.TEMPORARY,
-                expiresAt = LocalDateTime.now().plusMinutes(5)
+                expiresAt = expiresAt
             )
         }
     }

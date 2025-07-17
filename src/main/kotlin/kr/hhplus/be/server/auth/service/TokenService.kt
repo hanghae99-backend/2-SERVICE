@@ -2,6 +2,8 @@ package kr.hhplus.be.server.auth.service
 
 import kr.hhplus.be.server.auth.entity.TokenStatus
 import kr.hhplus.be.server.auth.entity.WaitingToken
+import kr.hhplus.be.server.auth.entity.TokenNotFoundException
+import kr.hhplus.be.server.auth.entity.TokenActivationException
 import kr.hhplus.be.server.auth.factory.TokenFactory
 
 import org.springframework.stereotype.Service
@@ -94,7 +96,6 @@ class TokenService(
         // 1. 토큰 존재 확인
         tokenLifecycleManager.findToken(token)
             ?: throw TokenNotFoundException("토큰을 찾을 수 없습니다.")
-        
         // 2. 토큰 완료 처리 (만료 + 다음 사용자 활성화)
         tokenLifecycleManager.completeToken(token)
     }
@@ -141,7 +142,5 @@ data class QueueStatusResponse(
     val availableSlots: Long
 )
 
-// ===== 예외 클래스들 (변경 없음) =====
-
-class TokenNotFoundException(message: String) : RuntimeException(message)
-class TokenActivationException(message: String) : RuntimeException(message)
+// ===== 예외 클래스들 =====
+// Auth 예외들을 import하여 사용

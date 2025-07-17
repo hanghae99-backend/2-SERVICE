@@ -27,7 +27,7 @@ class BalanceControllerUnitTest : BehaviorSpec({
                 
                 every { balanceService.chargeBalance(userId, chargeAmount) } returns chargedPoint
 
-                val response = balanceController.chargeBalance(userId, chargeAmount)
+                val response = balanceController.charge(ChargeBalanceRequest(userId, chargeAmount))
 
                 // then - BalanceController의 책임: HTTP 인터페이스 제공 + 서비스 위임
                 response.statusCode shouldBe HttpStatus.OK
@@ -44,7 +44,7 @@ class BalanceControllerUnitTest : BehaviorSpec({
                 
                 every { balanceService.chargeBalance(request.userId, request.amount) } returns chargedPoint
 
-                val response = balanceController.chargeBalanceJson(request)
+                val response = balanceController.charge(request)
 
                 response.statusCode shouldBe HttpStatus.OK
                 response.body?.userId shouldBe request.userId
@@ -60,7 +60,7 @@ class BalanceControllerUnitTest : BehaviorSpec({
                 
                 every { balanceService.chargeBalance(userId, minAmount) } returns chargedPoint
 
-                val response = balanceController.chargeBalance(userId, minAmount)
+                val response = balanceController.charge(ChargeBalanceRequest(userId, minAmount))
 
                 response.statusCode shouldBe HttpStatus.OK
                 response.body?.balance shouldBe BigDecimal("0.01")
@@ -74,7 +74,7 @@ class BalanceControllerUnitTest : BehaviorSpec({
                 
                 every { balanceService.chargeBalance(userId, largeAmount) } returns chargedPoint
 
-                val response = balanceController.chargeBalance(userId, largeAmount)
+                val response = balanceController.charge(ChargeBalanceRequest(userId, largeAmount))
 
                 response.statusCode shouldBe HttpStatus.OK
                 response.body?.balance shouldBe BigDecimal("999999.99")
@@ -137,7 +137,7 @@ class BalanceControllerUnitTest : BehaviorSpec({
                 
                 every { balanceService.getPointHistory(userId) } returns histories
 
-                val response = balanceController.getPointHistory(userId)
+                val response = balanceController.history(userId)
 
                 // then - BalanceController의 책임: HTTP 인터페이스 제공 + 서비스 위임
                 response.statusCode shouldBe HttpStatus.OK
@@ -164,7 +164,7 @@ class BalanceControllerUnitTest : BehaviorSpec({
                 
                 every { balanceService.getPointHistory(userId) } returns emptyHistories
 
-                val response = balanceController.getPointHistory(userId)
+                val response = balanceController.history(userId)
 
                 response.statusCode shouldBe HttpStatus.OK
                 response.body?.size shouldBe 0
@@ -179,7 +179,7 @@ class BalanceControllerUnitTest : BehaviorSpec({
                 
                 every { balanceService.getPointHistory(userId) } returns manyHistories
 
-                val response = balanceController.getPointHistory(userId)
+                val response = balanceController.history(userId)
 
                 response.statusCode shouldBe HttpStatus.OK
                 response.body?.size shouldBe 100

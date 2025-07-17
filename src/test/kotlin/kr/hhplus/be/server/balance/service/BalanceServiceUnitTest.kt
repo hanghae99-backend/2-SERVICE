@@ -5,6 +5,8 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.mockk.*
+import kr.hhplus.be.server.auth.service.DomainValidator
+import kr.hhplus.be.server.auth.service.ParameterValidator
 import kr.hhplus.be.server.balance.entity.*
 import kr.hhplus.be.server.balance.repository.PointHistoryRepository
 import kr.hhplus.be.server.balance.repository.PointRepository
@@ -16,7 +18,9 @@ class BalanceServiceUnitTest : BehaviorSpec({
     val pointRepository = mockk<PointRepository>(relaxed = true)
     val pointHistoryRepository = mockk<PointHistoryRepository>(relaxed = true)
     val userService = mockk<UserService>(relaxed = true)
-    val balanceService = BalanceService(pointRepository, pointHistoryRepository, userService)
+    val parameterValidator = mockk<BalanceParameterValidator>(relaxed = true)
+    val domainValidator = mockk<BalanceDomainValidator>(relaxed = true)
+    val balanceService = BalanceService(pointRepository, pointHistoryRepository, userService, parameterValidator, domainValidator )
 
     beforeTest {
         clearMocks(pointRepository, pointHistoryRepository, userService, answers = false, recordedCalls = true)

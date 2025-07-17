@@ -4,14 +4,14 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.assertions.throwables.shouldThrow
 import io.mockk.*
+import kr.hhplus.be.server.auth.entity.TokenActivationException
+import kr.hhplus.be.server.auth.entity.TokenNotFoundException
 import kr.hhplus.be.server.auth.entity.TokenStatus
 import kr.hhplus.be.server.auth.entity.WaitingToken
 import kr.hhplus.be.server.auth.factory.TokenFactory
 import kr.hhplus.be.server.auth.service.QueueManager
 import kr.hhplus.be.server.auth.service.QueueStatusResponse
-import kr.hhplus.be.server.auth.service.TokenActivationException
 import kr.hhplus.be.server.auth.service.TokenLifecycleManager
-import kr.hhplus.be.server.auth.service.TokenNotFoundException
 import kr.hhplus.be.server.auth.service.TokenService
 import kr.hhplus.be.server.auth.service.UserValidator
 import kr.hhplus.be.server.user.entity.UserNotFoundException

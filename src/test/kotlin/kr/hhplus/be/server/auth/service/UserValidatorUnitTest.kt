@@ -9,15 +9,21 @@ import io.mockk.mockk
 import io.mockk.verify
 import kr.hhplus.be.server.user.entity.User
 import kr.hhplus.be.server.user.entity.UserNotFoundException
+import kr.hhplus.be.server.user.repository.UserRepository
+import kr.hhplus.be.server.user.service.UserDomainValidator
+import kr.hhplus.be.server.user.service.UserParameterValidator
 import kr.hhplus.be.server.user.service.UserService
 
 class UserValidatorUnitTest : BehaviorSpec({
     lateinit var userService: UserService
     lateinit var userValidator: UserValidator
-
+    lateinit var userDomainValidator: UserDomainValidator
+    lateinit var userParameterValidator: UserParameterValidator
     beforeTest {
         userService = mockk()
-        userValidator = UserValidator(userService)
+        userDomainValidator = mockk()
+        userParameterValidator = mockk()
+        userValidator = UserValidator(userService, userDomainValidator, userParameterValidator)
         clearMocks(userService, answers = false, recordedCalls = true)
     }
 
@@ -30,7 +36,7 @@ class UserValidatorUnitTest : BehaviorSpec({
                 every { userService.findUserById(userId) } returns user
 
                 // when & then - UserValidator의 책임: 존재 검증
-                userValidator.validateUserExists(userId) // 예외 없이 통과
+                userValidator.validateTokenIssuable(userId) // 예외 없이 통과
 
                 verify(exactly = 1) { userService.findUserById(userId) }
             }
@@ -44,7 +50,7 @@ class UserValidatorUnitTest : BehaviorSpec({
 
                 // when & then - UserValidator의 책임: 비즈니스 규칙 적용
                 val exception = shouldThrow<UserNotFoundException> {
-                    userValidator.validateUserExists(userId)
+                    userValidator.validateTokenIssuable(userId)
                 }
 
                 exception.message?.contains("사용자를 찾을 수 없습니다") shouldBe true

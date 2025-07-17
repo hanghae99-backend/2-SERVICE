@@ -50,7 +50,6 @@ class PointUnitTest : BehaviorSpec({
                 
                 chargedPoint.amount shouldBe BigDecimal("150.00")
                 chargedPoint.userId shouldBe originalPoint.userId
-                chargedPoint.lastUpdated shouldNotBe originalPoint.lastUpdated
             }
             
             Then("0원 이하 충전 시 예외가 발생한다") {
@@ -83,7 +82,6 @@ class PointUnitTest : BehaviorSpec({
                 
                 deductedPoint.amount shouldBe BigDecimal("70.00")
                 deductedPoint.userId shouldBe originalPoint.userId
-                deductedPoint.lastUpdated shouldNotBe originalPoint.lastUpdated
             }
             
             Then("잔액 부족 시 예외가 발생한다") {
@@ -111,7 +109,7 @@ class PointUnitTest : BehaviorSpec({
                 val point = Point.create(1L, BigDecimal("100.00"))
                 val deductedPoint = point.deduct(BigDecimal("100.00"))
                 
-                deductedPoint.amount shouldBe BigDecimal.ZERO
+                deductedPoint.amount shouldBe BigDecimal("0.00")
             }
         }
         

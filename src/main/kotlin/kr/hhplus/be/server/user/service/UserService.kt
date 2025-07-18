@@ -1,7 +1,6 @@
 package kr.hhplus.be.server.user.service
 
 import kr.hhplus.be.server.user.entity.User
-import kr.hhplus.be.server.user.entity.UserNotFoundException
 import kr.hhplus.be.server.user.entity.UserAlreadyExistsException
 import kr.hhplus.be.server.user.repository.UserRepository
 import org.springframework.stereotype.Service
@@ -19,6 +18,7 @@ class UserService(
             throw UserAlreadyExistsException("이미 존재하는 사용자 ID입니다: $userId")
         }
         
+        // Entity의 create 메소드에서 파라미터 검증 처리
         val user = User.create(userId)
         return userRepository.save(user)
     }

@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.payment.entity
 
+import kr.hhplus.be.server.payment.entity.InvalidReservationStatusException
+import kr.hhplus.be.server.global.exception.ParameterValidationException
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -33,6 +35,17 @@ data class Reservation(
     
     companion object {
         fun create(userId: Long, seatId: Long, expiresAt: LocalDateTime = LocalDateTime.now().plusMinutes(5)): Reservation {
+            // 파라미터 검증
+            if (userId <= 0) {
+                throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
+            }
+            if (seatId <= 0) {
+                throw ParameterValidationException("좌석 ID는 0보다 커야 합니다: $seatId")
+            }
+            if (expiresAt.isBefore(LocalDateTime.now())) {
+                throw ParameterValidationException("만료 시간은 현재 시간 이후여야 합니다")
+            }
+            
             return Reservation(
                 userId = userId,
                 seatId = seatId,
@@ -44,7 +57,7 @@ data class Reservation(
     
     fun confirm(): Reservation {
         if (status != ReservationStatus.TEMPORARY) {
-            throw IllegalStateException("임시 예약 상태가 아닙니다: $reservationId")
+            throw InvalidReservationStatusException("임시 예약 상태가 아닙니다: $reservationId")
         }
         
         return this.copy(
@@ -55,7 +68,7 @@ data class Reservation(
     
     fun cancel(): Reservation {
         if (status == ReservationStatus.CONFIRMED) {
-            throw IllegalStateException("이미 확정된 예약은 취소할 수 없습니다: $reservationId")
+            throw InvalidReservationStatusException("이미 확정된 예약은 취소할 수 없습니다: $reservationId")
         }
         
         return this.copy(

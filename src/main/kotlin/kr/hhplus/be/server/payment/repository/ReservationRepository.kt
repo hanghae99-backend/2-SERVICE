@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import java.time.LocalDateTime
 
 @Repository
 interface ReservationRepository : JpaRepository<Reservation, Long> {
@@ -21,4 +22,9 @@ interface ReservationRepository : JpaRepository<Reservation, Long> {
     
     @Query("SELECT r FROM Reservation r WHERE r.expiresAt < CURRENT_TIMESTAMP AND r.status = :status")
     fun findExpiredReservations(@Param("status") status: ReservationStatus): List<Reservation>
+    
+    @Query("SELECT r FROM Reservation r WHERE r.expiresAt < :currentTime AND r.status = 'TEMPORARY'")
+    fun findExpiredTemporaryReservations(@Param("currentTime") currentTime: LocalDateTime): List<Reservation>
+    
+    fun findByReservationId(reservationId: Long): Reservation?
 }

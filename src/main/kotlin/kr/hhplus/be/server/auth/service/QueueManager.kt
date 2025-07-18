@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.auth.service
 
+import kr.hhplus.be.server.auth.dto.QueueStatusResponse
 import kr.hhplus.be.server.auth.repository.TokenStore
 import org.springframework.stereotype.Component
 
@@ -69,17 +70,38 @@ class QueueManager(
     /**
      * 큐 상태 조회
      */
-    fun getQueueStatus(): QueueStatusResponse {
-        val queueSize = tokenStore.getQueueSize()
-        val activeCount = tokenStore.countActiveTokens()
-        val availableSlots = MAX_ACTIVE_TOKENS - activeCount
+    fun getQueueStatus(token: String): QueueStatusResponse {
+        val tokenStatus = tokenStore.getTokenStatus(token)
+        val queuePosition = tokenStore.getQueuePosition(token)
+        val isActive = tokenStatus.name == "ACTIVE"
+        val status = tokenStatus.name
+        val message = when (tokenStatus.name) {
+            "ACTIVE" -> "토큰이 활성화되었습니다"
+            "WAITING" -> "대기 중입니다"
+            "EXPIRED" -> "토큰이 만료되었습니다"
+            else -> "알 수 없는 상태입니다"
+        }
+        val estimatedWaitingTime = if (isActive) null else calculateEstimatedWaitingTime(queuePosition)
 
         return QueueStatusResponse(
-            queueSize = queueSize,
-            activeTokens = activeCount,
-            maxActiveTokens = MAX_ACTIVE_TOKENS,
-            availableSlots = availableSlots
+            token = token,
+            status = status,
+            message = message,
+            queuePosition = if (isActive || queuePosition == -1) null else queuePosition + 1, // 1부터 시작하도록 조정
+            estimatedWaitingTime = estimatedWaitingTime
         )
+    }
+
+    /**
+     * 예상 대기 시간 계산 (분 단위)
+     */
+    private fun calculateEstimatedWaitingTime(queuePosition: Int): Int? {
+        return if (queuePosition >= 0) {
+            // 대략적인 계산: 1분에 10명씩 처리된다고 가정
+            ((queuePosition + 1) / 10).coerceAtLeast(1)
+        } else {
+            null
+        }
     }
 
     /**

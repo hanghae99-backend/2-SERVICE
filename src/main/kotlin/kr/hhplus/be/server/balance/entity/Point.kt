@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.balance.entity
 
 import jakarta.persistence.*
+import kr.hhplus.be.server.balance.entity.InvalidPointAmountException
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -28,7 +29,7 @@ data class Point(
     companion object {
         fun create(userId: Long, amount: BigDecimal): Point {
             if (amount < BigDecimal.ZERO) {
-                throw IllegalArgumentException("포인트 잔액은 음수일 수 없습니다")
+                throw InvalidPointAmountException("포인트 잔액은 음수일 수 없습니다")
             }
             
             return Point(
@@ -40,7 +41,7 @@ data class Point(
     
     fun charge(chargeAmount: BigDecimal): Point {
         if (chargeAmount <= BigDecimal.ZERO) {
-            throw IllegalArgumentException("충전 금액은 0보다 커야 합니다")
+            throw InvalidPointAmountException("충전 금액은 0보다 커야 합니다")
         }
         
         return this.copy(
@@ -51,7 +52,7 @@ data class Point(
     
     fun deduct(deductAmount: BigDecimal): Point {
         if (deductAmount <= BigDecimal.ZERO) {
-            throw IllegalArgumentException("차감 금액은 0보다 커야 합니다")
+            throw InvalidPointAmountException("차감 금액은 0보다 커야 합니다")
         }
         
         if (this.amount < deductAmount) {

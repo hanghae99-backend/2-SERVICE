@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.auth.infrastructure.persistence
+package kr.hhplus.be.server.auth.infrastructure
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import kr.hhplus.be.server.auth.entity.TokenStatus

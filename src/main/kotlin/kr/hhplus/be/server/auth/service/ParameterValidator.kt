@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.auth.service
 
+import kr.hhplus.be.server.global.exception.ParameterValidationException
 import org.springframework.stereotype.Component
 
 /**
@@ -13,28 +14,20 @@ class ParameterValidator {
      * 사용자 ID 파라미터 검증
      */
     fun validateUserId(userId: Long) {
-        require(userId > 0) { "사용자 ID는 0보다 커야 합니다: $userId" }
+        if (userId <= 0) {
+            throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
+        }
     }
     
     /**
      * 토큰 파라미터 검증
      */
     fun validateToken(token: String) {
-        require(token.isNotBlank()) { "토큰은 비어있을 수 없습니다" }
-        require(token.length >= 10) { "토큰 길이가 너무 짧습니다" }
-    }
-    
-    /**
-     * 좌석 ID 파라미터 검증
-     */
-    fun validateSeatId(seatId: Long) {
-        require(seatId > 0) { "좌석 ID는 0보다 커야 합니다: $seatId" }
-    }
-    
-    /**
-     * 예약 ID 파라미터 검증
-     */
-    fun validateReservationId(reservationId: Long) {
-        require(reservationId > 0) { "예약 ID는 0보다 커야 합니다: $reservationId" }
+        if (token.isBlank()) {
+            throw ParameterValidationException("토큰은 비어있을 수 없습니다")
+        }
+        if (token.length < 10) {
+            throw ParameterValidationException("토큰 길이가 너무 짧습니다: ${token.length}")
+        }
     }
 }

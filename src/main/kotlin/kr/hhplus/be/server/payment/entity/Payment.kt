@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.payment.entity
 
+import kr.hhplus.be.server.global.exception.ParameterValidationException
+import kr.hhplus.be.server.payment.entity.PaymentAlreadyProcessedException
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -34,8 +36,15 @@ data class Payment(
     
     companion object {
         fun create(userId: Long, reservationId: Long, amount: BigDecimal): Payment {
+            // 파라미터 검증
+            if (userId <= 0) {
+                throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
+            }
+            if (reservationId <= 0) {
+                throw ParameterValidationException("예약 ID는 0보다 커야 합니다: $reservationId")
+            }
             if (amount <= BigDecimal.ZERO) {
-                throw IllegalArgumentException("결제 금액은 0보다 커야 합니다")
+                throw ParameterValidationException("결제 금액은 0보다 커야 합니다: $amount")
             }
             
             return Payment(

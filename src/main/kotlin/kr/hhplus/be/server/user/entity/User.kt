@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.user.entity
 
+import kr.hhplus.be.server.global.exception.ParameterValidationException
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -19,6 +20,11 @@ data class User(
     
     companion object {
         fun create(userId: Long): User {
+            // 파라미터 검증
+            if (userId <= 0) {
+                throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
+            }
+            
             return User(
                 userId = userId
             )

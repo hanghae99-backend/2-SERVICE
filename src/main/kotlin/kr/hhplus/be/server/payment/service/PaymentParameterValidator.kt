@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.payment.service
 
+import kr.hhplus.be.server.global.exception.ParameterValidationException
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 
@@ -14,36 +15,38 @@ class PaymentParameterValidator {
      * 사용자 ID 파라미터 검증
      */
     fun validateUserId(userId: Long) {
-        require(userId > 0) { "사용자 ID는 0보다 커야 합니다: $userId" }
+        if (userId <= 0) {
+            throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
+        }
     }
     
     /**
      * 예약 ID 파라미터 검증
      */
     fun validateReservationId(reservationId: Long) {
-        require(reservationId > 0) { "예약 ID는 0보다 커야 합니다: $reservationId" }
+        if (reservationId <= 0) {
+            throw ParameterValidationException("예약 ID는 0보다 커야 합니다: $reservationId")
+        }
     }
     
     /**
      * 토큰 파라미터 검증
      */
     fun validateToken(token: String) {
-        require(token.isNotBlank()) { "토큰은 비어있을 수 없습니다" }
-        require(token.length >= 10) { "토큰 길이가 너무 짧습니다" }
+        if (token.isBlank()) {
+            throw ParameterValidationException("토큰은 비어있을 수 없습니다")
+        }
+        if (token.length < 10) {
+            throw ParameterValidationException("토큰 길이가 너무 짧습니다: ${token.length}")
+        }
     }
     
     /**
      * 결제 ID 파라미터 검증
      */
     fun validatePaymentId(paymentId: Long) {
-        require(paymentId > 0) { "결제 ID는 0보다 커야 합니다: $paymentId" }
-    }
-    
-    /**
-     * 금액 파라미터 검증
-     */
-    fun validateAmount(amount: BigDecimal) {
-        require(amount > BigDecimal.ZERO) { "금액은 0보다 커야 합니다: $amount" }
-        require(amount <= BigDecimal("1000000")) { "금액이 너무 큽니다: $amount" }
+        if (paymentId <= 0) {
+            throw ParameterValidationException("결제 ID는 0보다 커야 합니다: $paymentId")
+        }
     }
 }

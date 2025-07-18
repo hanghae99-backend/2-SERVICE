@@ -1,11 +1,13 @@
 package kr.hhplus.be.server.auth.service
 
+import kr.hhplus.be.server.auth.dto.TokenStatusResponse
 import kr.hhplus.be.server.auth.entity.TokenStatus
 import kr.hhplus.be.server.auth.entity.WaitingToken
 import kr.hhplus.be.server.auth.entity.TokenNotFoundException
 import kr.hhplus.be.server.auth.entity.TokenActivationException
 import kr.hhplus.be.server.auth.factory.TokenFactory
-
+import kr.hhplus.be.server.user.service.UserService
+import kr.hhplus.be.server.user.entity.UserNotFoundException
 import org.springframework.stereotype.Service
 
 /**
@@ -14,7 +16,8 @@ import org.springframework.stereotype.Service
  */
 @Service
 class TokenService(
-    private val userValidator: UserValidator,
+    private val userService: UserService,
+    private val parameterValidator: ParameterValidator,
     private val tokenFactory: TokenFactory,
     private val tokenLifecycleManager: TokenLifecycleManager,
     private val queueManager: QueueManager
@@ -22,19 +25,23 @@ class TokenService(
     
     /**
      * 대기 토큰 발급 플로우 조정
-     * 1. 사용자 검증 -> 2. 토큰 생성 -> 3. 토큰 저장 -> 4. 대기열 추가
+     * 1. 파라미터 검증 -> 2. 사용자 검증 -> 3. 토큰 생성 -> 4. 토큰 저장 -> 5. 대기열 추가
      */
     fun issueWaitingToken(userId: Long): WaitingToken {
-        // 1. 비즈니스 규칙 검증
-        userValidator.validateTokenIssuable(userId)
+        // 1. 파라미터 검증
+        parameterValidator.validateUserId(userId)
         
-        // 2. 토큰 생성
+        // 2. 사용자 존재 확인
+        val user = userService.findUserById(userId)
+            ?: throw UserNotFoundException("사용자를 찾을 수 없습니다: $userId")
+        
+        // 3. 토큰 생성
         val waitingToken = tokenFactory.createWaitingToken(userId)
         
-        // 3. 토큰 저장
+        // 4. 토큰 저장
         tokenLifecycleManager.saveToken(waitingToken)
         
-        // 4. 대기열에 추가
+        // 5. 대기열에 추가
         queueManager.addToQueue(waitingToken.token)
         
         return waitingToken
@@ -118,29 +125,4 @@ class TokenService(
     fun cleanupExpiredActiveTokens() {
         tokenLifecycleManager.cleanupExpiredTokens()
     }
-    
-    /**
-     * 큐 상태 조회
-     */
-    fun getQueueStatus(): QueueStatusResponse {
-        return queueManager.getQueueStatus()
-    }
 }
-
-// ===== 응답 객체들 (변경 없음) =====
-
-data class TokenStatusResponse(
-    val status: TokenStatus,
-    val message: String,
-    val queuePosition: Int? = null // 대기 순서 (WAITING 상태일 때만 제공)
-)
-
-data class QueueStatusResponse(
-    val queueSize: Long,
-    val activeTokens: Long,
-    val maxActiveTokens: Long,
-    val availableSlots: Long
-)
-
-// ===== 예외 클래스들 =====
-// Auth 예외들을 import하여 사용

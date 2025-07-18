@@ -7,13 +7,16 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import kr.hhplus.be.server.auth.dto.TokenIssueRequest
 import kr.hhplus.be.server.auth.dto.TokenIssueResponse
 import kr.hhplus.be.server.auth.dto.QueueStatusResponse
+import kr.hhplus.be.server.auth.service.TokenService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/queue")
 @Tag(name = "대기열 토큰", description = "대기열 토큰 관리 API")
-class TokenController {
+class TokenController(
+    private val tokenService: TokenService
+) {
 
     @PostMapping("/tokens")
     @Operation(
@@ -57,8 +60,19 @@ class TokenController {
         ]
     )
     fun issueToken(@RequestBody @Parameter(description = "토큰 발급 요청") request: TokenIssueRequest): ResponseEntity<TokenIssueResponse> {
-        // TODO: 실제 구현
-        throw NotImplementedError("실제 구현 필요")
+        val waitingToken = tokenService.issueWaitingToken(request.userId)
+        val statusResponse = tokenService.getTokenStatus(waitingToken.token)
+        
+        val response = TokenIssueResponse(
+            token = waitingToken.token,
+            userId = waitingToken.userId,
+            status = statusResponse.status.name,
+            queuePosition = statusResponse.queuePosition ?: 0,
+            issuedAt = java.time.LocalDateTime.now().toString(),
+            estimatedWaitingTime = (statusResponse.queuePosition ?: 0) * 2 // 예상 대기 시간 (분)
+        )
+        
+        return ResponseEntity.ok(response)
     }
 
     @GetMapping("/tokens/{token}/status")
@@ -94,7 +108,16 @@ class TokenController {
         ]
     )
     fun getQueueStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<QueueStatusResponse> {
-        // TODO: 실제 구현
-        throw NotImplementedError("실제 구현 필요")
+        val statusResponse = tokenService.getTokenStatus(token)
+        
+        val response = QueueStatusResponse(
+            token = token,
+            status = statusResponse.status.name,
+            message = statusResponse.message,
+            queuePosition = statusResponse.queuePosition,
+            estimatedWaitingTime = statusResponse.queuePosition?.let { it * 2 } // 예상 대기 시간 (분)
+        )
+        
+        return ResponseEntity.ok(response)
     }
 }

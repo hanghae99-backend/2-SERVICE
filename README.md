@@ -5,45 +5,72 @@
 
 ## 주요 기능
 - **대기열 토큰 시스템**: 사용자 순서 관리 및 서비스 접근 제어
-- **좌석 예약 시스템**: 임시 배정을 통한 안전한 좌석 예약 (1~50번 좌석)
+- **좌석 예약 시스템**: 임시 배정을 통한 안전한 좌석 예약
 - **결제 시스템**: 사용자 잔액 관리 및 결제 처리
-- **동시성 제어**: 멀티 인스턴스 환경에서 안전한 데이터 처리
+- **동시성 제어**: Redis 기반 분산 락으로 멀티 인스턴스 환경에서 안전한 데이터 처리
 
+## API 엔드포인트
+
+### 대기열 관리
+- `POST /api/v1/queue/tokens` - 대기열 토큰 발급
+- `GET /api/v1/queue/tokens/{token}/status` - 대기열 상태 조회
+
+### 사용자 관리
+- `POST /api/users?userId={userId}` - 사용자 생성
+
+### 잔액 관리
+- `POST /api/balance/charge` - 잔액 충전
+- `GET /api/balance/{userId}` - 잔액 조회
+- `GET /api/balance/history/{userId}` - 포인트 내역 조회
+
+### 콘서트 관리
+- `GET /api/concerts/available` - 예약 가능한 콘서트 목록 조회
+- `GET /api/concerts/by-date?date={date}` - 특정 날짜 콘서트 조회
+- `GET /api/concerts/{concertId}` - 콘서트 상세 정보 조회
+
+### 좌석 관리
+- `GET /api/concerts/{concertId}/seats/available` - 예약 가능한 좌석 목록 조회
+- `GET /api/concerts/{concertId}/seats` - 모든 좌석 정보 조회
+- `GET /api/concerts/seats/{seatId}` - 특정 좌석 정보 조회
+
+### 예약 관리
+- `POST /api/concerts/reservations` - 좌석 예약
+- `GET /api/concerts/reservations/user/{userId}` - 사용자 예약 목록 조회
+- `GET /api/concerts/reservations/{reservationId}` - 특정 예약 정보 조회
+
+### 결제 관리
+- `POST /api/payments` - 결제 처리
+- `GET /api/payments/history/{userId}` - 결제 내역 조회
+- `GET /api/payments/{paymentId}` - 특정 결제 정보 조회
 
 ## 시퀀스 다이어그램
 
-### 1. 대기열 토큰 발급 및 활성화
+### 1. 대기열 토큰 발급 및 상태 확인
 ```mermaid
 sequenceDiagram
     participant C as 클라이언트
     participant API as API 서버
-    participant TS as 토큰서비스
-    participant R as Redis
-    participant DB as 데이터베이스
+    participant TS as TokenService
+    participant QM as QueueManager
+    participant Redis as Redis
     
     C->>API: POST /api/v1/queue/tokens
-    API->>TS: 대기토큰발급(사용자ID)
-    TS->>DB: 최대순서조회()
-    TS->>TS: 다음순서생성()
-    TS->>R: 토큰저장(대기토큰)
-    TS->>API: 대기토큰
-    API->>C: 토큰응답
+    API->>TS: issueWaitingToken(userId)
+    TS->>TS: validateUserId()
+    TS->>TS: createWaitingToken()
+    TS->>Redis: saveToken()
+    TS->>QM: addToQueue(token)
+    TS->>API: WaitingToken
+    API->>C: TokenIssueResponse
     
     loop 대기 중
-        C->>API: GET /api/v1/queue/tokens/{token}/position
-        API->>TS: 현재순서조회(토큰)
-        TS->>R: 토큰조회(토큰)
-        TS->>TS: 예상대기시간계산()
-        TS->>API: 토큰순서응답
-        API->>C: 대기 정보
+        C->>API: GET /api/v1/queue/tokens/{token}/status
+        API->>TS: getTokenStatus(token)
+        TS->>Redis: getTokenStatus()
+        TS->>QM: getQueuePosition()
+        TS->>API: TokenStatusResponse
+        API->>C: QueueStatusResponse
     end
-    
-    C->>API: PATCH /api/v1/queue/tokens/{token}/activate
-    API->>TS: 사용자활성화(토큰)
-    TS->>TS: 활성화조건검증()
-    TS->>R: 토큰상태변경(활성)
-    TS->>API: 활성화된토큰
-    API->>C: 활성화 완료
 ```
 
 ### 2. 좌석 예약 프로세스
@@ -51,32 +78,25 @@ sequenceDiagram
 sequenceDiagram
     participant C as 클라이언트
     participant API as API 서버
-    participant TS as 토큰서비스
-    participant RS as 예약서비스
-    participant SS as 좌석서비스
-    participant R as Redis
+    participant RS as ReservationService
+    participant TS as TokenService
+    participant SS as SeatService
     participant DB as 데이터베이스
     
-    C->>API: POST /api/v1/reservations
-    API->>TS: 토큰검증(토큰)
-    TS->>R: 활성토큰조회(토큰)
-    TS->>API: 토큰유효
+    C->>API: POST /api/concerts/reservations
+    API->>RS: reserveSeat(userId, concertId, seatId, token)
+    RS->>TS: validateActiveToken(token)
+    TS->>Redis: 토큰 검증
+    TS->>RS: 검증 완료
     
-    API->>SS: 좌석가용성확인(좌석ID)
-    SS->>DB: 좌석조회(좌석ID)
-    SS->>API: 좌석가용
+    RS->>SS: validateSeatAvailability(seatId)
+    SS->>DB: 좌석 상태 확인
+    SS->>RS: 좌석 사용 가능
     
-    API->>RS: 예약생성(사용자ID, 좌석ID)
-    RS->>SS: 좌석예약(좌석ID, 사용자ID)
-    SS->>DB: 좌석상태변경(예약됨)
-    SS->>R: 예약만료시간설정(좌석ID, 5분)
-    RS->>DB: 예약정보저장()
-    RS->>API: 예약생성완료
-    API->>C: 예약 완료
-    
-    Note over R: 5분 후 자동 만료
-    R->>SS: 예약만료처리(좌석ID)
-    SS->>DB: 좌석상태변경(예약가능)
+    RS->>DB: 예약 생성 (5분 임시 예약)
+    RS->>SS: 좌석 상태 변경
+    RS->>API: Reservation
+    API->>C: SeatReservationResponse
 ```
 
 ### 3. 결제 프로세스
@@ -84,89 +104,102 @@ sequenceDiagram
 sequenceDiagram
     participant C as 클라이언트
     participant API as API 서버
-    participant PS as 결제서비스
-    participant BS as 잔액서비스
-    participant RS as 예약서비스
-    participant TS as 토큰서비스
+    participant PS as PaymentService
+    participant BS as BalanceService
+    participant RS as ReservationService
+    participant TS as TokenService
     participant DB as 데이터베이스
     
-    C->>API: POST /api/v1/payments
-    API->>TS: 토큰검증(토큰)
-    TS->>API: 토큰유효
+    C->>API: POST /api/payments
+    API->>PS: processPayment(userId, reservationId, token)
+    PS->>TS: validateActiveToken(token)
+    PS->>RS: validateReservation(reservationId)
     
-    API->>PS: 결제처리(예약ID)
-    PS->>RS: 예약정보조회(예약ID)
-    RS->>PS: 예약상세정보
+    PS->>BS: validateBalance(userId, amount)
+    BS->>DB: 잔액 확인
     
-    PS->>BS: 잔액확인(사용자ID, 금액)
-    BS->>DB: 사용자잔액조회(사용자ID)
-    BS->>PS: 잔액확인완료
+    PS->>BS: deductBalance(userId, amount)
+    BS->>DB: 잔액 차감 및 히스토리 생성
     
-    PS->>BS: 잔액차감(사용자ID, 금액)
-    BS->>DB: 잔액업데이트(사용자ID, -금액)
+    PS->>RS: confirmReservation(reservationId)
+    RS->>DB: 예약 확정
     
-    PS->>RS: 예약확정(예약ID)
-    RS->>DB: 예약상태변경(확정)
-    
-    PS->>TS: 토큰만료(토큰)
-    TS->>DB: 토큰상태변경(만료)
-    
-    PS->>DB: 결제정보저장()
-    PS->>API: 결제성공
-    API->>C: 결제 완료
+    PS->>DB: 결제 정보 저장
+    PS->>TS: completeReservation(token)
+    PS->>API: Payment
+    API->>C: PaymentResponse
 ```
 
 ## 클래스 다이어그램
 
-### 핵심 도메인 클래스
+### 핵심 서비스 클래스
 ```mermaid
 classDiagram
-    class TokenDomainService {
-        +예상대기시간계산(순서, 현재활성수, 최대활성수) Long
-        +다음순서생성(현재최대순서) Long
-        +활성화가능여부(토큰, 현재활성수, 최대활성수) Boolean
-        +최대활성토큰수조회() Long
+    class TokenService {
+        +issueWaitingToken(userId) WaitingToken
+        +getTokenStatus(token) TokenStatusResponse
+        +validateActiveToken(token) WaitingToken
+        +completeReservation(token) void
+        +processQueueAutomatically() void
     }
     
-    class TokenValidationService {
-        +활성화가능여부(토큰) Boolean
-        +만료가능여부(토큰) Boolean
-        +서비스이용가능여부(토큰) Boolean
-        +유효한순서여부(순서) Boolean
+    class QueueManager {
+        +addToQueue(token) void
+        +getQueueStatus(token) QueueStatusResponse
+        +getQueuePosition(token) int
+        +processQueueAutomatically() void
+        +calculateAvailableSlots() int
     }
     
-    class TokenApplicationService {
-        +대기토큰발급(사용자ID) 대기토큰
-        +현재순서조회(토큰) 토큰순서응답
-        +사용자활성화(토큰) 대기토큰
-        +토큰만료(토큰) 대기토큰
-        +활성토큰수조회() Long
+    class TokenLifecycleManager {
+        +saveToken(token) void
+        +findToken(token) WaitingToken?
+        +getTokenStatus(token) TokenStatus
+        +completeToken(token) void
+        +cleanupExpiredTokens() void
     }
     
     class ReservationService {
-        +예약생성(사용자ID, 좌석ID) 예약
-        +예약확정(예약ID) 예약
-        +예약취소(예약ID) 예약
-        +예약조회(예약ID) 예약
+        +reserveSeat(userId, concertId, seatId, token) Reservation
+        +getReservationById(id) Reservation
+        +getReservationsByUserId(userId) List~Reservation~
+        +confirmReservation(id) Reservation
     }
     
     class PaymentService {
-        +결제처리(예약ID) 결제
-        +결제내역조회(사용자ID) List
-        +결제환불(결제ID) 결제
+        +processPayment(userId, reservationId, token) Payment
+        +getPaymentHistory(userId) List~Payment~
+        +getPaymentById(id) Payment
     }
     
     class BalanceService {
-        +잔액충전(사용자ID, 금액) 잔액
-        +잔액조회(사용자ID) 잔액
-        +잔액차감(사용자ID, 금액) 잔액
+        +chargeBalance(userId, amount) Point
+        +getBalance(userId) Point
+        +validateBalance(userId, amount) boolean
+        +deductBalance(userId, amount) Point
+        +getPointHistory(userId) List~PointHistory~
     }
     
-    TokenApplicationService --> TokenDomainService
-    TokenApplicationService --> TokenValidationService
-    ReservationService --> TokenValidationService
-    PaymentService --> TokenValidationService
+    class ConcertService {
+        +getAvailableConcerts(startDate, endDate) List~ConcertSchedule~
+        +getConcertsByDate(date) List~ConcertSchedule~
+        +getConcertById(id) ConcertSchedule
+    }
+    
+    class SeatService {
+        +getAvailableSeats(concertId) List~SeatInfo~
+        +getAllSeats(concertId) List~SeatInfo~
+        +getSeatById(id) SeatInfo
+        +validateSeatAvailability(seatId) boolean
+    }
+    
+    TokenService --> QueueManager
+    TokenService --> TokenLifecycleManager
+    ReservationService --> TokenService
+    ReservationService --> SeatService
+    PaymentService --> TokenService
     PaymentService --> BalanceService
+    PaymentService --> ReservationService
 ```
 
 ## 데이터베이스 스키마 (ERD)
@@ -174,69 +207,74 @@ classDiagram
 ```mermaid
 erDiagram
     USER {
-        uuid user_id PK
-        varchar name
-        varchar email
+        bigint user_id PK
         timestamp created_at
         timestamp updated_at
     }
     
-    WAITING_TOKEN {
-        varchar token PK
-        uuid user_id FK
-        bigint position
-        enum status
+    WAITING_TOKEN_REDIS {
+        varchar token PK "Redis Key"
+        bigint user_id
+        enum status "WAITING/ACTIVE/EXPIRED"
         timestamp issued_at
         timestamp activated_at
         timestamp expired_at
     }
     
     CONCERT {
-        bigint concert_id PK
+        bigint id PK
         varchar title
         varchar artist
-        varchar venue
-        date concert_date
-        time start_time
-        time end_time
-        decimal base_price
         timestamp created_at
         timestamp updated_at
     }
     
-    SEAT {
-        bigint seat_id PK
+    CONCERT_SCHEDULE {
+        bigint id PK
         bigint concert_id FK
-        int seat_number
+        date concert_date
+        varchar venue
+        int total_seats
+        int available_seats
+        timestamp created_at
+    }
+    
+    SEAT {
+        bigint id PK
+        bigint concert_id FK
+        varchar seat_number
         decimal price
-        enum status
+        enum status "AVAILABLE/RESERVED/OCCUPIED"
         timestamp created_at
         timestamp updated_at
     }
     
     RESERVATION {
-        bigint reservation_id PK
-        uuid user_id FK
+        bigint id PK
+        bigint user_id FK
+        bigint concert_id FK
         bigint seat_id FK
-        enum status
-        timestamp created_at
+        varchar seat_number
+        decimal price
+        enum status "RESERVED/CONFIRMED/CANCELLED/EXPIRED"
+        timestamp reserved_at
         timestamp expires_at
         timestamp confirmed_at
     }
     
     PAYMENT {
-        bigint payment_id PK
-        uuid user_id FK
+        bigint id PK
+        bigint user_id FK
         bigint reservation_id FK
         decimal amount
-        enum status
+        enum status "PENDING/COMPLETED/FAILED/CANCELLED"
+        varchar payment_method
         timestamp paid_at
-        timestamp created_at
     }
     
     POINT {
         bigint point_id PK
-        uuid user_id FK
+        bigint user_id FK
         decimal amount
         timestamp last_updated
         timestamp created_at
@@ -244,21 +282,20 @@ erDiagram
     
     POINT_HISTORY {
         bigint history_id PK
-        uuid user_id FK
+        bigint user_id FK
         decimal amount
-        enum type
+        enum type "CHARGE/USAGE"
         varchar description
         timestamp created_at
     }
     
-    USER ||--o{ WAITING_TOKEN : "has"
     USER ||--o{ POINT : "has"
     USER ||--o{ POINT_HISTORY : "has"
     USER ||--o{ RESERVATION : "makes"
     USER ||--o{ PAYMENT : "makes"
+    CONCERT ||--o{ CONCERT_SCHEDULE : "has"
     CONCERT ||--o{ SEAT : "contains"
+    CONCERT_SCHEDULE ||--o{ RESERVATION : "for"
     SEAT ||--o{ RESERVATION : "reserved"
     RESERVATION ||--o{ PAYMENT : "paid_by"
 ```
-
-

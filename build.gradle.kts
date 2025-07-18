@@ -76,7 +76,7 @@ dependencies {
 	testImplementation("io.kotest.extensions:kotest-extensions-spring:1.1.3")
 
 	// Swagger (springdoc-openapi)
-	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
 }
 
 tasks.withType<Test> {

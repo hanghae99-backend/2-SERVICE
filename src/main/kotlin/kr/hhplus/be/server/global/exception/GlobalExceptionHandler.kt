@@ -233,14 +233,3 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse)
     }
 }
-
-/**
- * 에러 응답 DTO
- */
-data class ErrorResponse(
-    val timestamp: LocalDateTime,
-    val status: Int,
-    val error: String,
-    val message: String,
-    val path: String
-)

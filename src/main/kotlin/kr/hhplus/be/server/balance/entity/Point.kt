@@ -10,7 +10,7 @@ import java.time.LocalDateTime
 data class Point(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "point_id")
+    @Column(name = "id")
     val pointId: Long = 0,
     
     @Column(name = "user_id", nullable = false)

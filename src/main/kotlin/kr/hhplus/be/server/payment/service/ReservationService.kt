@@ -49,7 +49,7 @@ class ReservationService(
         // 6. 기존 임시 예약이 있는지 확인
         val existingReservation = reservationRepository.findBySeatIdAndStatus(
             seatId, 
-            kr.hhplus.be.server.payment.entity.ReservationStatus.TEMPORARY
+            ReservationStatusType.TEMPORARY
         )
         if (existingReservation != null && !existingReservation.isExpired()) {
             throw kr.hhplus.be.server.concert.entity.SeatTemporarilyHoldException("좌석이 임시 점유 중입니다")
@@ -67,7 +67,14 @@ class ReservationService(
         
         // 10. 예약 생성 (Entity에서 검증 처리, 5분간 임시 배정)
         val expiresAt = LocalDateTime.now().plusMinutes(5)
-        val reservation = Reservation.create(userId, seatId, expiresAt)
+        val reservation = Reservation.create(
+            userId = userId,
+            concertId = concertId,
+            seatId = seatId,
+            seatNumber = lockResult.seatNumber,
+            price = lockResult.price,
+            expiresAt = expiresAt
+        )
         
         return reservationRepository.save(reservation)
     }

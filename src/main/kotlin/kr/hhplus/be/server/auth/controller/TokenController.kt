@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.*
 import io.swagger.v3.oas.annotations.media.*
 import io.swagger.v3.oas.annotations.responses.*
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import kr.hhplus.be.server.auth.dto.TokenIssueRequest
 import kr.hhplus.be.server.auth.dto.TokenIssueResponse
 import kr.hhplus.be.server.auth.dto.QueueStatusResponse
@@ -59,7 +60,7 @@ class TokenController(
             )
         ]
     )
-    fun issueToken(@RequestBody @Parameter(description = "토큰 발급 요청") request: TokenIssueRequest): ResponseEntity<TokenIssueResponse> {
+    fun issueToken(@Valid @RequestBody @Parameter(description = "토큰 발급 요청") request: TokenIssueRequest): ResponseEntity<TokenIssueResponse> {
         val waitingToken = tokenService.issueWaitingToken(request.userId)
         val statusResponse = tokenService.getTokenStatus(waitingToken.token)
         

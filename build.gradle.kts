@@ -77,6 +77,9 @@ dependencies {
 
 	// Swagger (springdoc-openapi)
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
+	
+	// Spring Boot Validation
+	implementation("org.springframework.boot:spring-boot-starter-validation")
 }
 
 tasks.withType<Test> {

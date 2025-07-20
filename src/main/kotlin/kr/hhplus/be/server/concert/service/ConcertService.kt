@@ -11,8 +11,6 @@ import java.time.LocalDate
 @Service
 class ConcertService(
     private val concertJpaRepository: ConcertJpaRepository,
-    private val seatJpaRepository: SeatJpaRepository,
-    private val parameterValidator: ConcertParameterValidator
 ) {
     
     /**
@@ -22,10 +20,6 @@ class ConcertService(
         startDate: LocalDate = LocalDate.now(), 
         endDate: LocalDate = LocalDate.now().plusMonths(3)
     ): List<ConcertSchedule> {
-        // 파라미터 검증
-        parameterValidator.validateConcertDate(startDate)
-        parameterValidator.validateConcertDate(endDate)
-        
         return concertJpaRepository.findAvailableConcertsByDateRange(startDate, endDate)
             .map { concert ->
                 val availableSeats = concertJpaRepository.countAvailableSeatsByConcertId(concert.concertId)
@@ -47,9 +41,6 @@ class ConcertService(
      * 특정 날짜의 콘서트 목록 조회
      */
     fun getConcertsByDate(date: LocalDate): List<ConcertSchedule> {
-        // 파라미터 검증
-        parameterValidator.validateConcertDate(date)
-        
         return concertJpaRepository.findByConcertDate(date)
             .map { concert ->
                 val availableSeats = concertJpaRepository.countAvailableSeatsByConcertId(concert.concertId)
@@ -71,9 +62,6 @@ class ConcertService(
      * 콘서트 상세 정보 조회
      */
     fun getConcertById(concertId: Long): ConcertSchedule {
-        // 파라미터 검증
-        parameterValidator.validateConcertId(concertId)
-        
         val concert = concertJpaRepository.findById(concertId).orElse(null)
             ?: throw ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId")
         
@@ -96,9 +84,6 @@ class ConcertService(
      * 콘서트 엔티티 조회 (내부 사용)
      */
     fun getConcertEntityById(concertId: Long): Concert? {
-        // 파라미터 검증
-        parameterValidator.validateConcertId(concertId)
-        
         return concertJpaRepository.findById(concertId).orElse(null)
     }
 }

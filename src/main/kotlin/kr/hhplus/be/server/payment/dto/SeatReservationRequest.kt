@@ -1,11 +1,26 @@
 package kr.hhplus.be.server.payment.dto
 
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Positive
+import jakarta.validation.constraints.Size
 import java.time.LocalDateTime
 
 data class SeatReservationRequest(
+    @field:NotNull(message = "사용자 ID는 필수입니다")
+    @field:Positive(message = "사용자 ID는 양수여야 합니다")
     val userId: Long,
+    
+    @field:NotNull(message = "콘서트 ID는 필수입니다")
+    @field:Positive(message = "콘서트 ID는 양수여야 합니다")
     val concertId: Long,
+    
+    @field:NotNull(message = "좌석 ID는 필수입니다")
+    @field:Positive(message = "좌석 ID는 양수여야 합니다")
     val seatId: Long,
+    
+    @field:NotBlank(message = "토큰은 필수입니다")
+    @field:Size(min = 10, max = 100, message = "토큰 길이는 10-100자 사이여야 합니다")
     val token: String
 )
 

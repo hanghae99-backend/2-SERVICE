@@ -7,6 +7,7 @@ import kr.hhplus.be.server.concert.entity.SeatNotFoundException
 import kr.hhplus.be.server.concert.repository.SeatJpaRepository
 import kr.hhplus.be.server.concert.repository.ConcertJpaRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class SeatService(
@@ -73,14 +74,44 @@ class SeatService(
         val seat = seatJpaRepository.findById(seatId).orElse(null)
             ?: throw SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId")
         
-        return seat.status == SeatStatus.AVAILABLE
     }
     
     /**
-     * 좌석 상태 변경
+     * 좌석 임시 예약
      */
-    fun updateSeatStatus(seatId: Long, status: SeatStatus): Boolean {
-        val updatedCount = seatJpaRepository.updateSeatStatus(seatId, status)
-        return updatedCount > 0
+    @Transactional
+    fun reserveSeat(seatId: Long): Boolean {
+        val seat = seatJpaRepository.findById(seatId).orElse(null)
+            ?: throw SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId")
+        
+        val reservedSeat = seat.reserve() // 엔티티의 비즈니스 메소드 사용
+        seatJpaRepository.save(reservedSeat)
+        return true
+    }
+    
+    /**
+     * 좌석 예약 확정
+     */
+    @Transactional
+    fun confirmSeat(seatId: Long): Boolean {
+        val seat = seatJpaRepository.findById(seatId).orElse(null)
+            ?: throw SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId")
+        
+        val confirmedSeat = seat.confirm() // 엔티티의 비즈니스 메소드 사용
+        seatJpaRepository.save(confirmedSeat)
+        return true
+    }
+    
+    /**
+     * 좌석 예약 해제
+     */
+    @Transactional
+    fun releaseSeat(seatId: Long): Boolean {
+        val seat = seatJpaRepository.findById(seatId).orElse(null)
+            ?: throw SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId")
+        
+        val releasedSeat = seat.release() // 엔티티의 비즈니스 메소드 사용
+        seatJpaRepository.save(releasedSeat)
+        return true
     }
 }

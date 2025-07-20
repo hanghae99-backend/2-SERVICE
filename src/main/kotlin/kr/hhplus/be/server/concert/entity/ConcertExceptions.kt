@@ -59,3 +59,11 @@ class InvalidConcertDateException : BusinessRuleViolationException {
     constructor(message: String) : super(message)
     constructor(message: String, cause: Throwable) : super(message, cause)
 }
+
+/**
+ * 좌석 상태가 유효하지 않을 때 발생하는 예외
+ */
+class InvalidSeatStatusException : BusinessRuleViolationException {
+    constructor(message: String) : super(message)
+    constructor(message: String, cause: Throwable) : super(message, cause)
+}

@@ -42,7 +42,7 @@ class ReservationService(
         
         // 5. 좌석 예약 가능 여부 확인 (동시성 제어를 위해 비관적 락 사용)
         val lockResult = seatJpaRepository.findByIdWithLock(seatId)
-        if (lockResult == null || lockResult.status != SeatStatus.AVAILABLE) {
+        if (lockResult == null || !lockResult.canBeReserved()) { // 엔티티의 비즈니스 메소드 사용
             throw kr.hhplus.be.server.concert.entity.SeatAlreadyReservedException("이미 예약된 좌석이거나 예약할 수 없는 좌석입니다")
         }
         
@@ -62,7 +62,8 @@ class ReservationService(
         }
         
         // 8. 좌석 상태를 RESERVED로 변경 (임시 배정)
-        seatJpaRepository.updateSeatStatus(seatId, SeatStatus.RESERVED)
+        val reservedSeat = lockResult.reserve() // 엔티티의 비즈니스 메소드 사용
+        seatJpaRepository.save(reservedSeat)
         
         // 10. 예약 생성 (Entity에서 검증 처리, 5분간 임시 배정)
         val expiresAt = LocalDateTime.now().plusMinutes(5)
@@ -92,7 +93,11 @@ class ReservationService(
                 reservationRepository.save(cancelledReservation)
                 
                 // 좌석 상태를 AVAILABLE로 복원
-                seatJpaRepository.updateSeatStatus(reservation.seatId, SeatStatus.AVAILABLE)
+                val seat = seatJpaRepository.findById(reservation.seatId).orElse(null)
+                if (seat != null && seat.isReserved()) { // 엔티티의 비즈니스 메소드 사용
+                    val releasedSeat = seat.release()
+                    seatJpaRepository.save(releasedSeat)
+                }
             } catch (e: Exception) {
                 // 로그 남기고 계속 진행
                 println("만료된 예약 처리 중 오류: ${reservation.reservationId}, ${e.message}")

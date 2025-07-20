@@ -32,7 +32,7 @@ data class PointHistory(
     companion object {
         fun charge(userId: Long, amount: BigDecimal, description: String = "포인트 충전"): PointHistory {
             if (amount <= BigDecimal.ZERO) {
-                throw IllegalArgumentException("충전 금액은 0보다 커야 합니다")
+                throw InvalidPointAmountException("충전 금액은 0보다 커야 합니다")
             }
             
             return PointHistory(
@@ -45,7 +45,7 @@ data class PointHistory(
         
         fun usage(userId: Long, amount: BigDecimal, description: String = "포인트 사용"): PointHistory {
             if (amount <= BigDecimal.ZERO) {
-                throw IllegalArgumentException("사용 금액은 0보다 커야 합니다")
+                throw InvalidPointAmountException("사용 금액은 0보다 커야 합니다")
             }
             
             return PointHistory(

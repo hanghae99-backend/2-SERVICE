@@ -77,7 +77,7 @@ class PaymentService(
             reservationRepository.save(confirmedReservation)
             
             // 11. 좌석 상태 업데이트
-            seatService.updateSeatStatus(reservation.seatId, kr.hhplus.be.server.concert.entity.SeatStatus.CONFIRMED)
+            seatService.confirmSeat(reservation.seatId)
             
             // 12. 결제 완료 처리 (Entity에서 상태 검증 처리)
             val completedPayment = savedPayment.complete()

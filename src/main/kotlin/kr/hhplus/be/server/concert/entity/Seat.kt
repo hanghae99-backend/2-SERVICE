@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.concert.entity
 
+import kr.hhplus.be.server.concert.entity.InvalidSeatStatusException
+import kr.hhplus.be.server.global.exception.ParameterValidationException
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -30,7 +32,86 @@ data class Seat(
     
     @Column(name = "updated_at", nullable = false)
     val updatedAt: LocalDateTime = LocalDateTime.now()
-)
+) {
+    
+    companion object {
+        fun create(concertId: Long, seatNumber: Int, price: BigDecimal): Seat {
+            // 파라미터 검증
+            if (concertId <= 0) {
+                throw ParameterValidationException("콘서트 ID는 0보다 커야 합니다: $concertId")
+            }
+            if (seatNumber <= 0) {
+                throw ParameterValidationException("좌석 번호는 0보다 커야 합니다: $seatNumber")
+            }
+            if (price <= BigDecimal.ZERO) {
+                throw ParameterValidationException("좌석 가격은 0보다 커야 합니다: $price")
+            }
+            
+            return Seat(
+                concertId = concertId,
+                seatNumber = seatNumber,
+                price = price,
+                status = SeatStatus.AVAILABLE
+            )
+        }
+    }
+    
+    fun reserve(): Seat {
+        if (status != SeatStatus.AVAILABLE) {
+            throw InvalidSeatStatusException("예약 가능한 좌석이 아닙니다. 현재 상태: $status")
+        }
+        
+        return this.copy(
+            status = SeatStatus.RESERVED,
+            updatedAt = LocalDateTime.now()
+        )
+    }
+    
+    fun confirm(): Seat {
+        if (status != SeatStatus.RESERVED) {
+            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $status")
+        }
+        
+        return this.copy(
+            status = SeatStatus.CONFIRMED,
+            updatedAt = LocalDateTime.now()
+        )
+    }
+    
+    fun release(): Seat {
+        if (status != SeatStatus.RESERVED) {
+            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $status")
+        }
+        
+        return this.copy(
+            status = SeatStatus.AVAILABLE,
+            updatedAt = LocalDateTime.now()
+        )
+    }
+    
+    fun makeUnavailable(): Seat {
+        return this.copy(
+            status = SeatStatus.UNAVAILABLE,
+            updatedAt = LocalDateTime.now()
+        )
+    }
+    
+    fun isAvailable(): Boolean {
+        return status == SeatStatus.AVAILABLE
+    }
+    
+    fun isReserved(): Boolean {
+        return status == SeatStatus.RESERVED
+    }
+    
+    fun isConfirmed(): Boolean {
+        return status == SeatStatus.CONFIRMED
+    }
+    
+    fun canBeReserved(): Boolean {
+        return status == SeatStatus.AVAILABLE
+    }
+}
 
 enum class SeatStatus {
     AVAILABLE,    // 예약 가능

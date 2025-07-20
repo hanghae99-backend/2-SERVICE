@@ -76,6 +76,10 @@ class ReservationService(
         return reservationRepository.findByUserIdOrderByCreatedAtDesc(userId)
     }
     
+    fun getReservationsByConcertId(concertId: Long): List<Reservation> {
+        return reservationRepository.findByConcertIdOrderByCreatedAtDesc(concertId)
+    }
+    
     fun getReservationById(reservationId: Long): Reservation {
         return reservationRepository.findById(reservationId)
             .orElseThrow { kr.hhplus.be.server.payment.entity.ReservationNotFoundException("예약을 찾을 수 없습니다: $reservationId") }

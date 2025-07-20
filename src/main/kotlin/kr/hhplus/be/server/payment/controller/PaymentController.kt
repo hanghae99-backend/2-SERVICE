@@ -10,26 +10,24 @@ import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/payments")
+@RequestMapping("/api/v1/payments")
 @Validated
 class PaymentController(
     private val paymentService: PaymentService
 ) {
     
+    /**
+     * 결제 처리 (예약 기반)
+     */
     @PostMapping
     fun processPayment(@Valid @RequestBody request: PaymentRequest): ResponseEntity<PaymentResponse> {
         val payment = paymentService.processPayment(request.userId, request.reservationId, request.token)
-        return ResponseEntity.ok(PaymentResponse.from(payment))
+        return ResponseEntity.status(201).body(PaymentResponse.from(payment))
     }
     
-    @GetMapping("/history/{userId}")
-    fun getPaymentHistory(
-        @PathVariable @Positive(message = "사용자 ID는 양수여야 합니다") userId: Long
-    ): ResponseEntity<List<PaymentResponse>> {
-        val payments = paymentService.getPaymentHistory(userId)
-        return ResponseEntity.ok(payments.map { PaymentResponse.from(it) })
-    }
-    
+    /**
+     * 특정 결제 정보 조회
+     */
     @GetMapping("/{paymentId}")
     fun getPayment(
         @PathVariable @Positive(message = "결제 ID는 양수여야 합니다") paymentId: Long

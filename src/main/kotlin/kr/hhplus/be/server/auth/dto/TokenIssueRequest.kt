@@ -6,8 +6,8 @@ import jakarta.validation.constraints.Positive
 
 @Schema(description = "대기열 토큰 발급 요청")
 data class TokenIssueRequest(
-    @field:NotNull(message = "사용자 ID는 필수입니다")
-    @field:Positive(message = "사용자 ID는 양수여야 합니다")
+    @NotNull(message = "사용자 ID는 필수입니다")
+    @Positive(message = "사용자 ID는 양수여야 합니다")
     @Schema(description = "사용자 ID", example = "1")
     val userId: Long
 )

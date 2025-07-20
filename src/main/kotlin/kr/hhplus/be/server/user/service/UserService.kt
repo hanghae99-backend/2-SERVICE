@@ -27,6 +27,11 @@ class UserService(
         return userRepository.findById(userId).orElse(null)
     }
     
+    fun getUserById(userId: Long): User {
+        return userRepository.findById(userId)
+            .orElseThrow { throw IllegalArgumentException("사용자를 찾을 수 없습니다: $userId") }
+    }
+    
     fun getAllUsers(): List<User> {
         return userRepository.findAll()
     }

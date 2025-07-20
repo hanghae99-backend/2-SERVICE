@@ -13,13 +13,13 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/v1/queue")
+@RequestMapping("/api/v1/tokens")
 @Tag(name = "대기열 토큰", description = "대기열 토큰 관리 API")
 class TokenController(
     private val tokenService: TokenService
 ) {
 
-    @PostMapping("/tokens")
+    @PostMapping
     @Operation(
         summary = "대기열 토큰 발급",
         description = """
@@ -39,7 +39,7 @@ class TokenController(
     @ApiResponses(
         value = [
             ApiResponse(
-                responseCode = "200",
+                responseCode = "201",
                 description = "토큰 발급 성공",
                 content = [Content(
                     mediaType = "application/json",
@@ -73,10 +73,10 @@ class TokenController(
             estimatedWaitingTime = (statusResponse.queuePosition ?: 0) * 2 // 예상 대기 시간 (분)
         )
         
-        return ResponseEntity.ok(response)
+        return ResponseEntity.status(201).body(response)
     }
 
-    @GetMapping("/tokens/{token}/status")
+    @GetMapping("/{token}")
     @Operation(
         summary = "대기열 상태 조회",
         description = """
@@ -108,7 +108,7 @@ class TokenController(
             )
         ]
     )
-    fun getQueueStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<QueueStatusResponse> {
+    fun getTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<QueueStatusResponse> {
         val statusResponse = tokenService.getTokenStatus(token)
         
         val response = QueueStatusResponse(

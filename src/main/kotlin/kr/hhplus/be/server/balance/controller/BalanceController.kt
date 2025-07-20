@@ -11,26 +11,18 @@ import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/balance")
+@RequestMapping("/api/v1/balance")
 @Validated
 class BalanceController(
     private val balanceService: BalanceService
 ) {
     
-    @PostMapping("/charge")
-    fun charge(@Valid @RequestBody request: ChargeBalanceRequest): ResponseEntity<BalanceResponse> {
+    @PostMapping
+    fun chargeBalance(@Valid @RequestBody request: ChargeBalanceRequest): ResponseEntity<BalanceResponse> {
         val point = balanceService.chargeBalance(request.userId, request.amount)
         return ResponseEntity.ok(BalanceResponse.from(point))
     }
-    
-    @GetMapping("/history/{userId}")
-    fun history(
-        @PathVariable @Positive(message = "사용자 ID는 양수여야 합니다") userId: Long
-    ): ResponseEntity<List<PointHistoryResponse>> {
-        val histories = balanceService.getPointHistory(userId)
-        return ResponseEntity.ok(histories.map { PointHistoryResponse.from(it) })
-    }
-    
+
     @GetMapping("/{userId}")
     fun getBalance(
         @PathVariable @Positive(message = "사용자 ID는 양수여야 합니다") userId: Long
@@ -38,4 +30,13 @@ class BalanceController(
         val point = balanceService.getBalance(userId)
         return ResponseEntity.ok(BalanceResponse.from(point))
     }
+
+    @GetMapping("/history/{userId}")
+    fun getPointHistory(
+        @PathVariable @Positive(message = "사용자 ID는 양수여야 합니다") userId: Long
+    ): ResponseEntity<List<PointHistoryResponse>> {
+        val histories = balanceService.getPointHistory(userId)
+        return ResponseEntity.ok(histories.map { PointHistoryResponse.from(it) })
+    }
+
 }

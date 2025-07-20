@@ -215,10 +215,6 @@ erDiagram
     WAITING_TOKEN_REDIS {
         varchar token PK "Redis Key"
         bigint user_id
-        enum status "WAITING/ACTIVE/EXPIRED"
-        timestamp issued_at
-        timestamp activated_at
-        timestamp expired_at
     }
     
     CONCERT {
@@ -244,9 +240,17 @@ erDiagram
         bigint concert_id FK
         varchar seat_number
         decimal price
-        enum status "AVAILABLE/RESERVED/OCCUPIED"
+        varchar status_code FK
         timestamp created_at
         timestamp updated_at
+    }
+    
+    SEAT_STATUS_TYPE {
+        varchar code PK
+        varchar name
+        varchar description
+        boolean is_active
+        timestamp created_at
     }
     
     RESERVATION {
@@ -254,26 +258,42 @@ erDiagram
         bigint user_id FK
         bigint concert_id FK
         bigint seat_id FK
+        bigint payment_id FK
         varchar seat_number
         decimal price
-        enum status "RESERVED/CONFIRMED/CANCELLED/EXPIRED"
+        varchar status_code FK
         timestamp reserved_at
         timestamp expires_at
         timestamp confirmed_at
     }
     
+    RESERVATION_STATUS_TYPE {
+        varchar code PK
+        varchar name
+        varchar description
+        boolean is_active
+        timestamp created_at
+    }
+    
     PAYMENT {
         bigint id PK
         bigint user_id FK
-        bigint reservation_id FK
         decimal amount
-        enum status "PENDING/COMPLETED/FAILED/CANCELLED"
+        varchar status_code FK
         varchar payment_method
         timestamp paid_at
     }
     
+    PAYMENT_STATUS_TYPE {
+        varchar code PK
+        varchar name
+        varchar description
+        boolean is_active
+        timestamp created_at
+    }
+    
     POINT {
-        bigint point_id PK
+        bigint id PK
         bigint user_id FK
         decimal amount
         timestamp last_updated
@@ -281,11 +301,19 @@ erDiagram
     }
     
     POINT_HISTORY {
-        bigint history_id PK
+        bigint id PK
         bigint user_id FK
         decimal amount
-        enum type "CHARGE/USAGE"
+        varchar type_code FK
         varchar description
+        timestamp created_at
+    }
+    
+    POINT_HISTORY_TYPE {
+        varchar code PK
+        varchar name
+        varchar description
+        boolean is_active
         timestamp created_at
     }
     
@@ -297,5 +325,11 @@ erDiagram
     CONCERT ||--o{ SEAT : "contains"
     CONCERT_SCHEDULE ||--o{ RESERVATION : "for"
     SEAT ||--o{ RESERVATION : "reserved"
-    RESERVATION ||--o{ PAYMENT : "paid_by"
+    PAYMENT ||--o{ RESERVATION : "completes"
+    
+    SEAT_STATUS_TYPE ||--o{ SEAT : "defines"
+    RESERVATION_STATUS_TYPE ||--o{ RESERVATION : "defines"
+    PAYMENT_STATUS_TYPE ||--o{ PAYMENT : "defines"
+    POINT_HISTORY_TYPE ||--o{ POINT_HISTORY : "defines"
+```
 ```

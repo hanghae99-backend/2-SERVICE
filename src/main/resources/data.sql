@@ -13,11 +13,7 @@ INSERT INTO concert (title, artist, venue, concert_date, start_time, end_time, b
 -- 아이유 콘서트 좌석 (concert_id = 1)
 INSERT INTO seat (concert_id, seat_number, price, status, created_at, updated_at)
 SELECT 1, seat_num, 
-       CASE 
-           WHEN seat_num <= 10 THEN 150000.00  -- VIP석 (1~10번)
-           WHEN seat_num <= 30 THEN 120000.00  -- 일반석 (11~30번)
-           ELSE 100000.00                      -- 자유석 (31~50번)
-       END as price,
+       120000.00 as price,  -- 모든 좌석 동일 가격
        'AVAILABLE' as status,
        NOW() as created_at,
        NOW() as updated_at
@@ -41,11 +37,7 @@ WHERE seat_num <= 50;
 -- BTS 콘서트 좌석 (concert_id = 2)
 INSERT INTO seat (concert_id, seat_number, price, status, created_at, updated_at)
 SELECT 2, seat_num, 
-       CASE 
-           WHEN seat_num <= 10 THEN 200000.00  -- VIP석 (1~10번)
-           WHEN seat_num <= 30 THEN 150000.00  -- 일반석 (11~30번)
-           ELSE 120000.00                      -- 자유석 (31~50번)
-       END as price,
+       150000.00 as price,  -- 모든 좌석 동일 가격
        'AVAILABLE' as status,
        NOW() as created_at,
        NOW() as updated_at
@@ -69,11 +61,7 @@ WHERE seat_num <= 50;
 -- 검정치마 콘서트 좌석 (concert_id = 3)
 INSERT INTO seat (concert_id, seat_number, price, status, created_at, updated_at)
 SELECT 3, seat_num, 
-       CASE 
-           WHEN seat_num <= 10 THEN 100000.00  -- VIP석 (1~10번)
-           WHEN seat_num <= 30 THEN 80000.00   -- 일반석 (11~30번)
-           ELSE 60000.00                       -- 자유석 (31~50번)
-       END as price,
+       80000.00 as price,   -- 모든 좌석 동일 가격
        'AVAILABLE' as status,
        NOW() as created_at,
        NOW() as updated_at

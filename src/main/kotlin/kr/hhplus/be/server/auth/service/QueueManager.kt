@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.auth.service
 
-import kr.hhplus.be.server.auth.dto.QueueStatusResponse
+import kr.hhplus.be.server.auth.dto.response.QueueStatusResponse
 import kr.hhplus.be.server.auth.repository.TokenStore
 import org.springframework.stereotype.Component
 

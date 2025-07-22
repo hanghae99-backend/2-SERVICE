@@ -46,3 +46,12 @@ data class QueueFullException(
     val errorCode: String = AuthErrorCode.QueueFull.code,
     val status: HttpStatus = AuthErrorCode.QueueFull.httpStatus
 ) : RuntimeException(message)
+
+/**
+ * 대기열이 가득 찰 때 발생하는 예외
+ */
+data class TokenActivationException(
+    override val message: String = AuthErrorCode.TokenExpired.defaultMessage,
+    val errorCode: String = AuthErrorCode.TokenExpired.code,
+    val status: HttpStatus = AuthErrorCode.TokenExpired.httpStatus
+) : RuntimeException(message)

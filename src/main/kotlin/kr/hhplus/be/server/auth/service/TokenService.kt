@@ -1,14 +1,15 @@
 package kr.hhplus.be.server.auth.service
 
-import kr.hhplus.be.server.auth.dto.TokenStatusResponse
+import kr.hhplus.be.server.auth.dto.response.TokenResponse
 import kr.hhplus.be.server.auth.entity.TokenStatus
 import kr.hhplus.be.server.auth.entity.WaitingToken
-import kr.hhplus.be.server.auth.entity.TokenNotFoundException
-import kr.hhplus.be.server.auth.entity.TokenActivationException
+import kr.hhplus.be.server.auth.exception.TokenActivationException
+import kr.hhplus.be.server.auth.exception.TokenNotFoundException
 import kr.hhplus.be.server.auth.factory.TokenFactory
 import kr.hhplus.be.server.user.service.UserService
-import kr.hhplus.be.server.user.entity.UserNotFoundException
+import kr.hhplus.be.server.user.exception.UserNotFoundException
 import org.springframework.stereotype.Service
+import java.time.LocalDateTime
 
 /**
  * 토큰 관련 비즈니스 플로우 조정의 책임을 가진다
@@ -23,12 +24,12 @@ class TokenService(
 ) {
     
     /**
-     * 대기 토큰 발급 플로우 조정
+     * 대기 토큰 발급 플로우 조정 - TokenResponse.Issue 반환
      * 1. 파라미터 검증 -> 2. 사용자 검증 -> 3. 토큰 생성 -> 4. 토큰 저장 -> 5. 대기열 추가
      */
-    fun issueWaitingToken(userId: Long): WaitingToken {
+    fun issueWaitingToken(userId: Long): TokenResponse.Issue {
         // 1. 사용자 존재 확인
-        val user = userService.findUserById(userId)
+        val user = userService.getUserById(userId)
             ?: throw UserNotFoundException("사용자를 찾을 수 없습니다: $userId")
         
         // 2. 토큰 생성
@@ -40,14 +41,25 @@ class TokenService(
         // 4. 대기열에 추가
         queueManager.addToQueue(waitingToken.token)
         
-        return waitingToken
+        // 5. 상태 조회 및 대기 정보 계산
+        val queuePosition = queueManager.getQueuePosition(waitingToken.token) + 1 // 1부터 시작
+        val estimatedWaitingTime = calculateWaitingTime(queuePosition)
+        
+        return TokenResponse.Issue.fromTokenWithDetails(
+            token = waitingToken.token,
+            status = "WAITING",
+            message = "대기열에 등록되었습니다",
+            userId = userId,
+            queuePosition = queuePosition,
+            estimatedWaitingTime = estimatedWaitingTime,
+            issuedAt = LocalDateTime.now()
+        )
     }
     
     /**
-     * 토큰 상태 조회 플로우 조정
-     * 1. 토큰 존재 확인 -> 2. 상태 조회 -> 3. 사용자 친화적 메시지 변환 -> 4. 대기 순서 조회 (WAITING 상태인 경우)
+     * 토큰 대기열 상태 조회 - TokenResponse.Queue 반환
      */
-    fun getTokenStatus(token: String): TokenStatusResponse {
+    fun getTokenQueueStatus(token: String): TokenResponse.Queue {
         // 1. 토큰 존재 확인
         tokenLifecycleManager.findToken(token)
             ?: throw TokenNotFoundException("토큰을 찾을 수 없습니다.")
@@ -56,21 +68,57 @@ class TokenService(
         val status = tokenLifecycleManager.getTokenStatus(token)
         
         // 3. 비즈니스 도메인에 맞는 메시지 변환
+        val (message, queuePosition, estimatedTime) = when (status) {
+            TokenStatus.WAITING -> {
+                val position = queueManager.getQueuePosition(token)
+                val pos = if (position >= 0) position + 1 else null
+                val time = pos?.let { calculateWaitingTime(it) }
+                Triple("대기 중입니다", pos, time)
+            }
+            TokenStatus.ACTIVE -> Triple("서비스 이용 가능합니다", null, null)
+            TokenStatus.EXPIRED -> Triple("토큰이 만료되었습니다", null, null)
+        }
+        
+        return TokenResponse.Queue.fromTokenWithQueue(
+            token = token,
+            status = status.name,
+            message = message,
+            queuePosition = queuePosition,
+            estimatedWaitingTime = estimatedTime
+        )
+    }
+    
+    /**
+     * 간단한 토큰 상태 조회 - TokenResponse 반환
+     */
+    fun getSimpleTokenStatus(token: String): TokenResponse {
+        // 1. 토큰 존재 확인
+        tokenLifecycleManager.findToken(token)
+            ?: throw TokenNotFoundException("토큰을 찾을 수 없습니다.")
+        
+        // 2. 상태 조회
+        val status = tokenLifecycleManager.getTokenStatus(token)
+        
+        // 3. 메시지 변환
         val message = when (status) {
             TokenStatus.WAITING -> "대기 중입니다"
-            TokenStatus.ACTIVE -> "예약 가능합니다"
+            TokenStatus.ACTIVE -> "서비스 이용 가능합니다"
             TokenStatus.EXPIRED -> "토큰이 만료되었습니다"
         }
         
-        // 4. 대기 순서 조회 (WAITING 상태인 경우만)
-        val queuePosition = if (status == TokenStatus.WAITING) {
-            val position = queueManager.getQueuePosition(token)
-            if (position >= 0) position + 1 else null // 1부터 시작하도록 +1, 찾지 못하면 null
-        } else {
-            null
-        }
-        
-        return TokenStatusResponse(status, message, queuePosition)
+        return TokenResponse.create(
+            token = token,
+            status = status.name,
+            message = message
+        )
+    }
+
+    /**
+     * 대기 시간 계산 (분 단위)
+     */
+    private fun calculateWaitingTime(queuePosition: Int): Int {
+        // 간단한 계산: 대기 순서 * 2분
+        return queuePosition * 2
     }
     
     /**

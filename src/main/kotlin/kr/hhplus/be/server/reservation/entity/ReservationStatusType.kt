@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.payment.entity
+package kr.hhplus.be.server.reservation.entity
 
 import jakarta.persistence.*
 import java.time.LocalDateTime

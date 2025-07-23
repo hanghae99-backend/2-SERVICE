@@ -1,9 +1,11 @@
 package kr.hhplus.be.server.balance.service
 
 import kr.hhplus.be.server.balance.entity.*
+import kr.hhplus.be.server.balance.exception.InvalidPointAmountException
+import kr.hhplus.be.server.balance.exception.PointNotFoundException
 import kr.hhplus.be.server.balance.repository.PointHistoryRepository
 import kr.hhplus.be.server.balance.repository.PointRepository
-import kr.hhplus.be.server.user.entity.UserNotFoundException
+import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -49,7 +51,8 @@ class BalanceService(
         
         return savedPoint
     }
-    
+
+    @Transactional(readOnly = true)
     fun getBalance(userId: Long): Point {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
@@ -58,7 +61,7 @@ class BalanceService(
         return pointRepository.findByUserId(userId)
             ?: Point.create(userId, BigDecimal.ZERO)
     }
-    
+
     @Transactional
     fun deductBalance(userId: Long, amount: BigDecimal): Point {
         if (!userService.existsById(userId)) {
@@ -71,19 +74,21 @@ class BalanceService(
         val deductedPoint = currentPoint.deduct(amount)
         val savedPoint = pointRepository.save(deductedPoint)
         
-        val history = PointHistory.usage(userId, amount, "포인트 사용")
+        val history = PointHistory.use(userId, amount, "포인트 사용")
         pointHistoryRepository.save(history)
         
         return savedPoint
     }
-    
+
+    @Transactional(readOnly = true)
     fun checkBalance(userId: Long, amount: BigDecimal): Boolean {
         val point = pointRepository.findByUserId(userId)
             ?: return false
         
         return point.hasEnoughBalance(amount)
     }
-    
+
+    @Transactional(readOnly = true)
     fun getPointHistory(userId: Long): List<PointHistory> {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")

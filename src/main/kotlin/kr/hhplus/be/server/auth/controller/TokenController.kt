@@ -18,7 +18,6 @@ import java.time.LocalDateTime
 class TokenController(
     private val tokenService: TokenService
 ) {
-
     @PostMapping
     @ApiResponses(
         value = [

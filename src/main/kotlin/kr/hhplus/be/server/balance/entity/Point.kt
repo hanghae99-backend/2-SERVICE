@@ -1,30 +1,36 @@
 package kr.hhplus.be.server.balance.entity
 
 import jakarta.persistence.*
-import kr.hhplus.be.server.balance.entity.InvalidPointAmountException
+import kr.hhplus.be.server.balance.exception.InvalidPointAmountException
+import kr.hhplus.be.server.balance.exception.InsufficientBalanceException
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Entity
 @Table(name = "point")
-data class Point(
+class Point(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     val pointId: Long = 0,
     
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, unique = true)
     val userId: Long,
     
     @Column(name = "amount", nullable = false, precision = 10, scale = 2)
-    val amount: BigDecimal,
+    var amount: BigDecimal,
     
     @Column(name = "last_updated", nullable = false)
-    val lastUpdated: LocalDateTime = LocalDateTime.now(),
+    var lastUpdated: LocalDateTime = LocalDateTime.now(),
     
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 ) {
+    
+    // Point -> User 연관관계 (1:1)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    val user: kr.hhplus.be.server.user.entity.User? = null
     
     companion object {
         fun create(userId: Long, amount: BigDecimal): Point {
@@ -44,13 +50,13 @@ data class Point(
             throw InvalidPointAmountException("충전 금액은 0보다 커야 합니다")
         }
         
-        return this.copy(
-            amount = this.amount.add(chargeAmount),
-            lastUpdated = LocalDateTime.now()
-        )
+        this.amount = this.amount.add(chargeAmount)
+        this.lastUpdated = LocalDateTime.now()
+
+        return this
     }
     
-    fun deduct(deductAmount: BigDecimal): Point {
+    fun deduct(deductAmount: BigDecimal): Point  {
         if (deductAmount <= BigDecimal.ZERO) {
             throw InvalidPointAmountException("차감 금액은 0보다 커야 합니다")
         }
@@ -59,10 +65,10 @@ data class Point(
             throw InsufficientBalanceException("잔액이 부족합니다. 현재 잔액: ${this.amount}, 차감 요청: ${deductAmount}")
         }
         
-        return this.copy(
-            amount = this.amount.subtract(deductAmount),
-            lastUpdated = LocalDateTime.now()
-        )
+        this.amount = this.amount.subtract(deductAmount)
+        this.lastUpdated = LocalDateTime.now()
+
+        return this
     }
     
     fun hasEnoughBalance(amount: BigDecimal): Boolean {

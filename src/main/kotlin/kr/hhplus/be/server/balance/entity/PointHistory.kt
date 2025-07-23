@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.balance.entity
 
 import jakarta.persistence.*
+import kr.hhplus.be.server.balance.exception.InvalidPointAmountException
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -28,7 +29,12 @@ data class PointHistory(
     val createdAt: LocalDateTime = LocalDateTime.now()
 ) {
     
-    // 연관관계 매핑 (읽기 전용)
+    // PointHistory -> User 연관관계 (N:1)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    val user: kr.hhplus.be.server.user.entity.User? = null
+    
+    // PointHistory -> PointHistoryType 연관관계 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "type_code", referencedColumnName = "code", insertable = false, updatable = false)
     val historyType: PointHistoryType? = null
@@ -51,7 +57,7 @@ data class PointHistory(
             if (amount <= BigDecimal.ZERO) {
                 throw InvalidPointAmountException("사용 금액은 0보다 커야 합니다")
             }
-            
+
             return PointHistory(
                 userId = userId,
                 amount = amount,
@@ -59,35 +65,8 @@ data class PointHistory(
                 description = description
             )
         }
-        
-        fun refund(userId: Long, amount: BigDecimal, description: String = "포인트 환불"): PointHistory {
-            if (amount <= BigDecimal.ZERO) {
-                throw InvalidPointAmountException("환불 금액은 0보다 커야 합니다")
-            }
-            
-            return PointHistory(
-                userId = userId,
-                amount = amount,
-                typeCode = PointHistoryType.REFUND,
-                description = description
-            )
-        }
-        
-        fun bonus(userId: Long, amount: BigDecimal, description: String = "포인트 보너스"): PointHistory {
-            if (amount <= BigDecimal.ZERO) {
-                throw InvalidPointAmountException("보너스 금액은 0보다 커야 합니다")
-            }
-            
-            return PointHistory(
-                userId = userId,
-                amount = amount,
-                typeCode = PointHistoryType.BONUS,
-                description = description
-            )
-        }
     }
     
-    // 타입 이름 조회를 위한 편의 메서드
     val type: String
         get() = historyType?.name ?: typeCode
 }

@@ -1,7 +1,6 @@
 package kr.hhplus.be.server.user.service
 
 import kr.hhplus.be.server.user.dto.UserDto
-import kr.hhplus.be.server.user.dto.UserDetail
 import kr.hhplus.be.server.user.dto.request.UserCreateRequest
 import kr.hhplus.be.server.user.entity.User
 import kr.hhplus.be.server.user.exception.UserAlreadyExistsException
@@ -33,12 +32,6 @@ class UserService(
         return userRepository.findById(userId).orElse(null)
     }
 
-    fun getUserDetailById(userId: Long): UserDetail {
-        val user = userRepository.findById(userId)
-            .orElseThrow { UserNotFoundException("사용자를 찾을 수 없습니다: $userId") }
-        return UserDetail.fromEntity(user)
-    }
-
     fun existsById(userId: Long): Boolean {
         return userRepository.existsById(userId)
     }
@@ -47,8 +40,8 @@ class UserService(
         return userRepository.count()
     }
     
-    fun getUserDtoById(userId: Long): UserDto? {
-        val user = getUserById(userId) ?: return null
+    fun getUserDtoById(userId: Long): UserDto {
+        val user = getUserById(userId) ?: throw UserNotFoundException("User with id $userId not found")
         return UserDto.fromEntity(user)
     }
 }

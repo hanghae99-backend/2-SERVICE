@@ -8,13 +8,12 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.user.dto.request.UserCreateRequest
-import kr.hhplus.be.server.user.dto.UserDetail
+import kr.hhplus.be.server.user.dto.UserDto
 import kr.hhplus.be.server.user.service.UserService
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
 import kr.hhplus.be.server.global.response.CommonApiResponse
-import kr.hhplus.be.server.user.dto.UserDto
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -61,11 +60,11 @@ class UserController(
             required = true
         )
         @Positive(message = "사용자 ID는 양수여야 합니다") userId: Long
-    ): ResponseEntity<CommonApiResponse<UserDetail>> {
-        val userDetail = userService.getUserDetailById(userId)
+    ): ResponseEntity<CommonApiResponse<UserDto>> {
+        val UserDto = userService.getUserDtoById(userId)
         return ResponseEntity.ok(
             CommonApiResponse.success(
-                data = userDetail,
+                data = UserDto,
                 message = "사용자 조회 성공"
             )
         )

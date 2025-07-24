@@ -21,6 +21,9 @@ data class Seat(
     @Column(name = "seat_number", nullable = false, length = 10)
     val seatNumber: String,
     
+    @Column(name = "seat_grade", nullable = false, length = 20)
+    val seatGrade: String = "STANDARD",
+    
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     val price: BigDecimal,
     
@@ -43,10 +46,6 @@ data class Seat(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "status_code", referencedColumnName = "code", insertable = false, updatable = false)
     val statusType: SeatStatusType? = null
-    
-    // Seat -> Reservation 연관관계 (1:N) - 한 좌석이 여러 예약을 가질 수 있음 (시간대별)
-    @OneToMany(mappedBy = "seat", fetch = FetchType.LAZY)
-    val reservations: List<Reservation> = emptyList()
     
     companion object {
         fun create(scheduleId: Long, seatNumber: String, price: BigDecimal): Seat {

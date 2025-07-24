@@ -38,24 +38,6 @@ class ConcertSchedule(
     @JoinColumn(name = "concert_id", insertable = false, updatable = false)
     val concert: Concert? = null
     
-    // Private MutableList for internal JPA management
-    @OneToMany(mappedBy = "concertSchedule", fetch = FetchType.LAZY)
-    private var _reservations: MutableList<Reservation> = mutableListOf()
-    
-    // Public read-only access
-    val reservations: List<Reservation>
-        get() = _reservations.toList()
-    
-    // Business methods for managing relationships
-    fun addReservation(reservation: Reservation) {
-        if (!_reservations.contains(reservation)) {
-            _reservations.add(reservation)
-        }
-    }
-    
-    // Internal access for JPA (if needed)
-    internal fun getInternalReservations() = _reservations
-    
     companion object {
         fun create(
             concertId: Long,

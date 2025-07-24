@@ -1,9 +1,5 @@
 package kr.hhplus.be.server.user.dto
 
-import kr.hhplus.be.server.balance.entity.Point
-import kr.hhplus.be.server.balance.entity.PointHistory
-import kr.hhplus.be.server.payment.entity.Payment
-import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.user.entity.User
 
 /**
@@ -26,27 +22,5 @@ data class UserDto(
     }
 }
 
-/**
- * 사용자 상세 정보 DTO
- */
-data class UserDetail(
-    val userId: Long,
-    val point: Point?,
-    val pointHistoryList: List<PointHistory>,
-    val reservationList: List<Reservation>,
-    val paymentList: List<Payment>
-) {
-    companion object {
-        fun fromEntity(user: User): UserDetail {
-            return UserDetail(
-                userId = user.userId,
-                point = user.point,
-                pointHistoryList = user.pointHistoryList,
-                reservationList = user.reservationList,
-                paymentList = user.paymentList
-            )
-        }
-    }
-}
 
 

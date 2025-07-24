@@ -44,16 +44,6 @@ class ConcertController(
         @Valid @RequestBody request: SearchConcertRequest
     ): ResponseEntity<List<ConcertScheduleDetail>> {
         val concerts = when {
-            !request.keyword.isNullOrBlank() -> {
-                val searchResults = concertService.searchConcerts(request.keyword)
-                // 검색 결과를 스케줄과 함께 조회하는 로직 필요
-                emptyList() // TODO: 구현 필요
-            }
-            !request.artist.isNullOrBlank() -> {
-                val searchResults = concertService.getConcertsByArtist(request.artist)
-                // 아티스트 검색 결과를 스케줄과 함께 조회하는 로직 필요
-                emptyList() // TODO: 구현 필요
-            }
             request.startDate != null && request.endDate != null -> {
                 concertService.getAvailableConcerts(request.startDate, request.endDate)
             }

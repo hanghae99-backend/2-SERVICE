@@ -1,6 +1,8 @@
 package kr.hhplus.be.server.auth.service
 
-import kr.hhplus.be.server.auth.dto.response.TokenResponse
+import kr.hhplus.be.server.auth.dto.TokenDto
+import kr.hhplus.be.server.auth.dto.TokenIssueDetail
+import kr.hhplus.be.server.auth.dto.TokenQueueDetail
 import kr.hhplus.be.server.auth.entity.TokenStatus
 import kr.hhplus.be.server.auth.entity.WaitingToken
 import kr.hhplus.be.server.auth.exception.TokenActivationException

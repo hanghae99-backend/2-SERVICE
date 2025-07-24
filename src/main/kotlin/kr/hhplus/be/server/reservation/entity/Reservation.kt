@@ -47,6 +47,24 @@ class Reservation(
     @Column(name = "confirmed_at", nullable = true)
     var confirmedAt: LocalDateTime? = null
 ) {
+    
+    // 상태 명칭 계산 프로퍼티
+    val statusName: String
+        get() = when (statusCode) {
+            ReservationStatusType.TEMPORARY -> "임시 예약"
+            ReservationStatusType.CONFIRMED -> "예약 확정"
+            ReservationStatusType.CANCELLED -> "예약 취소"
+            else -> "알 수 없음"
+        }
+    
+    // 상태 설명 계산 프로퍼티
+    val statusDescription: String
+        get() = when (statusCode) {
+            ReservationStatusType.TEMPORARY -> "결제 대기 중인 임시 예약입니다."
+            ReservationStatusType.CONFIRMED -> "결제가 완료된 확정 예약입니다."
+            ReservationStatusType.CANCELLED -> "취소된 예약입니다."
+            else -> "알 수 없는 상태입니다."
+        }
 
     // 필요할 때만 사용하는 연관관계 (조회 전용)
     @ManyToOne(fetch = FetchType.LAZY)

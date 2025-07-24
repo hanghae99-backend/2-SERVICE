@@ -87,13 +87,7 @@ class SeatService(
         ).map { SeatDto.from(it) }
     }
     
-    /**
-     * 특정 상태의 좌석 개수 조회
-     */
-    fun countSeatsByStatus(scheduleId: Long, statusCode: String): Int {
-        return seatJpaRepository.countByScheduleIdAndStatusCode(scheduleId, statusCode)
-    }
-    
+
     /**
      * 예약 가능한 좌석 개수 조회
      */

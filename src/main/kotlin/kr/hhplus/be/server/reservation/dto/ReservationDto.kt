@@ -2,6 +2,10 @@ package kr.hhplus.be.server.reservation.dto
 
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.reservation.entity.ReservationStatusType
+import kr.hhplus.be.server.user.entity.User
+import kr.hhplus.be.server.concert.entity.Concert
+import kr.hhplus.be.server.concert.entity.Seat
+import kr.hhplus.be.server.payment.entity.Payment
 import com.fasterxml.jackson.annotation.JsonFormat
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -40,6 +44,7 @@ data class ReservationDto(
                 confirmedAt = reservation.confirmedAt
             )
         }
+
         
         private fun generateDefaultMessage(reservation: Reservation): String {
             return when (reservation.statusCode) {
@@ -79,75 +84,20 @@ data class ReservationDto(
      */
     data class Detail(
         val reservation: ReservationDto,
-        val user: UserInfo?,
-        val concert: ConcertInfo?,
-        val seat: SeatInfo?,
-        val payment: PaymentInfo?
+        val user: User?,
+        val concert: Concert?,
+        val seat: Seat?,
+        val payment: Payment?
     ) {
-        data class UserInfo(
-            val userId: Long,
-            val name: String,
-            val email: String
-        )
-        
-        data class ConcertInfo(
-            val concertId: Long,
-            val title: String,
-            @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-            val concertAt: LocalDateTime,
-            val venue: String
-        )
-        
-        data class SeatInfo(
-            val seatId: Long,
-            val seatNumber: String,
-            val seatGrade: String,
-            val price: BigDecimal
-        )
-        
-        data class PaymentInfo(
-            val paymentId: Long,
-            val amount: BigDecimal,
-            val status: String,
-            @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-            val paidAt: LocalDateTime?
-        )
         
         companion object {
             fun fromEntity(reservation: Reservation): Detail {
                 return Detail(
                     reservation = ReservationDto.fromEntity(reservation),
-                    user = reservation.user?.let { 
-                        UserInfo(
-                            userId = it.userId,
-                            name = it.name,
-                            email = it.email
-                        )
-                    },
-                    concert = reservation.concert?.let {
-                        ConcertInfo(
-                            concertId = it.concertId,
-                            title = it.title,
-                            concertAt = it.concertAt,
-                            venue = it.venue
-                        )
-                    },
-                    seat = reservation.seat?.let {
-                        SeatInfo(
-                            seatId = it.seatId,
-                            seatNumber = it.seatNumber,
-                            seatGrade = it.seatGrade,
-                            price = it.price
-                        )
-                    },
-                    payment = reservation.payment?.let {
-                        PaymentInfo(
-                            paymentId = it.paymentId,
-                            amount = it.amount,
-                            status = it.status,
-                            paidAt = it.paidAt
-                        )
-                    }
+                    user = reservation.user,
+                    concert = reservation.concert,
+                    seat = reservation.seat,
+                    payment = reservation.payment
                 )
             }
         }

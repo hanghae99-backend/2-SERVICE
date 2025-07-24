@@ -55,8 +55,9 @@ class PaymentService(
         val paymentAmount = seat.price
 
         // 6. 잔액 확인 및 차감
-        if (!balanceService.checkBalance(userId, paymentAmount)) {
-            throw PaymentProcessException("잔액이 부족합니다")
+        val currentBalance = balanceService.getBalance(userId)
+        if (currentBalance.amount < paymentAmount) {
+            throw PaymentProcessException("잔액이 부족합니다. 현재 잔액: ${currentBalance.amount}, 필요 금액: $paymentAmount")
         }
 
         // 7. 결제 생성
@@ -90,15 +91,6 @@ class PaymentService(
         }
     }
 
-    fun getPaymentHistory(userId: Long): List<PaymentDto> {
-        if (!userService.existsById(userId)) {
-            throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
-        }
-
-        return paymentRepository.findByUserIdOrderByPaymentIdDesc(userId)
-            .map { PaymentDto.fromEntity(it) }
-    }
-
     fun getPaymentById(paymentId: Long): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
             .orElseThrow { PaymentNotFoundException("결제를 찾을 수 없습니다: $paymentId") }
@@ -106,13 +98,5 @@ class PaymentService(
         return PaymentDto.fromEntity(payment)
     }
 
-    fun getPaymentsByStatus(statusCode: String): List<PaymentDto> {
-        return paymentRepository.findByStatusCode(statusCode)
-            .map { PaymentDto.fromEntity(it) }
-    }
 
-    fun getUserPaymentsByStatus(userId: Long, statusCode: String): List<PaymentDto> {
-        return paymentRepository.findByUserIdAndStatusCode(userId, statusCode)
-            .map { PaymentDto.fromEntity(it) }
-    }
 }

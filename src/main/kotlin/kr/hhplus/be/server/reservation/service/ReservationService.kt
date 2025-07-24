@@ -119,11 +119,7 @@ class ReservationService(
         )
     }
     
-    @Transactional(readOnly = true)
-    fun searchReservations(condition: ReservationSearchCondition): ReservationDto.Page {
-        return getReservationsByCondition(condition)
-    }
-    
+
     @Transactional(readOnly = true)
     fun getReservationStats(concertId: Long?, startDate: String?, endDate: String?): ReservationDto.Statistics {
         // 현재 시점 기준 통계

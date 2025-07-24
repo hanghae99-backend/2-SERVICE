@@ -152,7 +152,7 @@ class ReservationController(
     fun searchReservations(
         @Valid @RequestBody request: ReservationSearchRequest
     ): ResponseEntity<ReservationDto.Page> {
-        val result = reservationService.searchReservations(request.toSearchCondition())
+        val result = reservationService.getReservationsByCondition(request.toSearchCondition())
         return ResponseEntity.ok(result)
     }
 

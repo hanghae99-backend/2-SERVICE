@@ -49,17 +49,4 @@ data class UserDetail(
     }
 }
 
-/**
- * 사용자 기본 정보 응답용 DTO
- */
-data class UserSummary(
-    val userId: Long
-) {
-    companion object {
-        fun fromEntity(user: User): UserSummary {
-            return UserSummary(
-                userId = user.userId
-            )
-        }
-    }
-}
+

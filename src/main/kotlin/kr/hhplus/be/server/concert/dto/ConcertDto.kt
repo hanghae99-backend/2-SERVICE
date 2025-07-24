@@ -57,14 +57,14 @@ data class ConcertScheduleDto(
  * 콘서트 전체 정보 조합 DTO
  */
 data class ConcertWithScheduleDto(
-    val concert: ConcertDto,
-    val schedule: ConcertScheduleDto
+    val concert: Concert,
+    val schedule: ConcertSchedule
 ) {
     companion object {
         fun from(concert: Concert, schedule: ConcertSchedule): ConcertWithScheduleDto {
             return ConcertWithScheduleDto(
-                concert = ConcertDto.from(concert),
-                schedule = ConcertScheduleDto.from(schedule)
+                concert = concert,
+                schedule = schedule
             )
         }
     }

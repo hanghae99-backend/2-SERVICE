@@ -27,9 +27,6 @@ interface SeatJpaRepository : JpaRepository<Seat, Long> {
     // 예약 가능한 좌석 개수 조회
     fun countByScheduleIdAndStatusCode(scheduleId: Long, statusCode: String): Int
     
-    // 여러 상태의 좌석들 조회
-    fun findByScheduleIdAndStatusCodeInOrderBySeatNumberAsc(scheduleId: Long, statusCodes: List<String>): List<Seat>
-    
     // 가격 범위로 좌석 조회
     fun findByScheduleIdAndStatusCodeAndPriceBetweenOrderByPriceAscSeatNumberAsc(
         scheduleId: Long, 
@@ -41,26 +38,10 @@ interface SeatJpaRepository : JpaRepository<Seat, Long> {
     // 좌석 번호 패턴으로 검색
     fun findByScheduleIdAndSeatNumberContainingOrderBySeatNumberAsc(scheduleId: Long, seatNumberPattern: String): List<Seat>
     
-    // 특정 가격의 좌석 조회
-    fun findByScheduleIdAndPrice(scheduleId: Long, price: BigDecimal): List<Seat>
-    
     // 특정 가격 이하의 좌석 조회
     fun findByScheduleIdAndStatusCodeAndPriceLessThanEqualOrderByPriceAsc(
         scheduleId: Long, 
         statusCode: String, 
         maxPrice: BigDecimal
     ): List<Seat>
-    
-    // 특정 가격 이상의 좌석 조회
-    fun findByScheduleIdAndStatusCodeAndPriceGreaterThanEqualOrderByPriceAsc(
-        scheduleId: Long, 
-        statusCode: String, 
-        minPrice: BigDecimal
-    ): List<Seat>
-    
-    // 여러 좌석 ID로 조회
-    fun findBySeatIdIn(seatIds: List<Long>): List<Seat>
-    
-    // 좌석 번호 시작 패턴으로 검색
-    fun findByScheduleIdAndSeatNumberStartingWithOrderBySeatNumberAsc(scheduleId: Long, prefix: String): List<Seat>
 }

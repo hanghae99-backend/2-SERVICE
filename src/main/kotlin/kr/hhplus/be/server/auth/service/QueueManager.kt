@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.auth.service
 
-import kr.hhplus.be.server.auth.dto.response.QueueStatusResponse
 import kr.hhplus.be.server.auth.repository.TokenStore
+import kr.hhplus.be.server.auth.dto.TokenQueueDetail
 import org.springframework.stereotype.Component
 
 /**
@@ -70,7 +70,7 @@ class QueueManager(
     /**
      * 큐 상태 조회
      */
-    fun getQueueStatus(token: String): QueueStatusResponse {
+    fun getQueueStatus(token: String): TokenQueueDetail {
         val tokenStatus = tokenStore.getTokenStatus(token)
         val queuePosition = tokenStore.getQueuePosition(token)
         val isActive = tokenStatus.name == "ACTIVE"
@@ -83,7 +83,7 @@ class QueueManager(
         }
         val estimatedWaitingTime = if (isActive) null else calculateEstimatedWaitingTime(queuePosition)
 
-        return QueueStatusResponse(
+        return TokenQueueDetail.fromTokenWithQueue(
             token = token,
             status = status,
             message = message,

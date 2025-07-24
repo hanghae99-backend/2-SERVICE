@@ -102,23 +102,7 @@ class ConcertService(
         return ConcertDetailDto.from(concert, schedule, seats)
     }
     
-    /**
-     * 특정 스케줄의 좌석 목록 조회
-     */
-    fun getSeatsByScheduleId(scheduleId: Long): List<SeatDto> {
-        val seats = seatJpaRepository.findByScheduleId(scheduleId)
-        return seats.map { SeatDto.from(it) }
-    }
-    
-    /**
-     * 특정 스케줄의 예약 가능한 좌석 목록 조회
-     */
-    fun getAvailableSeatsByScheduleId(scheduleId: Long): List<SeatDto> {
-        val seats = seatJpaRepository.findByScheduleIdAndStatusCodeOrderBySeatNumberAsc(
-            scheduleId, SeatStatusType.AVAILABLE
-        )
-        return seats.map { SeatDto.from(it) }
-    }
+
     
     /**
      * 특정 콘서트의 모든 스케줄 조회
@@ -150,22 +134,7 @@ class ConcertService(
         }
     }
     
-    /**
-     * 아티스트별 콘서트 검색
-     */
-    fun getConcertsByArtist(artist: String): List<ConcertDto> {
-        val concerts = concertJpaRepository.findByArtist(artist)
-        return concerts.map { ConcertDto.from(it) }
-    }
-    
-    /**
-     * 키워드로 콘서트 검색
-     */
-    fun searchConcerts(keyword: String): List<ConcertDto> {
-        val concerts = concertJpaRepository.findByTitleContainingOrArtistContaining(keyword, keyword)
-        return concerts.map { ConcertDto.from(it) }
-    }
-    
+
     /**
      * 콘서트 엔티티 조회 (내부 사용)
      */

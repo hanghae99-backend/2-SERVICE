@@ -2,8 +2,8 @@ package kr.hhplus.be.server.payment.controller
 
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive
+import kr.hhplus.be.server.payment.dto.PaymentDto
 import kr.hhplus.be.server.payment.dto.PaymentRequest
-import kr.hhplus.be.server.payment.dto.PaymentResponse
 import kr.hhplus.be.server.payment.service.PaymentService
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -20,9 +20,9 @@ class PaymentController(
      * 결제 처리 (예약 기반)
      */
     @PostMapping
-    fun processPayment(@Valid @RequestBody request: PaymentRequest): ResponseEntity<PaymentResponse> {
+    fun processPayment(@Valid @RequestBody request: PaymentRequest): ResponseEntity<PaymentDto> {
         val payment = paymentService.processPayment(request.userId, request.reservationId, request.token)
-        return ResponseEntity.status(201).body(PaymentResponse.from(payment))
+        return ResponseEntity.status(201).body(payment)
     }
     
     /**
@@ -31,8 +31,8 @@ class PaymentController(
     @GetMapping("/{paymentId}")
     fun getPayment(
         @PathVariable @Positive(message = "결제 ID는 양수여야 합니다") paymentId: Long
-    ): ResponseEntity<PaymentResponse> {
+    ): ResponseEntity<PaymentDto> {
         val payment = paymentService.getPaymentById(paymentId)
-        return ResponseEntity.ok(PaymentResponse.from(payment))
+        return ResponseEntity.ok(payment)
     }
 }

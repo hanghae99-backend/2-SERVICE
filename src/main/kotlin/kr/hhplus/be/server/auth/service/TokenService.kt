@@ -24,10 +24,10 @@ class TokenService(
 ) {
     
     /**
-     * 대기 토큰 발급 플로우 조정 - TokenResponse.Issue 반환
+     * 대기 토큰 발급 플로우 조정 - TokenIssueDetail 반환
      * 1. 파라미터 검증 -> 2. 사용자 검증 -> 3. 토큰 생성 -> 4. 토큰 저장 -> 5. 대기열 추가
      */
-    fun issueWaitingToken(userId: Long): TokenResponse.Issue {
+    fun issueWaitingToken(userId: Long): TokenIssueDetail {
         // 1. 사용자 존재 확인
         val user = userService.getUserById(userId)
             ?: throw UserNotFoundException("사용자를 찾을 수 없습니다: $userId")
@@ -45,7 +45,7 @@ class TokenService(
         val queuePosition = queueManager.getQueuePosition(waitingToken.token) + 1 // 1부터 시작
         val estimatedWaitingTime = calculateWaitingTime(queuePosition)
         
-        return TokenResponse.Issue.fromTokenWithDetails(
+        return TokenIssueDetail.fromTokenWithDetails(
             token = waitingToken.token,
             status = "WAITING",
             message = "대기열에 등록되었습니다",
@@ -57,9 +57,9 @@ class TokenService(
     }
     
     /**
-     * 토큰 대기열 상태 조회 - TokenResponse.Queue 반환
+     * 토큰 대기열 상태 조회 - TokenQueueDetail 반환
      */
-    fun getTokenQueueStatus(token: String): TokenResponse.Queue {
+    fun getTokenQueueStatus(token: String): TokenQueueDetail {
         // 1. 토큰 존재 확인
         tokenLifecycleManager.findToken(token)
             ?: throw TokenNotFoundException("토큰을 찾을 수 없습니다.")
@@ -79,7 +79,7 @@ class TokenService(
             TokenStatus.EXPIRED -> Triple("토큰이 만료되었습니다", null, null)
         }
         
-        return TokenResponse.Queue.fromTokenWithQueue(
+        return TokenQueueDetail.fromTokenWithQueue(
             token = token,
             status = status.name,
             message = message,
@@ -89,9 +89,9 @@ class TokenService(
     }
     
     /**
-     * 간단한 토큰 상태 조회 - TokenResponse 반환
+     * 간단한 토큰 상태 조회 - TokenDto 반환
      */
-    fun getSimpleTokenStatus(token: String): TokenResponse {
+    fun getSimpleTokenStatus(token: String): TokenDto {
         // 1. 토큰 존재 확인
         tokenLifecycleManager.findToken(token)
             ?: throw TokenNotFoundException("토큰을 찾을 수 없습니다.")
@@ -106,7 +106,7 @@ class TokenService(
             TokenStatus.EXPIRED -> "토큰이 만료되었습니다"
         }
         
-        return TokenResponse.create(
+        return TokenDto.create(
             token = token,
             status = status.name,
             message = message

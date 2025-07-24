@@ -5,12 +5,13 @@ import io.swagger.v3.oas.annotations.media.*
 import io.swagger.v3.oas.annotations.responses.*
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import kr.hhplus.be.server.auth.dto.response.TokenResponse
+import kr.hhplus.be.server.auth.dto.TokenDto
+import kr.hhplus.be.server.auth.dto.TokenIssueDetail
+import kr.hhplus.be.server.auth.dto.TokenQueueDetail
 import kr.hhplus.be.server.auth.dto.request.TokenIssueRequest
 import kr.hhplus.be.server.auth.service.TokenService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import java.time.LocalDateTime
 
 @RestController
 @RequestMapping("/api/v1/tokens")
@@ -26,7 +27,7 @@ class TokenController(
                 description = "토큰 발급 성공",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = TokenResponse.Issue::class)
+                    schema = Schema(implementation = TokenIssueDetail::class)
                 )]
             ),
             ApiResponse(
@@ -39,19 +40,8 @@ class TokenController(
             ),
         ]
     )
-    fun issueToken(@Valid @RequestBody @Parameter(description = "토큰 발급 요청") request: TokenIssueRequest): ResponseEntity<TokenResponse.Issue> {
-        val issueResult = tokenService.issueWaitingToken(request.userId)
-        
-        val response = TokenResponse.Issue.fromTokenWithDetails(
-            token = issueResult.token,
-            status = issueResult.status,
-            message = issueResult.message,
-            userId = issueResult.userId,
-            queuePosition = issueResult.queuePosition,
-            estimatedWaitingTime = issueResult.estimatedWaitingTime,
-            issuedAt = issueResult.issuedAt
-        )
-        
+    fun issueToken(@Valid @RequestBody @Parameter(description = "토큰 발급 요청") request: TokenIssueRequest): ResponseEntity<TokenIssueDetail> {
+        val response = tokenService.issueWaitingToken(request.userId)
         return ResponseEntity.status(201).body(response)
     }
 
@@ -63,7 +53,7 @@ class TokenController(
                 description = "상태 조회 성공",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = TokenResponse.Queue::class)
+                    schema = Schema(implementation = TokenQueueDetail::class)
                 )]
             ),
             ApiResponse(
@@ -72,17 +62,8 @@ class TokenController(
             )
         ]
     )
-    fun getTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<TokenResponse.Queue> {
-        val queueResult = tokenService.getTokenQueueStatus(token)
-        
-        val response = TokenResponse.Queue.fromTokenWithQueue(
-            token = queueResult.token,
-            status = queueResult.status,
-            message = queueResult.message,
-            queuePosition = queueResult.queuePosition,
-            estimatedWaitingTime = queueResult.estimatedWaitingTime
-        )
-        
+    fun getTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<TokenQueueDetail> {
+        val response = tokenService.getTokenQueueStatus(token)
         return ResponseEntity.ok(response)
     }
 
@@ -94,7 +75,7 @@ class TokenController(
                 description = "간단 상태 조회 성공",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = TokenResponse::class)
+                    schema = Schema(implementation = TokenDto::class)
                 )]
             ),
             ApiResponse(
@@ -103,15 +84,8 @@ class TokenController(
             )
         ]
     )
-    fun getSimpleTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<TokenResponse> {
-        val statusResult = tokenService.getSimpleTokenStatus(token)
-        
-        val response = TokenResponse.create(
-            token = statusResult.token,
-            status = statusResult.status,
-            message = statusResult.message
-        )
-        
+    fun getSimpleTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<TokenDto> {
+        val response = tokenService.getSimpleTokenStatus(token)
         return ResponseEntity.ok(response)
     }
 }

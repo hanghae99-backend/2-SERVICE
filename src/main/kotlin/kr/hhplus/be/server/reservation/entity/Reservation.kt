@@ -1,6 +1,10 @@
 package kr.hhplus.be.server.reservation.entity
 
 import kr.hhplus.be.server.global.exception.ParameterValidationException
+import kr.hhplus.be.server.user.entity.User
+import kr.hhplus.be.server.concert.entity.Concert
+import kr.hhplus.be.server.concert.entity.Seat
+import kr.hhplus.be.server.payment.entity.Payment
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -47,19 +51,19 @@ class Reservation(
     // 필요할 때만 사용하는 연관관계 (조회 전용)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    val user: kr.hhplus.be.server.user.entity.User? = null
+    val user: User? = null
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "concert_id", insertable = false, updatable = false)
-    val concert: kr.hhplus.be.server.concert.entity.Concert? = null
+    val concert: Concert? = null
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seat_id", insertable = false, updatable = false)
-    val seat: kr.hhplus.be.server.concert.entity.Seat? = null
+    val seat: Seat? = null
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payment_id", insertable = false, updatable = false)
-    val payment: kr.hhplus.be.server.payment.entity.Payment? = null
+    val payment: Payment? = null
 
     companion object {
         // 상태 코드 상수

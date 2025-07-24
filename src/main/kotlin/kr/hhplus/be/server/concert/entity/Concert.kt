@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.concert.entity
 
 import kr.hhplus.be.server.global.exception.ParameterValidationException
+import kr.hhplus.be.server.reservation.entity.Reservation
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -33,7 +34,7 @@ class Concert(
     private var _seats: MutableList<Seat> = mutableListOf()
     
     @OneToMany(mappedBy = "concert", fetch = FetchType.LAZY)
-    private var _reservations: MutableList<kr.hhplus.be.server.reservation.entity.Reservation> = mutableListOf()
+    private var _reservations: MutableList<Reservation> = mutableListOf()
     
     // Public read-only access
     val schedules: List<ConcertSchedule>
@@ -42,7 +43,7 @@ class Concert(
     val seats: List<Seat>
         get() = _seats.toList()
     
-    val reservations: List<kr.hhplus.be.server.reservation.entity.Reservation>
+    val reservations: List<Reservation>
         get() = _reservations.toList()
     
     // Business methods for managing relationships
@@ -66,7 +67,7 @@ class Concert(
         _seats.remove(seat)
     }
     
-    fun addReservation(reservation: kr.hhplus.be.server.reservation.entity.Reservation) {
+    fun addReservation(reservation: Reservation) {
         if (!_reservations.contains(reservation)) {
             _reservations.add(reservation)
         }

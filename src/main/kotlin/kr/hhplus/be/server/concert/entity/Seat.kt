@@ -2,6 +2,7 @@ package kr.hhplus.be.server.concert.entity
 
 import kr.hhplus.be.server.concert.exception.InvalidSeatStatusException
 import kr.hhplus.be.server.global.exception.ParameterValidationException
+import kr.hhplus.be.server.reservation.entity.Reservation
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -45,7 +46,7 @@ data class Seat(
     
     // Seat -> Reservation 연관관계 (1:N) - 한 좌석이 여러 예약을 가질 수 있음 (시간대별)
     @OneToMany(mappedBy = "seat", fetch = FetchType.LAZY)
-    val reservations: List<kr.hhplus.be.server.reservation.entity.Reservation> = emptyList()
+    val reservations: List<Reservation> = emptyList()
     
     companion object {
         fun create(scheduleId: Long, seatNumber: String, price: BigDecimal): Seat {

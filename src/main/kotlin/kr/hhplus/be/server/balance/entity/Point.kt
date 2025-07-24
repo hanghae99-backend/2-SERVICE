@@ -3,6 +3,7 @@ package kr.hhplus.be.server.balance.entity
 import jakarta.persistence.*
 import kr.hhplus.be.server.balance.exception.InvalidPointAmountException
 import kr.hhplus.be.server.balance.exception.InsufficientBalanceException
+import kr.hhplus.be.server.user.entity.User
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -30,7 +31,7 @@ class Point(
     // Point -> User 연관관계 (1:1)
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    val user: kr.hhplus.be.server.user.entity.User? = null
+    val user: User? = null
     
     companion object {
         fun create(userId: Long, amount: BigDecimal): Point {

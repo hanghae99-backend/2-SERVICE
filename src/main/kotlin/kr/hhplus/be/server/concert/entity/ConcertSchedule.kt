@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.concert.entity
 
 import kr.hhplus.be.server.global.exception.ParameterValidationException
+import kr.hhplus.be.server.reservation.entity.Reservation
 import jakarta.persistence.*
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -39,14 +40,14 @@ class ConcertSchedule(
     
     // Private MutableList for internal JPA management
     @OneToMany(mappedBy = "concertSchedule", fetch = FetchType.LAZY)
-    private var _reservations: MutableList<kr.hhplus.be.server.reservation.entity.Reservation> = mutableListOf()
+    private var _reservations: MutableList<Reservation> = mutableListOf()
     
     // Public read-only access
-    val reservations: List<kr.hhplus.be.server.reservation.entity.Reservation>
+    val reservations: List<Reservation>
         get() = _reservations.toList()
     
     // Business methods for managing relationships
-    fun addReservation(reservation: kr.hhplus.be.server.reservation.entity.Reservation) {
+    fun addReservation(reservation: Reservation) {
         if (!_reservations.contains(reservation)) {
             _reservations.add(reservation)
         }

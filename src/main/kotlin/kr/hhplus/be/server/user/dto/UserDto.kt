@@ -1,4 +1,4 @@
-package com.hbd.book_be.dto
+package kr.hhplus.be.server.user.dto
 
 import kr.hhplus.be.server.balance.entity.Point
 import kr.hhplus.be.server.balance.entity.PointHistory
@@ -6,43 +6,60 @@ import kr.hhplus.be.server.payment.entity.Payment
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.user.entity.User
 
+/**
+ * User Domain DTOs
+ * 사용자 관련 DTO 클래스들
+ */
 
+/**
+ * 기본 사용자 DTO
+ */
 data class UserDto(
-    val id: Long,
+    val userId: Long
 ) {
     companion object {
         fun fromEntity(user: User): UserDto {
             return UserDto(
-                id = user.userId
+                userId = user.userId
             )
         }
     }
+}
 
-    data class Detail(
-        val id: Long,
-        val point: Point?,
-        val pointHistoryList: List<PointHistory>,
-        val reservationList: List<Reservation>,
-        val paymentList: List<Payment>
-    ){
-        companion object {
-            fun fromEntity(
-                user: User
-            ): Detail {
-                val pointHistoryList = user.pointHistoryList
+/**
+ * 사용자 상세 정보 DTO
+ */
+data class UserDetail(
+    val userId: Long,
+    val point: Point?,
+    val pointHistoryList: List<PointHistory>,
+    val reservationList: List<Reservation>,
+    val paymentList: List<Payment>
+) {
+    companion object {
+        fun fromEntity(user: User): UserDetail {
+            return UserDetail(
+                userId = user.userId,
+                point = user.point,
+                pointHistoryList = user.pointHistoryList,
+                reservationList = user.reservationList,
+                paymentList = user.paymentList
+            )
+        }
+    }
+}
 
-                val reservationList = user.reservationList
-
-                val paymentList = user.paymentList
-
-                return Detail(
-                    id = user.userId,
-                    point = user.point,
-                    pointHistoryList = pointHistoryList,
-                    reservationList = reservationList,
-                    paymentList = paymentList
-                )
-            }
+/**
+ * 사용자 기본 정보 응답용 DTO
+ */
+data class UserSummary(
+    val userId: Long
+) {
+    companion object {
+        fun fromEntity(user: User): UserSummary {
+            return UserSummary(
+                userId = user.userId
+            )
         }
     }
 }

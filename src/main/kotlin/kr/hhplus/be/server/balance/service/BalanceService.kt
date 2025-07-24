@@ -52,7 +52,6 @@ class BalanceService(
         return savedPoint
     }
 
-    @Transactional(readOnly = true)
     fun getBalance(userId: Long): Point {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
@@ -80,7 +79,6 @@ class BalanceService(
         return savedPoint
     }
 
-    @Transactional(readOnly = true)
     fun getPointHistory(userId: Long): List<PointHistory> {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")

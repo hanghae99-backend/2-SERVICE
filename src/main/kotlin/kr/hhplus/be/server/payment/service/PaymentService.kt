@@ -97,6 +97,4 @@ class PaymentService(
 
         return PaymentDto.fromEntity(payment)
     }
-
-
 }

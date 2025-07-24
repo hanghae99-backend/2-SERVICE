@@ -156,19 +156,6 @@ class ReservationController(
         return ResponseEntity.ok(result)
     }
 
-    @Operation(summary = "예약 통계 조회", description = "예약 관련 통계 정보를 조회합니다. (관리자용)")
-    @PostMapping("/stats")
-    fun getReservationStats(
-        @Valid @RequestBody(required = false) request: ReservationStatsRequest?
-    ): ResponseEntity<ReservationDto.Statistics> {
-        val stats = reservationService.getReservationStats(
-            request?.concertId,
-            request?.startDate,
-            request?.endDate
-        )
-        return ResponseEntity.ok(stats)
-    }
-
     @Operation(summary = "만료된 예약 목록 조회", description = "만료된 임시 예약 목록을 조회합니다. (관리자용)")
     @PostMapping("/expired")
     fun getExpiredReservations(

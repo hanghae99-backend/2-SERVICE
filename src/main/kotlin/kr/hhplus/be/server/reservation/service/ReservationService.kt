@@ -64,18 +64,15 @@ class ReservationService(
         return reservationRepository.save(reservation)
     }
     
-    @Transactional(readOnly = true)
     fun getReservationById(reservationId: Long): Reservation {
         return reservationRepository.findById(reservationId)
             .orElseThrow { IllegalArgumentException("예약을 찾을 수 없습니다: $reservationId") }
     }
     
-    @Transactional(readOnly = true)
     fun getReservationWithDetails(reservationId: Long): Reservation {
         return getReservationById(reservationId)
     }
     
-    @Transactional(readOnly = true)
     fun getReservationsByCondition(condition: ReservationSearchCondition): ReservationDto.Page {
         val pageable = PageRequest.of(
             condition.pageNumber - 1,
@@ -118,40 +115,7 @@ class ReservationService(
             pageSize = condition.pageSize
         )
     }
-    
 
-    @Transactional(readOnly = true)
-    fun getReservationStats(concertId: Long?, startDate: String?, endDate: String?): ReservationDto.Statistics {
-        // 현재 시점 기준 통계
-        val now = LocalDateTime.now()
-        val start = startDate?.let { LocalDateTime.parse("${it}T00:00:00") } ?: now.minusMonths(1)
-        val end = endDate?.let { LocalDateTime.parse("${it}T23:59:59") } ?: now
-        
-        val allReservations = if (concertId != null) {
-            reservationRepository.findByConcertIdOrderByReservedAtDesc(concertId)
-        } else {
-            reservationRepository.findByReservedAtBetween(start, end)
-        }
-        
-        val temporaryCount = allReservations.count { it.isTemporary() }.toLong()
-        val confirmedCount = allReservations.count { it.isConfirmed() }.toLong()
-        val cancelledCount = allReservations.count { it.isCancelled() }.toLong()
-        val expiredCount = allReservations.count { it.isExpired() }.toLong()
-        val totalAmount = allReservations
-            .filter { it.isConfirmed() }
-            .sumOf { it.price }
-        
-        return ReservationDto.Statistics(
-            totalReservations = allReservations.size.toLong(),
-            temporaryReservations = temporaryCount,
-            confirmedReservations = confirmedCount,
-            cancelledReservations = cancelledCount,
-            expiredReservations = expiredCount,
-            totalAmount = totalAmount
-        )
-    }
-    
-    @Transactional(readOnly = true)
     fun getExpiredReservations(pageNumber: Int, pageSize: Int): ReservationDto.Page {
         val expiredReservations = reservationRepository.findByExpiresAtBeforeAndStatusCode(
             LocalDateTime.now(), 

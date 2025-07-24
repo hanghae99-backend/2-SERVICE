@@ -8,9 +8,9 @@ import kr.hhplus.be.server.concert.repository.SeatJpaRepository
 import kr.hhplus.be.server.concert.repository.ConcertScheduleJpaRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.math.BigDecimal
 
 @Service
+@Transactional(readOnly = true)
 class SeatService(
     private val seatJpaRepository: SeatJpaRepository,
     private val concertScheduleJpaRepository: ConcertScheduleJpaRepository,
@@ -59,25 +59,7 @@ class SeatService(
         
         return seat.isAvailable()
     }
-    
-    /**
-     * 가격 범위로 예약 가능한 좌석 조회
-     */
-    fun getAvailableSeatsByPriceRange(scheduleId: Long, minPrice: BigDecimal, maxPrice: BigDecimal): List<SeatDto> {
-        return seatJpaRepository.findByScheduleIdAndStatusCodeAndPriceBetweenOrderByPriceAscSeatNumberAsc(
-            scheduleId, SeatStatusType.AVAILABLE, minPrice, maxPrice
-        ).map { SeatDto.from(it) }
-    }
-    
-    /**
-     * 특정 가격 이하의 예약 가능한 좌석 조회
-     */
-    fun getAvailableSeatsUnderPrice(scheduleId: Long, maxPrice: BigDecimal): List<SeatDto> {
-        return seatJpaRepository.findByScheduleIdAndStatusCodeAndPriceLessThanEqualOrderByPriceAsc(
-            scheduleId, SeatStatusType.AVAILABLE, maxPrice
-        ).map { SeatDto.from(it) }
-    }
-    
+
     /**
      * 좌석 번호 패턴으로 좌석 검색
      */
@@ -86,25 +68,7 @@ class SeatService(
             scheduleId, pattern
         ).map { SeatDto.from(it) }
     }
-    
 
-    /**
-     * 예약 가능한 좌석 개수 조회
-     */
-    fun countAvailableSeats(scheduleId: Long): Int {
-        return seatJpaRepository.countByScheduleIdAndStatusCode(scheduleId, SeatStatusType.AVAILABLE)
-    }
-    
-    @Transactional
-    fun reserveSeat(seatId: Long): SeatDto {
-        val seat = seatJpaRepository.findById(seatId).orElse(null)
-            ?: throw SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId")
-        
-        val reservedSeat = seat.reserve()
-        val savedSeat = seatJpaRepository.save(reservedSeat)
-        return SeatDto.from(savedSeat)
-    }
-    
     @Transactional
     fun confirmSeat(seatId: Long): SeatDto {
         val seat = seatJpaRepository.findById(seatId).orElse(null)
@@ -114,14 +78,5 @@ class SeatService(
         val savedSeat = seatJpaRepository.save(confirmedSeat)
         return SeatDto.from(savedSeat)
     }
-    
-    @Transactional
-    fun releaseSeat(seatId: Long): SeatDto {
-        val seat = seatJpaRepository.findById(seatId).orElse(null)
-            ?: throw SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId")
-        
-        val releasedSeat = seat.release()
-        val savedSeat = seatJpaRepository.save(releasedSeat)
-        return SeatDto.from(savedSeat)
-    }
+
 }

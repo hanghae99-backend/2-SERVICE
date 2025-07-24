@@ -1,17 +1,16 @@
 package kr.hhplus.be.server.concert.service
 
-import kr.hhplus.be.server.concert.entity.Concert
-import kr.hhplus.be.server.concert.entity.ConcertSchedule
-import kr.hhplus.be.server.concert.entity.SeatStatusType
 import kr.hhplus.be.server.concert.exception.ConcertNotFoundException
 import kr.hhplus.be.server.concert.dto.*
 import kr.hhplus.be.server.concert.repository.ConcertJpaRepository
 import kr.hhplus.be.server.concert.repository.ConcertScheduleJpaRepository
 import kr.hhplus.be.server.concert.repository.SeatJpaRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 @Service
+@Transactional(readOnly = true)
 class ConcertService(
     private val concertJpaRepository: ConcertJpaRepository,
     private val concertScheduleJpaRepository: ConcertScheduleJpaRepository,
@@ -132,20 +131,5 @@ class ConcertService(
         return schedules.map { schedule ->
             ConcertWithScheduleDto.from(concert, schedule)
         }
-    }
-    
-
-    /**
-     * 콘서트 엔티티 조회 (내부 사용)
-     */
-    fun getConcertEntityById(concertId: Long): Concert? {
-        return concertJpaRepository.findById(concertId).orElse(null)
-    }
-    
-    /**
-     * 콘서트 스케줄 엔티티 조회 (내부 사용)
-     */
-    fun getConcertScheduleEntityById(scheduleId: Long): ConcertSchedule? {
-        return concertScheduleJpaRepository.findById(scheduleId).orElse(null)
     }
 }

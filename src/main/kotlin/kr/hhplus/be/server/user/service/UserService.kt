@@ -36,10 +36,6 @@ class UserService(
         return userRepository.existsById(userId)
     }
 
-    fun getUserCount(): Long {
-        return userRepository.count()
-    }
-    
     fun getUserDtoById(userId: Long): UserDto {
         val user = getUserById(userId) ?: throw UserNotFoundException("User with id $userId not found")
         return UserDto.fromEntity(user)

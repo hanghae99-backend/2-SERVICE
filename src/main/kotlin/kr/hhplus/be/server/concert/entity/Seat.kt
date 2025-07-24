@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.concert.entity
 
-import kr.hhplus.be.server.concert.entity.InvalidSeatStatusException
+import kr.hhplus.be.server.concert.exception.InvalidSeatStatusException
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import jakarta.persistence.*
 import java.math.BigDecimal
@@ -14,8 +14,8 @@ data class Seat(
     @Column(name = "id")
     val seatId: Long = 0,
     
-    @Column(name = "concert_id", nullable = false)
-    val concertId: Long,
+    @Column(name = "schedule_id", nullable = false)
+    val scheduleId: Long,
     
     @Column(name = "seat_number", nullable = false, length = 10)
     val seatNumber: String,
@@ -33,16 +33,24 @@ data class Seat(
     val updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
     
-    // 연관관계 매핑 (읽기 전용)
+    // Seat -> ConcertSchedule 연관관계 (N:1)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "schedule_id", insertable = false, updatable = false)
+    val concertSchedule: ConcertSchedule? = null
+    
+    // Seat -> SeatStatusType 연관관계 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "status_code", referencedColumnName = "code", insertable = false, updatable = false)
     val statusType: SeatStatusType? = null
     
+    // Seat -> Reservation 연관관계 (1:N) - 한 좌석이 여러 예약을 가질 수 있음 (시간대별)
+    @OneToMany(mappedBy = "seat", fetch = FetchType.LAZY)
+    val reservations: List<kr.hhplus.be.server.reservation.entity.Reservation> = emptyList()
+    
     companion object {
-        fun create(concertId: Long, seatNumber: String, price: BigDecimal): Seat {
-            // 파라미터 검증
-            if (concertId <= 0) {
-                throw ParameterValidationException("콘서트 ID는 0보다 커야 합니다: $concertId")
+        fun create(scheduleId: Long, seatNumber: String, price: BigDecimal): Seat {
+            if (scheduleId <= 0) {
+                throw ParameterValidationException("스케줄 ID는 0보다 커야 합니다: $scheduleId")
             }
             if (seatNumber.isBlank()) {
                 throw ParameterValidationException("좌석 번호는 필수입니다")
@@ -52,7 +60,7 @@ data class Seat(
             }
             
             return Seat(
-                concertId = concertId,
+                scheduleId = scheduleId,
                 seatNumber = seatNumber,
                 price = price,
                 statusCode = SeatStatusType.AVAILABLE
@@ -64,7 +72,6 @@ data class Seat(
         if (statusCode != SeatStatusType.AVAILABLE) {
             throw InvalidSeatStatusException("예약 가능한 좌석이 아닙니다. 현재 상태: $statusCode")
         }
-        
         return this.copy(
             statusCode = SeatStatusType.RESERVED,
             updatedAt = LocalDateTime.now()
@@ -75,7 +82,16 @@ data class Seat(
         if (statusCode != SeatStatusType.RESERVED) {
             throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $statusCode")
         }
-        
+        return this.copy(
+            statusCode = SeatStatusType.OCCUPIED,
+            updatedAt = LocalDateTime.now()
+        )
+    }
+    
+    fun confirm(): Seat {
+        if (statusCode != SeatStatusType.RESERVED) {
+            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $statusCode")
+        }
         return this.copy(
             statusCode = SeatStatusType.OCCUPIED,
             updatedAt = LocalDateTime.now()
@@ -86,7 +102,6 @@ data class Seat(
         if (statusCode != SeatStatusType.RESERVED) {
             throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $statusCode")
         }
-        
         return this.copy(
             statusCode = SeatStatusType.AVAILABLE,
             updatedAt = LocalDateTime.now()
@@ -100,44 +115,11 @@ data class Seat(
         )
     }
     
-    fun isAvailable(): Boolean {
-        return statusCode == SeatStatusType.AVAILABLE
-    }
+    fun isAvailable(): Boolean = statusCode == SeatStatusType.AVAILABLE
+    fun isReserved(): Boolean = statusCode == SeatStatusType.RESERVED
+    fun isOccupied(): Boolean = statusCode == SeatStatusType.OCCUPIED
+    fun canBeReserved(): Boolean = statusCode == SeatStatusType.AVAILABLE
     
-    fun isReserved(): Boolean {
-        return statusCode == SeatStatusType.RESERVED
-    }
-    
-    fun isOccupied(): Boolean {
-        return statusCode == SeatStatusType.OCCUPIED
-    }
-    
-    fun canBeReserved(): Boolean {
-        return statusCode == SeatStatusType.AVAILABLE
-    }
-    
-    // 상태 이름 조회를 위한 편의 메서드
     val status: String
         get() = statusType?.name ?: statusCode
-}
-
-// DTO for API responses
-data class SeatInfo(
-    val seatId: Long,
-    val seatNumber: String,
-    val price: BigDecimal,
-    val statusCode: String,
-    val status: String
-) {
-    companion object {
-        fun from(seat: Seat): SeatInfo {
-            return SeatInfo(
-                seatId = seat.seatId,
-                seatNumber = seat.seatNumber,
-                price = seat.price,
-                statusCode = seat.statusCode,
-                status = seat.status
-            )
-        }
-    }
 }

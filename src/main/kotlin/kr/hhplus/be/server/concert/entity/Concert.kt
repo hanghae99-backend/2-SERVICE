@@ -6,7 +6,7 @@ import java.time.LocalDateTime
 
 @Entity
 @Table(name = "concert")
-data class Concert(
+class Concert(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
@@ -25,9 +25,60 @@ data class Concert(
     val updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
     
+    // Private MutableList for internal JPA management
+    @OneToMany(mappedBy = "concert", fetch = FetchType.LAZY, cascade = [CascadeType.ALL], orphanRemoval = true)
+    private var _schedules: MutableList<ConcertSchedule> = mutableListOf()
+    
+    @OneToMany(mappedBy = "concert", fetch = FetchType.LAZY, cascade = [CascadeType.ALL], orphanRemoval = true)
+    private var _seats: MutableList<Seat> = mutableListOf()
+    
+    @OneToMany(mappedBy = "concert", fetch = FetchType.LAZY)
+    private var _reservations: MutableList<kr.hhplus.be.server.reservation.entity.Reservation> = mutableListOf()
+    
+    // Public read-only access
+    val schedules: List<ConcertSchedule>
+        get() = _schedules.toList()
+    
+    val seats: List<Seat>
+        get() = _seats.toList()
+    
+    val reservations: List<kr.hhplus.be.server.reservation.entity.Reservation>
+        get() = _reservations.toList()
+    
+    // Business methods for managing relationships
+    fun addSchedule(schedule: ConcertSchedule) {
+        if (!_schedules.contains(schedule)) {
+            _schedules.add(schedule)
+        }
+    }
+    
+    fun removeSchedule(schedule: ConcertSchedule) {
+        _schedules.remove(schedule)
+    }
+    
+    fun addSeat(seat: Seat) {
+        if (!_seats.contains(seat)) {
+            _seats.add(seat)
+        }
+    }
+    
+    fun removeSeat(seat: Seat) {
+        _seats.remove(seat)
+    }
+    
+    fun addReservation(reservation: kr.hhplus.be.server.reservation.entity.Reservation) {
+        if (!_reservations.contains(reservation)) {
+            _reservations.add(reservation)
+        }
+    }
+    
+    // Internal access for JPA (if needed)
+    internal fun getInternalSchedules() = _schedules
+    internal fun getInternalSeats() = _seats
+    internal fun getInternalReservations() = _reservations
+    
     companion object {
         fun create(title: String, artist: String): Concert {
-            // 파라미터 검증
             if (title.isBlank()) {
                 throw ParameterValidationException("콘서트 제목은 필수입니다")
             }

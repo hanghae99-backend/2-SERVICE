@@ -84,10 +84,10 @@ class Reservation(
     val payment: Payment? = null
 
     companion object {
-        // 상태 코드 상수
-        const val STATUS_TEMPORARY = "TEMP"
-        const val STATUS_CONFIRMED = "CONF"
-        const val STATUS_CANCELLED = "CANC"
+        // 상태 코드 상수 - ReservationStatusType과 동일하게 수정
+        const val STATUS_TEMPORARY = "TEMPORARY"
+        const val STATUS_CONFIRMED = "CONFIRMED"
+        const val STATUS_CANCELLED = "CANCELLED"
 
         fun createTemporary(
             userId: Long,

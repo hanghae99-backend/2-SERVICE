@@ -8,6 +8,7 @@ import kr.hhplus.be.server.user.exception.*
 import kr.hhplus.be.server.reservation.exception.*
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import java.time.LocalDateTime
@@ -18,6 +19,19 @@ import java.time.LocalDateTime
  */
 @RestControllerAdvice
 class GlobalExceptionHandler {
+
+    /**
+     * 요청 검증 실패
+     */
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleMethodArgumentNotValid(ex: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {
+        val errorMessage = ex.bindingResult.fieldErrors.joinToString(", ") { it.defaultMessage ?: "잘못된 값입니다" }
+        return createErrorResponse(
+            errorMessage,
+            CommonErrorCode.BadRequest.code,
+            CommonErrorCode.BadRequest.httpStatus
+        )
+    }
 
     /**
      * Concert Domain Exceptions
@@ -190,14 +204,42 @@ class GlobalExceptionHandler {
     }
 
     /**
-     * 레거시 IllegalArgumentException 처리 (점진적 마이그레이션을 위해 유지)
+     * IllegalStateException 처리 (이미 예약된 좌석 등)
+     */
+    @ExceptionHandler(IllegalStateException::class)
+    fun handleIllegalStateException(ex: IllegalStateException): ResponseEntity<ErrorResponse> {
+        // 이미 예약된 좌석의 경우 409 Conflict 반환
+        val status = if (ex.message?.contains("이미 예약된") == true) {
+            HttpStatus.CONFLICT
+        } else {
+            HttpStatus.BAD_REQUEST
+        }
+        
+        return createErrorResponse(
+            ex.message ?: "잘못된 상태입니다",
+            if (status == HttpStatus.CONFLICT) "ALREADY_RESERVED" else CommonErrorCode.BadRequest.code,
+            status
+        )
+    }
+
+    /**
+     * IllegalArgumentException 처리 (권한 없음, 잘못된 매개변수 등)
      */
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgumentException(ex: IllegalArgumentException): ResponseEntity<ErrorResponse> {
+        // 권한 관련 에러의 경우 403 Forbidden 반환
+        val status = if (ex.message?.contains("소유자가 아닙니다") == true || 
+                        ex.message?.contains("권한이 없습니다") == true ||
+                        ex.message?.contains("예약 소유자가 아닙니다") == true) {
+            HttpStatus.FORBIDDEN
+        } else {
+            HttpStatus.BAD_REQUEST
+        }
+        
         return createErrorResponse(
             ex.message ?: "잘못된 요청입니다",
-            CommonErrorCode.BadRequest.code,
-            CommonErrorCode.BadRequest.httpStatus
+            if (status == HttpStatus.FORBIDDEN) "ACCESS_DENIED" else CommonErrorCode.BadRequest.code,
+            status
         )
     }
 

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.concert.dto.*
 import kr.hhplus.be.server.concert.dto.request.SearchConcertRequest
 import kr.hhplus.be.server.concert.service.ConcertService
+import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
@@ -22,18 +23,19 @@ class ConcertController(
      */
     @GetMapping
     fun getAvailableConcerts(
-        @RequestParam(required = false) date: LocalDate?
-    ): ResponseEntity<List<ConcertScheduleDetail>> {
-        val concerts = if (date != null) {
-            concertService.getConcertsByDate(date)
-        } else {
-            val start = LocalDate.now()
-            val end = start.plusMonths(3)
-            concertService.getAvailableConcerts(start, end)
-        }
+        @RequestParam(required = false) startDate: LocalDate?,
+        @RequestParam(required = false) endDate: LocalDate?
+    ): ResponseEntity<CommonApiResponse<List<ConcertScheduleWithInfoDto>>> {
+        val start = startDate ?: LocalDate.now()
+        val end = endDate ?: start.plusMonths(3)
+        val concerts = concertService.getAvailableConcerts(start, end)
         
-        val response = concerts.map { ConcertScheduleDetail.from(it) }
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = concerts,
+                message = "예약 가능한 콘서트 목록 조회가 완료되었습니다"
+            )
+        )
     }
 
     /**
@@ -62,9 +64,14 @@ class ConcertController(
     @GetMapping("/{concertId}")
     fun getConcert(
         @PathVariable @Positive(message = "콘서트 ID는 양수여야 합니다") concertId: Long
-    ): ResponseEntity<ConcertDetail> {
+    ): ResponseEntity<CommonApiResponse<ConcertDto>> {
         val concert = concertService.getConcertById(concertId)
-        return ResponseEntity.ok(ConcertDetail.from(concert))
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = concert,
+                message = "콘서트 정보 조회가 완료되었습니다"
+            )
+        )
     }
     
     /**
@@ -74,15 +81,15 @@ class ConcertController(
     fun getConcertSchedules(
         @PathVariable @Positive(message = "콘서트 ID는 양수여야 합니다") concertId: Long,
         @RequestParam(required = false, defaultValue = "false") availableOnly: Boolean
-    ): ResponseEntity<List<ConcertScheduleDetail>> {
-        val schedules = if (availableOnly) {
-            concertService.getAvailableSchedulesByConcertId(concertId)
-        } else {
-            concertService.getSchedulesByConcertId(concertId)
-        }
+    ): ResponseEntity<CommonApiResponse<List<ConcertWithScheduleDto>>> {
+        val schedules = concertService.getSchedulesByConcertId(concertId)
         
-        val response = schedules.map { ConcertScheduleDetail.from(it) }
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = schedules,
+                message = "콘서트 스케줄 조회가 완료되었습니다"
+            )
+        )
     }
     
     /**
@@ -91,19 +98,13 @@ class ConcertController(
     @GetMapping("/schedules/{scheduleId}")
     fun getConcertSchedule(
         @PathVariable @Positive(message = "스케줄 ID는 양수여야 합니다") scheduleId: Long
-    ): ResponseEntity<ConcertScheduleDetail> {
-        val schedule = concertService.getConcertScheduleById(scheduleId)
-        return ResponseEntity.ok(ConcertScheduleDetail.from(schedule))
-    }
-    
-    /**
-     * 특정 스케줄의 상세 정보 조회 (좌석 포함)
-     */
-    @GetMapping("/schedules/{scheduleId}/detail")
-    fun getConcertDetail(
-        @PathVariable @Positive(message = "스케줄 ID는 양수여야 합니다") scheduleId: Long
-    ): ResponseEntity<ConcertFullDetail> {
+    ): ResponseEntity<CommonApiResponse<ConcertDetailDto>> {
         val detail = concertService.getConcertDetailByScheduleId(scheduleId)
-        return ResponseEntity.ok(ConcertFullDetail.from(detail))
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = detail,
+                message = "콘서트 상세 정보 조회가 완료되었습니다"
+            )
+        )
     }
 }

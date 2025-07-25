@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.reservation.dto.ReservationDto
 import kr.hhplus.be.server.reservation.dto.request.*
 import kr.hhplus.be.server.reservation.service.ReservationService
+import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
@@ -31,7 +32,7 @@ class ReservationController(
     @PostMapping
     fun createReservation(
         @Valid @RequestBody request: ReservationCreateRequest
-    ): ResponseEntity<ReservationDto.WithMessage> {
+    ): ResponseEntity<CommonApiResponse<ReservationDto>> {
         val reservation = reservationService.reserveSeat(
             request.userId,
             request.concertId,
@@ -39,7 +40,10 @@ class ReservationController(
             request.token
         )
         return ResponseEntity.status(201).body(
-            ReservationDto.WithMessage.fromEntity(reservation, "좌석이 성공적으로 예약되었습니다.")
+            CommonApiResponse.success(
+                data = ReservationDto.fromEntity(reservation),
+                message = "좌석이 성공적으로 예약되었습니다."
+            )
         )
     }
 
@@ -49,16 +53,18 @@ class ReservationController(
         ApiResponse(responseCode = "400", description = "잘못된 요청"),
         ApiResponse(responseCode = "404", description = "예약을 찾을 수 없음")
     ])
-    @PutMapping("/confirm")
+    @PutMapping("/{reservationId}/confirm")
     fun confirmReservation(
-        @Valid @RequestBody request: ReservationConfirmRequest
-    ): ResponseEntity<ReservationDto.WithMessage> {
-        val reservation = reservationService.confirmReservation(
-            request.reservationId,
-            request.paymentId
-        )
+        @Parameter(description = "예약 ID", example = "1")
+        @PathVariable @Positive(message = "예약 ID는 양수여야 합니다") reservationId: Long,
+        @RequestParam @Positive(message = "결제 ID는 양수여야 합니다") paymentId: Long
+    ): ResponseEntity<CommonApiResponse<ReservationDto>> {
+        val reservation = reservationService.confirmReservation(reservationId, paymentId)
         return ResponseEntity.ok(
-            ReservationDto.WithMessage.fromEntity(reservation, "예약이 성공적으로 확정되었습니다.")
+            CommonApiResponse.success(
+                data = ReservationDto.fromEntity(reservation),
+                message = "예약이 성공적으로 확정되었습니다."
+            )
         )
     }
 
@@ -68,17 +74,22 @@ class ReservationController(
         ApiResponse(responseCode = "400", description = "잘못된 요청"),
         ApiResponse(responseCode = "404", description = "예약을 찾을 수 없음")
     ])
-    @PutMapping("/cancel")
+    @DeleteMapping("/{reservationId}")
     fun cancelReservation(
+        @Parameter(description = "예약 ID", example = "1")
+        @PathVariable @Positive(message = "예약 ID는 양수여야 합니다") reservationId: Long,
         @Valid @RequestBody request: ReservationCancelRequest
-    ): ResponseEntity<ReservationDto.WithMessage> {
+    ): ResponseEntity<CommonApiResponse<ReservationDto>> {
         val reservation = reservationService.cancelReservation(
-            request.reservationId,
+            reservationId,
             request.userId,
             request.cancelReason
         )
         return ResponseEntity.ok(
-            ReservationDto.WithMessage.fromEntity(reservation, "예약이 성공적으로 취소되었습니다.")
+            CommonApiResponse.success(
+                data = ReservationDto.fromEntity(reservation),
+                message = "예약이 성공적으로 취소되었습니다."
+            )
         )
     }
 
@@ -91,9 +102,14 @@ class ReservationController(
     fun getReservation(
         @Parameter(description = "예약 ID", example = "1")
         @PathVariable @Positive(message = "예약 ID는 양수여야 합니다") reservationId: Long
-    ): ResponseEntity<ReservationDto> {
+    ): ResponseEntity<CommonApiResponse<ReservationDto>> {
         val reservation = reservationService.getReservationById(reservationId)
-        return ResponseEntity.ok(ReservationDto.fromEntity(reservation))
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = ReservationDto.fromEntity(reservation),
+                message = "예약 정보를 성공적으로 조회했습니다."
+            )
+        )
     }
 
     @Operation(summary = "예약 상세 정보 조회", description = "연관 엔티티 정보를 포함한 예약 상세 정보를 조회합니다.")

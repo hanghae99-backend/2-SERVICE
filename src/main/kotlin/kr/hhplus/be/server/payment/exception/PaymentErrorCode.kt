@@ -26,6 +26,6 @@ sealed class PaymentErrorCode(
     object ProcessFailed : PaymentErrorCode(
         "PAYMENT_PROCESS_FAILED", 
         "결제 처리에 실패했습니다", 
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.BAD_REQUEST
     )
 }

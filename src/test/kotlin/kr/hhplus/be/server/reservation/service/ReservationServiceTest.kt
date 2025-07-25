@@ -13,7 +13,6 @@ import kr.hhplus.be.server.reservation.repository.ReservationRepository
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import java.math.BigDecimal
-import java.util.*
 
 class ReservationServiceTest : DescribeSpec({
     
@@ -96,7 +95,7 @@ class ReservationServiceTest : DescribeSpec({
                 val paymentId = 1L
                 val reservation = mockk<Reservation>(relaxed = true)
                 
-                every { reservationRepository.findById(reservationId) } returns Optional.of(reservation)
+                every { reservationRepository.findById(reservationId) } returns reservation
                 every { reservationRepository.save(any()) } returns reservation
                 
                 // when
@@ -113,7 +112,7 @@ class ReservationServiceTest : DescribeSpec({
                 val reservationId = 999L
                 val paymentId = 1L
                 
-                every { reservationRepository.findById(reservationId) } returns Optional.empty()
+                every { reservationRepository.findById(reservationId) } returns null
                 
                 // when & then
                 shouldThrow<IllegalArgumentException> {
@@ -132,7 +131,7 @@ class ReservationServiceTest : DescribeSpec({
                 val cancelReason = "사용자 요청"
                 val reservation = mockk<Reservation>(relaxed = true)
                 
-                every { reservationRepository.findById(reservationId) } returns Optional.of(reservation)
+                every { reservationRepository.findById(reservationId) } returns reservation
                 every { reservation.userId } returns userId
                 every { reservationRepository.save(any()) } returns reservation
                 
@@ -153,7 +152,7 @@ class ReservationServiceTest : DescribeSpec({
                 val cancelReason = "사용자 요청"
                 val reservation = mockk<Reservation>(relaxed = true)
                 
-                every { reservationRepository.findById(reservationId) } returns Optional.of(reservation)
+                every { reservationRepository.findById(reservationId) } returns reservation
                 every { reservation.userId } returns otherUserId
                 
                 // when & then
@@ -171,7 +170,7 @@ class ReservationServiceTest : DescribeSpec({
                 val reservationId = 1L
                 val reservation = mockk<Reservation>(relaxed = true)
                 
-                every { reservationRepository.findById(reservationId) } returns Optional.of(reservation)
+                every { reservationRepository.findById(reservationId) } returns reservation
                 
                 // when
                 val result = reservationService.getReservationById(reservationId)
@@ -187,7 +186,7 @@ class ReservationServiceTest : DescribeSpec({
                 // given
                 val reservationId = 999L
                 
-                every { reservationRepository.findById(reservationId) } returns Optional.empty()
+                every { reservationRepository.findById(reservationId) } returns null
                 
                 // when & then
                 shouldThrow<IllegalArgumentException> {

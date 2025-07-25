@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.reservation.service
 
+import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.reservation.entity.ReservationStatusType
 import kr.hhplus.be.server.reservation.repository.ReservationRepository

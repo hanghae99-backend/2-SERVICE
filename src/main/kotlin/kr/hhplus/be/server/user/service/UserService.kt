@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.user.service
 
+import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.user.dto.UserDto
 import kr.hhplus.be.server.user.dto.request.UserCreateRequest
 import kr.hhplus.be.server.user.entity.User
@@ -29,7 +30,7 @@ class UserService(
     }
 
     fun getUserById(userId: Long): User? {
-        return userRepository.findById(userId).orElse(null)
+        return userRepository.findById(userId)
     }
 
     fun existsById(userId: Long): Boolean {
@@ -37,7 +38,8 @@ class UserService(
     }
 
     fun getUserDtoById(userId: Long): UserDto {
-        val user = getUserById(userId) ?: throw UserNotFoundException("User with id $userId not found")
+        val user = userRepository.findById(userId)
+            .orElseThrow { UserNotFoundException("User with id $userId not found") }
         return UserDto.fromEntity(user)
     }
 }

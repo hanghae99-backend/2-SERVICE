@@ -1,12 +1,11 @@
 package kr.hhplus.be.server.payment.repository
 
 import kr.hhplus.be.server.payment.entity.Payment
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.stereotype.Repository
 
-@Repository
-interface PaymentRepository : JpaRepository<Payment, Long> {
-    
-    // 사용자 ID로 존재 여부 확인
+interface PaymentRepository {
+    fun save(payment: Payment): Payment
+    fun findById(id: Long): Payment?
     fun existsByUserId(userId: Long): Boolean
+    fun findAll(): List<Payment>
+    fun delete(payment: Payment)
 }

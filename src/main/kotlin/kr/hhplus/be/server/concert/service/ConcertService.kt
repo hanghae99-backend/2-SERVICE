@@ -2,9 +2,10 @@ package kr.hhplus.be.server.concert.service
 
 import kr.hhplus.be.server.concert.exception.ConcertNotFoundException
 import kr.hhplus.be.server.concert.dto.*
-import kr.hhplus.be.server.concert.repository.ConcertJpaRepository
-import kr.hhplus.be.server.concert.repository.ConcertScheduleJpaRepository
-import kr.hhplus.be.server.concert.repository.SeatJpaRepository
+import kr.hhplus.be.server.concert.repository.ConcertRepository
+import kr.hhplus.be.server.concert.repository.ConcertScheduleRepository
+import kr.hhplus.be.server.concert.repository.SeatRepository
+import kr.hhplus.be.server.global.extension.orElseThrow
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -12,9 +13,9 @@ import java.time.LocalDate
 @Service
 @Transactional(readOnly = true)
 class ConcertService(
-    private val concertJpaRepository: ConcertJpaRepository,
-    private val concertScheduleJpaRepository: ConcertScheduleJpaRepository,
-    private val seatJpaRepository: SeatJpaRepository
+    private val concertRepository: ConcertRepository,
+    private val concertScheduleRepository: ConcertScheduleRepository,
+    private val seatRepository: SeatRepository
 ) {
     
     /**
@@ -24,7 +25,7 @@ class ConcertService(
         startDate: LocalDate = LocalDate.now(), 
         endDate: LocalDate = LocalDate.now().plusMonths(3)
     ): List<ConcertScheduleWithInfoDto> {
-        val schedules = concertScheduleJpaRepository.findByConcertDateBetweenAndAvailableSeatsGreaterThanOrderByConcertDateAsc(
+        val schedules = concertScheduleRepository.findByConcertDateBetweenAndAvailableSeatsGreaterThanOrderByConcertDateAsc(
             startDate, endDate, 0
         )
         
@@ -32,8 +33,8 @@ class ConcertService(
         
         // 콘서트 정보를 한 번에 조회
         val concertIds = schedules.map { it.concertId }.distinct()
-        val concertMap = concertJpaRepository.findAllById(concertIds)
-            .associateBy { it.concertId }
+        val concerts = concertIds.mapNotNull { concertRepository.findById(it) }
+        val concertMap = concerts.associateBy { it.concertId }
         
         return schedules.mapNotNull { schedule ->
             val concert = concertMap[schedule.concertId]
@@ -47,13 +48,13 @@ class ConcertService(
      * 특정 날짜의 콘서트 목록 조회
      */
     fun getConcertsByDate(date: LocalDate): List<ConcertScheduleWithInfoDto> {
-        val schedules = concertScheduleJpaRepository.findByConcertDate(date)
+        val schedules = concertScheduleRepository.findByConcertDate(date)
         
         if (schedules.isEmpty()) return emptyList()
         
         val concertIds = schedules.map { it.concertId }.distinct()
-        val concertMap = concertJpaRepository.findAllById(concertIds)
-            .associateBy { it.concertId }
+        val concerts = concertIds.mapNotNull { concertRepository.findById(it) }
+        val concertMap = concerts.associateBy { it.concertId }
         
         return schedules.mapNotNull { schedule ->
             val concert = concertMap[schedule.concertId]
@@ -67,8 +68,8 @@ class ConcertService(
      * 콘서트 상세 정보 조회
      */
     fun getConcertById(concertId: Long): ConcertDto {
-        val concert = concertJpaRepository.findById(concertId).orElse(null)
-            ?: throw ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId")
+        val concert = concertRepository.findById(concertId)
+            .orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId") }
         
         return ConcertDto.from(concert)
     }
@@ -77,11 +78,11 @@ class ConcertService(
      * 콘서트 스케줄 상세 정보 조회
      */
     fun getConcertScheduleById(scheduleId: Long): ConcertScheduleWithInfoDto {
-        val schedule = concertScheduleJpaRepository.findById(scheduleId).orElse(null)
-            ?: throw ConcertNotFoundException("콘서트 스케줄을 찾을 수 없습니다. ID: $scheduleId")
+        val schedule = concertScheduleRepository.findById(scheduleId)
+            .orElseThrow { ConcertNotFoundException("콘서트 스케줄을 찾을 수 없습니다. ID: $scheduleId") }
         
-        val concert = concertJpaRepository.findById(schedule.concertId).orElse(null)
-            ?: throw ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: ${schedule.concertId}")
+        val concert = concertRepository.findById(schedule.concertId)
+            .orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: ${schedule.concertId}") }
             
         return ConcertScheduleWithInfoDto.from(concert, schedule)
     }
@@ -90,13 +91,13 @@ class ConcertService(
      * 콘서트 상세 정보 조회 (스케줄과 좌석 정보 포함)
      */
     fun getConcertDetailByScheduleId(scheduleId: Long): ConcertDetailDto {
-        val schedule = concertScheduleJpaRepository.findById(scheduleId).orElse(null)
-            ?: throw ConcertNotFoundException("콘서트 스케줄을 찾을 수 없습니다. ID: $scheduleId")
+        val schedule = concertScheduleRepository.findById(scheduleId)
+            .orElseThrow { ConcertNotFoundException("콘서트 스케줄을 찾을 수 없습니다. ID: $scheduleId") }
         
-        val concert = concertJpaRepository.findById(schedule.concertId).orElse(null)
-            ?: throw ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: ${schedule.concertId}")
+        val concert = concertRepository.findById(schedule.concertId)
+            .orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: ${schedule.concertId}") }
         
-        val seats = seatJpaRepository.findByScheduleId(scheduleId)
+        val seats = seatRepository.findByScheduleId(scheduleId)
         
         return ConcertDetailDto.from(concert, schedule, seats)
     }
@@ -107,10 +108,9 @@ class ConcertService(
      * 특정 콘서트의 모든 스케줄 조회
      */
     fun getSchedulesByConcertId(concertId: Long): List<ConcertWithScheduleDto> {
-        val concert = concertJpaRepository.findById(concertId).orElse(null)
-            ?: throw ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId")
+        val concert = concertRepository.findById(concertId).orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId") }
         
-        val schedules = concertScheduleJpaRepository.findByConcertId(concertId)
+        val schedules = concertScheduleRepository.findByConcertId(concertId)
         
         return schedules.map { schedule ->
             ConcertWithScheduleDto.from(concert, schedule)
@@ -121,10 +121,9 @@ class ConcertService(
      * 특정 콘서트의 예약 가능한 스케줄 조회
      */
     fun getAvailableSchedulesByConcertId(concertId: Long): List<ConcertWithScheduleDto> {
-        val concert = concertJpaRepository.findById(concertId).orElse(null)
-            ?: throw ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId")
+        val concert = concertRepository.findById(concertId).orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId")}
         
-        val schedules = concertScheduleJpaRepository.findByConcertIdAndAvailableSeatsGreaterThanAndConcertDateGreaterThanEqualOrderByConcertDateAsc(
+        val schedules = concertScheduleRepository.findByConcertIdAndAvailableSeatsGreaterThanAndConcertDateGreaterThanEqualOrderByConcertDateAsc(
             concertId, 0, LocalDate.now()
         )
         

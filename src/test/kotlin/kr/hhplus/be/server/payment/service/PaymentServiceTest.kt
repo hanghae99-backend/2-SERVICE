@@ -20,7 +20,6 @@ import kr.hhplus.be.server.reservation.service.ReservationService
 import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.service.UserService
 import java.math.BigDecimal
-import java.util.*
 
 class PaymentServiceTest : DescribeSpec({
     
@@ -234,7 +233,7 @@ class PaymentServiceTest : DescribeSpec({
                 val paymentId = 1L
                 val payment = Payment.create(1L, BigDecimal("50000"))
                 
-                every { paymentRepository.findById(paymentId) } returns Optional.of(payment)
+                every { paymentRepository.findById(paymentId) } returns payment
                 
                 // when
                 val result = paymentService.getPaymentById(paymentId)
@@ -249,7 +248,7 @@ class PaymentServiceTest : DescribeSpec({
                 // given
                 val paymentId = 999L
                 
-                every { paymentRepository.findById(paymentId) } returns Optional.empty()
+                every { paymentRepository.findById(paymentId) } returns null
                 
                 // when & then
                 shouldThrow<PaymentNotFoundException> {

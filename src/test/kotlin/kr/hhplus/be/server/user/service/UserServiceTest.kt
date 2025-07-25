@@ -12,7 +12,6 @@ import kr.hhplus.be.server.user.entity.User
 import kr.hhplus.be.server.user.exception.UserAlreadyExistsException
 import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.repository.UserRepository
-import java.util.*
 
 class UserServiceTest : DescribeSpec({
     
@@ -62,7 +61,7 @@ class UserServiceTest : DescribeSpec({
                 val userId = 1L
                 val user = User.create(userId)
                 
-                every { userRepository.findById(userId) } returns Optional.of(user)
+                every { userRepository.findById(userId) } returns user
                 
                 // when
                 val result = userService.getUserById(userId)

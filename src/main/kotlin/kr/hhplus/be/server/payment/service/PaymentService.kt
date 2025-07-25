@@ -3,6 +3,7 @@ package kr.hhplus.be.server.payment.service
 import kr.hhplus.be.server.auth.service.TokenService
 import kr.hhplus.be.server.balance.service.BalanceService
 import kr.hhplus.be.server.concert.service.SeatService
+import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.payment.dto.PaymentDto
 import kr.hhplus.be.server.payment.entity.Payment
 import kr.hhplus.be.server.payment.exception.PaymentNotFoundException

@@ -11,15 +11,14 @@ import kr.hhplus.be.server.concert.entity.Seat
 import kr.hhplus.be.server.concert.entity.SeatStatusType
 import kr.hhplus.be.server.concert.exception.ConcertNotFoundException
 import kr.hhplus.be.server.concert.exception.SeatNotFoundException
-import kr.hhplus.be.server.concert.repository.ConcertScheduleJpaRepository
-import kr.hhplus.be.server.concert.repository.SeatJpaRepository
-import java.util.*
+import kr.hhplus.be.server.concert.repository.ConcertScheduleRepository
+import kr.hhplus.be.server.concert.repository.SeatRepository
 
 class SeatServiceTest : DescribeSpec({
     
-    val seatJpaRepository = mockk<SeatJpaRepository>()
-    val concertScheduleJpaRepository = mockk<ConcertScheduleJpaRepository>()
-    val seatService = SeatService(seatJpaRepository, concertScheduleJpaRepository)
+    val seatRepository = mockk<SeatRepository>()
+    val concertScheduleRepository = mockk<ConcertScheduleRepository>()
+    val seatService = SeatService(seatRepository, concertScheduleRepository)
     
     describe("getAvailableSeats") {
         context("존재하는 스케줄의 예약 가능한 좌석을 조회할 때") {
@@ -32,9 +31,9 @@ class SeatServiceTest : DescribeSpec({
                     mockk<Seat>(relaxed = true)
                 )
                 
-                every { concertScheduleJpaRepository.findById(scheduleId) } returns Optional.of(schedule)
+                every { concertScheduleRepository.findById(scheduleId) } returns schedule
                 every { 
-                    seatJpaRepository.findByScheduleIdAndStatusCodeOrderBySeatNumberAsc(scheduleId, SeatStatusType.AVAILABLE) 
+                    seatRepository.findByScheduleIdAndStatusCodeOrderBySeatNumberAsc(scheduleId, SeatStatusType.AVAILABLE) 
                 } returns seats
                 
                 // when
@@ -51,7 +50,7 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val scheduleId = 999L
                 
-                every { concertScheduleJpaRepository.findById(scheduleId) } returns Optional.empty()
+                every { concertScheduleRepository.findById(scheduleId) } returns null
                 
                 // when & then
                 shouldThrow<ConcertNotFoundException> {
@@ -73,8 +72,8 @@ class SeatServiceTest : DescribeSpec({
                     mockk<Seat>(relaxed = true)
                 )
                 
-                every { concertScheduleJpaRepository.findById(scheduleId) } returns Optional.of(schedule)
-                every { seatJpaRepository.findByScheduleId(scheduleId) } returns seats
+                every { concertScheduleRepository.findById(scheduleId) } returns schedule
+                every { seatRepository.findByScheduleId(scheduleId) } returns seats
                 
                 // when
                 val result = seatService.getAllSeats(scheduleId)
@@ -90,7 +89,7 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val scheduleId = 999L
                 
-                every { concertScheduleJpaRepository.findById(scheduleId) } returns Optional.empty()
+                every { concertScheduleRepository.findById(scheduleId) } returns null
                 
                 // when & then
                 shouldThrow<ConcertNotFoundException> {
@@ -107,7 +106,7 @@ class SeatServiceTest : DescribeSpec({
                 val seatId = 1L
                 val seat = mockk<Seat>(relaxed = true)
                 
-                every { seatJpaRepository.findById(seatId) } returns Optional.of(seat)
+                every { seatRepository.findById(seatId) } returns seat
                 
                 // when
                 val result = seatService.getSeatById(seatId)
@@ -122,7 +121,7 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val seatId = 999L
                 
-                every { seatJpaRepository.findById(seatId) } returns Optional.empty()
+                every { seatRepository.findById(seatId) } returns null
                 
                 // when & then
                 shouldThrow<SeatNotFoundException> {
@@ -139,7 +138,7 @@ class SeatServiceTest : DescribeSpec({
                 val seatId = 1L
                 val seat = mockk<Seat>(relaxed = true)
                 
-                every { seatJpaRepository.findById(seatId) } returns Optional.of(seat)
+                every { seatRepository.findById(seatId) } returns seat
                 every { seat.isAvailable() } returns true
                 
                 // when
@@ -156,7 +155,7 @@ class SeatServiceTest : DescribeSpec({
                 val seatId = 1L
                 val seat = mockk<Seat>(relaxed = true)
                 
-                every { seatJpaRepository.findById(seatId) } returns Optional.of(seat)
+                every { seatRepository.findById(seatId) } returns seat
                 every { seat.isAvailable() } returns false
                 
                 // when
@@ -172,7 +171,7 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val seatId = 999L
                 
-                every { seatJpaRepository.findById(seatId) } returns Optional.empty()
+                every { seatRepository.findById(seatId) } returns null
                 
                 // when & then
                 shouldThrow<SeatNotFoundException> {
@@ -194,7 +193,7 @@ class SeatServiceTest : DescribeSpec({
                 )
                 
                 every { 
-                    seatJpaRepository.findByScheduleIdAndSeatNumberContainingOrderBySeatNumberAsc(scheduleId, pattern) 
+                    seatRepository.findByScheduleIdAndSeatNumberContainingOrderBySeatNumberAsc(scheduleId, pattern) 
                 } returns seats
                 
                 // when
@@ -215,9 +214,9 @@ class SeatServiceTest : DescribeSpec({
                 val seat = mockk<Seat>(relaxed = true)
                 val confirmedSeat = mockk<Seat>(relaxed = true)
                 
-                every { seatJpaRepository.findById(seatId) } returns Optional.of(seat)
+                every { seatRepository.findById(seatId) } returns seat
                 every { seat.confirm() } returns confirmedSeat
-                every { seatJpaRepository.save(confirmedSeat) } returns confirmedSeat
+                every { seatRepository.save(confirmedSeat) } returns confirmedSeat
                 
                 // when
                 val result = seatService.confirmSeat(seatId)
@@ -232,7 +231,7 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val seatId = 999L
                 
-                every { seatJpaRepository.findById(seatId) } returns Optional.empty()
+                every { seatRepository.findById(seatId) } returns null
                 
                 // when & then
                 shouldThrow<SeatNotFoundException> {

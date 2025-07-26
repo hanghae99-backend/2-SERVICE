@@ -291,3 +291,59 @@ INSERT INTO point_history (user_id, amount, type_code, description, created_at) 
 -- 포인트 잔액 차감
 UPDATE point SET amount = amount - 500000.00, last_updated = NOW() - INTERVAL 1 DAY WHERE user_id = 1;
 UPDATE point SET amount = amount - 450000.00, last_updated = NOW() - INTERVAL 2 DAY WHERE user_id = 2;
+
+-- =============================================================================
+-- 추가 타입 데이터 (예약 상태, 결제 상태)
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 12. 예약 상태 타입 (중복 체크 후 삽입)
+-- -----------------------------------------------------------------------------
+INSERT INTO reservation_status_type (code, name, description, is_active, created_at)
+SELECT 'TEMPORARY', '임시 예약', '결제 대기 중인 임시 예약 상태입니다. 5분 후 자동 만료됩니다.', true, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM reservation_status_type WHERE code = 'TEMPORARY');
+
+INSERT INTO reservation_status_type (code, name, description, is_active, created_at)
+SELECT 'CONFIRMED', '예약 확정', '결제가 완료되어 확정된 예약 상태입니다.', true, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM reservation_status_type WHERE code = 'CONFIRMED');
+
+INSERT INTO reservation_status_type (code, name, description, is_active, created_at)
+SELECT 'CANCELLED', '예약 취소', '사용자가 취소하거나 만료된 예약 상태입니다.', true, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM reservation_status_type WHERE code = 'CANCELLED');
+
+-- -----------------------------------------------------------------------------
+-- 13. 결제 상태 타입 (중복 체크 후 삽입)
+-- -----------------------------------------------------------------------------
+INSERT INTO payment_status_type (code, name, description, is_active, created_at)
+SELECT 'PENDING', '결제 대기', '결제 요청이 처리 대기 중인 상태입니다.', true, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM payment_status_type WHERE code = 'PENDING');
+
+INSERT INTO payment_status_type (code, name, description, is_active, created_at)
+SELECT 'COMPLETED', '결제 완료', '결제가 성공적으로 완료된 상태입니다.', true, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM payment_status_type WHERE code = 'COMPLETED');
+
+INSERT INTO payment_status_type (code, name, description, is_active, created_at)
+SELECT 'FAILED', '결제 실패', '결제 처리 중 오류가 발생한 상태입니다.', true, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM payment_status_type WHERE code = 'FAILED');
+
+INSERT INTO payment_status_type (code, name, description, is_active, created_at)
+SELECT 'CANCELLED', '결제 취소', '사용자 또는 시스템에 의해 취소된 상태입니다.', true, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM payment_status_type WHERE code = 'CANCELLED');
+
+INSERT INTO payment_status_type (code, name, description, is_active, created_at)
+SELECT 'REFUNDED', '결제 환불', '결제가 환불 처리된 상태입니다.', true, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM payment_status_type WHERE code = 'REFUNDED');
+
+-- -----------------------------------------------------------------------------
+-- 14. 타입 데이터 확인
+-- -----------------------------------------------------------------------------
+SELECT '=== 타입 데이터 확인 ===' as info;
+
+SELECT 'point_history_type' as table_name, code, name FROM point_history_type
+UNION ALL
+SELECT 'seat_status_type' as table_name, code, name FROM seat_status_type
+UNION ALL
+SELECT 'reservation_status_type' as table_name, code, name FROM reservation_status_type
+UNION ALL
+SELECT 'payment_status_type' as table_name, code, name FROM payment_status_type
+ORDER BY table_name, code;

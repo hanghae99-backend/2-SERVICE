@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.global.scheduler
 
 import kr.hhplus.be.server.auth.service.TokenService
-import kr.hhplus.be.server.payment.service.ReservationService
+import kr.hhplus.be.server.reservation.service.ReservationService
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
@@ -17,7 +17,10 @@ class ReservationScheduler(
     @Scheduled(fixedRate = 60000) // 1분마다 실행
     fun cleanupExpiredReservations() {
         try {
-            reservationService.cancelExpiredReservations()
+            val cleanedCount = reservationService.cleanupExpiredReservations()
+            if (cleanedCount > 0) {
+                println("만료된 예약 $cleanedCount 건을 정리했습니다.")
+            }
         } catch (e: Exception) {
             println("만료된 예약 정리 중 오류 발생: ${e.message}")
         }

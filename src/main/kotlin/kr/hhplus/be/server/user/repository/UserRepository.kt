@@ -2,9 +2,10 @@ package kr.hhplus.be.server.user.repository
 
 import kr.hhplus.be.server.user.entity.User
 
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.stereotype.Repository
-
-@Repository
-interface UserRepository : JpaRepository<User, Long> {
+interface UserRepository {
+    fun save(user: User): User
+    fun findById(id: Long): User?
+    fun existsById(id: Long): Boolean
+    fun findAll(): List<User>
+    fun delete(user: User)
 }

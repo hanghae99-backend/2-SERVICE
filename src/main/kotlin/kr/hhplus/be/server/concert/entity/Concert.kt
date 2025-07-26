@@ -1,12 +1,13 @@
 package kr.hhplus.be.server.concert.entity
 
 import kr.hhplus.be.server.global.exception.ParameterValidationException
+import kr.hhplus.be.server.reservation.entity.Reservation
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
 @Entity
 @Table(name = "concert")
-data class Concert(
+class Concert(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
@@ -18,6 +19,9 @@ data class Concert(
     @Column(name = "artist", nullable = false, length = 100)
     val artist: String,
     
+    @Column(name = "is_active", nullable = false)
+    val isActive: Boolean = true,
+    
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
     
@@ -27,7 +31,6 @@ data class Concert(
     
     companion object {
         fun create(title: String, artist: String): Concert {
-            // 파라미터 검증
             if (title.isBlank()) {
                 throw ParameterValidationException("콘서트 제목은 필수입니다")
             }

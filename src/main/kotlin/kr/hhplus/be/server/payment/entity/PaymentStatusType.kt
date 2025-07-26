@@ -21,12 +21,4 @@ data class PaymentStatusType(
     
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
-) {
-    companion object {
-        const val PENDING = "PENDING"
-        const val COMPLETED = "COMPLETED"
-        const val FAILED = "FAILED"
-        const val CANCELLED = "CANCELLED"
-        const val REFUNDED = "REFUNDED"
-    }
-}
+)

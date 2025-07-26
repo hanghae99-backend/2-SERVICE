@@ -25,7 +25,7 @@ data class SeatDto(
                 scheduleId = seat.scheduleId,
                 seatNumber = seat.seatNumber,
                 price = seat.price,
-                statusCode = seat.statusCode
+                statusCode = seat.status.code
             )
         }
     }
@@ -50,9 +50,9 @@ data class SeatWithStatusDto(
                 scheduleId = seat.scheduleId,
                 seatNumber = seat.seatNumber,
                 price = seat.price,
-                statusCode = seat.statusCode,
-                statusName = statusName,
-                statusDescription = statusDescription
+                statusCode = seat.status.code,
+                statusName = statusName ?: seat.status.name,
+                statusDescription = statusDescription ?: seat.status.description
             )
         }
     }

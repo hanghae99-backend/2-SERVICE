@@ -8,20 +8,24 @@ import io.mockk.every
 import io.mockk.mockk
 import kr.hhplus.be.server.balance.entity.Point
 import kr.hhplus.be.server.balance.entity.PointHistory
+import kr.hhplus.be.server.balance.entity.PointHistoryType
 import kr.hhplus.be.server.balance.exception.InvalidPointAmountException
 import kr.hhplus.be.server.balance.exception.PointNotFoundException
 import kr.hhplus.be.server.balance.repository.PointHistoryRepository
 import kr.hhplus.be.server.balance.repository.PointRepository
+import kr.hhplus.be.server.balance.repository.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.service.UserService
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 class BalanceServiceTest : DescribeSpec({
     
     val pointRepository = mockk<PointRepository>()
     val pointHistoryRepository = mockk<PointHistoryRepository>()
+    val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
     val userService = mockk<UserService>()
-    val balanceService = BalanceService(pointRepository, pointHistoryRepository, userService)
+    val balanceService = BalanceService(pointRepository, pointHistoryRepository, pointHistoryTypeRepository, userService)
     
     describe("chargeBalance") {
         context("유효한 사용자가 적절한 금액으로 충전할 때") {
@@ -31,10 +35,12 @@ class BalanceServiceTest : DescribeSpec({
                 val chargeAmount = BigDecimal("10000")
                 val currentPoint = Point.create(userId, BigDecimal("5000"))
                 val chargedPoint = Point.create(userId, BigDecimal("15000"))
+                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
                 
                 every { userService.existsById(userId) } returns true
                 every { pointRepository.findByUserId(userId) } returns currentPoint
                 every { pointRepository.save(any()) } returns chargedPoint
+                every { pointHistoryTypeRepository.getChargeType() } returns chargeType
                 every { pointHistoryRepository.save(any()) } returns mockk()
                 
                 // when
@@ -101,10 +107,12 @@ class BalanceServiceTest : DescribeSpec({
                 val userId = 1L
                 val chargeAmount = BigDecimal("10000")
                 val newPoint = Point.create(userId, BigDecimal("10000"))
+                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
                 
                 every { userService.existsById(userId) } returns true
                 every { pointRepository.findByUserId(userId) } returns null
                 every { pointRepository.save(any()) } returns newPoint
+                every { pointHistoryTypeRepository.getChargeType() } returns chargeType
                 every { pointHistoryRepository.save(any()) } returns mockk()
                 
                 // when
@@ -176,10 +184,12 @@ class BalanceServiceTest : DescribeSpec({
                 val deductAmount = BigDecimal("5000")
                 val currentPoint = Point.create(userId, BigDecimal("10000"))
                 val deductedPoint = Point.create(userId, BigDecimal("5000"))
+                val useType = PointHistoryType("USE", "사용", "포인트 사용", true, LocalDateTime.now())
                 
                 every { userService.existsById(userId) } returns true
                 every { pointRepository.findByUserId(userId) } returns currentPoint
                 every { pointRepository.save(any()) } returns deductedPoint
+                every { pointHistoryTypeRepository.getUseType() } returns useType
                 every { pointHistoryRepository.save(any()) } returns mockk()
                 
                 // when
@@ -228,9 +238,11 @@ class BalanceServiceTest : DescribeSpec({
             it("해당 사용자의 포인트 이력을 반환해야 한다") {
                 // given
                 val userId = 1L
+                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
+                val useType = PointHistoryType("USE", "사용", "포인트 사용", true, LocalDateTime.now())
                 val histories = listOf(
-                    PointHistory.charge(userId, BigDecimal("10000"), "포인트 충전"),
-                    PointHistory.use(userId, BigDecimal("5000"), "포인트 사용")
+                    PointHistory.charge(userId, BigDecimal("10000"), chargeType, "포인트 충전"),
+                    PointHistory.use(userId, BigDecimal("5000"), useType, "포인트 사용")
                 )
                 
                 every { userService.existsById(userId) } returns true

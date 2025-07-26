@@ -10,14 +10,17 @@ import kr.hhplus.be.server.reservation.dto.request.ReservationSearchCondition
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.reservation.entity.ReservationStatusType
 import kr.hhplus.be.server.reservation.repository.ReservationRepository
+import kr.hhplus.be.server.reservation.repository.ReservationStatusTypePojoRepository
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 class ReservationServiceTest : DescribeSpec({
     
     val reservationRepository = mockk<ReservationRepository>()
-    val reservationService = ReservationService(reservationRepository)
+    val reservationStatusTypePojoRepository = mockk<ReservationStatusTypePojoRepository>()
+    val reservationService = ReservationService(reservationRepository,reservationStatusTypePojoRepository)
     
     describe("reserveSeat") {
         context("예약 가능한 좌석을 예약할 때") {
@@ -27,9 +30,14 @@ class ReservationServiceTest : DescribeSpec({
                 val concertId = 1L
                 val seatId = 1L
                 val token = "test-token"
-                val activeStatuses = listOf(ReservationStatusType.TEMPORARY, ReservationStatusType.CONFIRMED)
-                val reservation = Reservation.createTemporary(userId, concertId, seatId, "A1", BigDecimal("50000"))
                 
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
+                val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
+                val activeStatuses = listOf(temporaryStatus.code, confirmedStatus.code)
+                val reservation = Reservation.createTemporary(userId, concertId, seatId, "A1", BigDecimal("50000"), temporaryStatus)
+                
+                every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
+                every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
                 every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses) } returns null
                 every { reservationRepository.save(any()) } returns reservation
                 
@@ -51,9 +59,14 @@ class ReservationServiceTest : DescribeSpec({
                 val concertId = 1L
                 val seatId = 1L
                 val token = "test-token"
-                val activeStatuses = listOf(ReservationStatusType.TEMPORARY, ReservationStatusType.CONFIRMED)
+                
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
+                val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
+                val activeStatuses = listOf(temporaryStatus.code, confirmedStatus.code)
                 val existingReservation = mockk<Reservation>(relaxed = true)
                 
+                every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
+                every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
                 every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses) } returns existingReservation
                 every { existingReservation.isConfirmed() } returns true
                 
@@ -71,9 +84,14 @@ class ReservationServiceTest : DescribeSpec({
                 val concertId = 1L
                 val seatId = 1L
                 val token = "test-token"
-                val activeStatuses = listOf(ReservationStatusType.TEMPORARY, ReservationStatusType.CONFIRMED)
+                
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
+                val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
+                val activeStatuses = listOf(temporaryStatus.code, confirmedStatus.code)
                 val existingReservation = mockk<Reservation>(relaxed = true)
                 
+                every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
+                every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
                 every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses) } returns existingReservation
                 every { existingReservation.isConfirmed() } returns false
                 every { existingReservation.isTemporary() } returns true
@@ -94,8 +112,10 @@ class ReservationServiceTest : DescribeSpec({
                 val reservationId = 1L
                 val paymentId = 1L
                 val reservation = mockk<Reservation>(relaxed = true)
+                val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
                 
                 every { reservationRepository.findById(reservationId) } returns reservation
+                every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
                 every { reservationRepository.save(any()) } returns reservation
                 
                 // when
@@ -130,9 +150,11 @@ class ReservationServiceTest : DescribeSpec({
                 val userId = 1L
                 val cancelReason = "사용자 요청"
                 val reservation = mockk<Reservation>(relaxed = true)
+                val cancelledStatus = ReservationStatusType("CANCELLED", "취소", "취소된 예약 상태", true, LocalDateTime.now())
                 
                 every { reservationRepository.findById(reservationId) } returns reservation
                 every { reservation.userId } returns userId
+                every { reservationStatusTypePojoRepository.getCancelledStatus() } returns cancelledStatus
                 every { reservationRepository.save(any()) } returns reservation
                 
                 // when
@@ -251,9 +273,13 @@ class ReservationServiceTest : DescribeSpec({
                 val expiredReservation1 = mockk<Reservation>(relaxed = true)
                 val expiredReservation2 = mockk<Reservation>(relaxed = true)
                 val expiredReservations = listOf(expiredReservation1, expiredReservation2)
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
+                val cancelledStatus = ReservationStatusType("CANCELLED", "취소", "취소된 예약 상태", true, LocalDateTime.now())
                 
+                every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
+                every { reservationStatusTypePojoRepository.getCancelledStatus() } returns cancelledStatus
                 every { 
-                    reservationRepository.findByExpiresAtBeforeAndStatusCode(any(), ReservationStatusType.TEMPORARY) 
+                    reservationRepository.findByExpiresAtBeforeAndStatusCode(any(), temporaryStatus.code) 
                 } returns expiredReservations
                 every { reservationRepository.save(any()) } returnsMany expiredReservations
                 
@@ -268,8 +294,11 @@ class ReservationServiceTest : DescribeSpec({
         context("만료된 예약이 없을 때") {
             it("0을 반환해야 한다") {
                 // given
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
+                
+                every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
                 every { 
-                    reservationRepository.findByExpiresAtBeforeAndStatusCode(any(), ReservationStatusType.TEMPORARY) 
+                    reservationRepository.findByExpiresAtBeforeAndStatusCode(any(), temporaryStatus.code) 
                 } returns emptyList()
                 
                 // when

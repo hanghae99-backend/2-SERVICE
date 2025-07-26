@@ -27,8 +27,9 @@ data class Seat(
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     val price: BigDecimal,
     
-    @Column(name = "status_code", nullable = false, length = 50)
-    val statusCode: String,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "status_code", referencedColumnName = "code")
+    var status: SeatStatusType,
     
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
@@ -42,13 +43,14 @@ data class Seat(
     @JoinColumn(name = "schedule_id", insertable = false, updatable = false)
     val concertSchedule: ConcertSchedule? = null
     
-    // Seat -> SeatStatusType 연관관계 (N:1)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "status_code", referencedColumnName = "code", insertable = false, updatable = false)
-    val statusType: SeatStatusType? = null
-    
     companion object {
-        fun create(scheduleId: Long, seatNumber: String, price: BigDecimal): Seat {
+        // 상태 코드 상수
+        const val STATUS_AVAILABLE = "AVAILABLE"
+        const val STATUS_RESERVED = "RESERVED"
+        const val STATUS_OCCUPIED = "OCCUPIED"
+        const val STATUS_MAINTENANCE = "MAINTENANCE"
+        
+        fun create(scheduleId: Long, seatNumber: String, price: BigDecimal, availableStatus: SeatStatusType): Seat {
             if (scheduleId <= 0) {
                 throw ParameterValidationException("스케줄 ID는 0보다 커야 합니다: $scheduleId")
             }
@@ -63,63 +65,63 @@ data class Seat(
                 scheduleId = scheduleId,
                 seatNumber = seatNumber,
                 price = price,
-                statusCode = SeatStatusType.AVAILABLE
+                status = availableStatus
             )
         }
     }
     
-    fun reserve(): Seat {
-        if (statusCode != SeatStatusType.AVAILABLE) {
-            throw InvalidSeatStatusException("예약 가능한 좌석이 아닙니다. 현재 상태: $statusCode")
+    fun reserve(reservedStatus: SeatStatusType): Seat {
+        if (status.code != STATUS_AVAILABLE) {
+            throw InvalidSeatStatusException("예약 가능한 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
         return this.copy(
-            statusCode = SeatStatusType.RESERVED,
+            status = reservedStatus,
             updatedAt = LocalDateTime.now()
         )
     }
     
-    fun occupy(): Seat {
-        if (statusCode != SeatStatusType.RESERVED) {
-            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $statusCode")
+    fun occupy(occupiedStatus: SeatStatusType): Seat {
+        if (status.code != STATUS_RESERVED) {
+            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
         return this.copy(
-            statusCode = SeatStatusType.OCCUPIED,
+            status = occupiedStatus,
             updatedAt = LocalDateTime.now()
         )
     }
     
-    fun confirm(): Seat {
-        if (statusCode != SeatStatusType.RESERVED) {
-            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $statusCode")
+    fun confirm(occupiedStatus: SeatStatusType): Seat {
+        if (status.code != STATUS_RESERVED) {
+            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
         return this.copy(
-            statusCode = SeatStatusType.OCCUPIED,
+            status = occupiedStatus,
             updatedAt = LocalDateTime.now()
         )
     }
     
-    fun release(): Seat {
-        if (statusCode != SeatStatusType.RESERVED) {
-            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $statusCode")
+    fun release(availableStatus: SeatStatusType): Seat {
+        if (status.code != STATUS_RESERVED) {
+            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
         return this.copy(
-            statusCode = SeatStatusType.AVAILABLE,
+            status = availableStatus,
             updatedAt = LocalDateTime.now()
         )
     }
     
-    fun setMaintenance(): Seat {
+    fun setMaintenance(maintenanceStatus: SeatStatusType): Seat {
         return this.copy(
-            statusCode = SeatStatusType.MAINTENANCE,
+            status = maintenanceStatus,
             updatedAt = LocalDateTime.now()
         )
     }
     
-    fun isAvailable(): Boolean = statusCode == SeatStatusType.AVAILABLE
-    fun isReserved(): Boolean = statusCode == SeatStatusType.RESERVED
-    fun isOccupied(): Boolean = statusCode == SeatStatusType.OCCUPIED
-    fun canBeReserved(): Boolean = statusCode == SeatStatusType.AVAILABLE
+    fun isAvailable(): Boolean = status.code == STATUS_AVAILABLE
+    fun isReserved(): Boolean = status.code == STATUS_RESERVED
+    fun isOccupied(): Boolean = status.code == STATUS_OCCUPIED
+    fun canBeReserved(): Boolean = status.code == STATUS_AVAILABLE
     
-    val status: String
-        get() = statusType?.name ?: statusCode
+    val statusName: String
+        get() = status.name
 }

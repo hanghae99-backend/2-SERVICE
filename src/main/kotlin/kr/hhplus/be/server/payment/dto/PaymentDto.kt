@@ -21,7 +21,7 @@ data class PaymentDto(
                 userId = payment.userId,
                 amount = payment.amount,
                 paymentMethod = payment.paymentMethod,
-                statusCode = payment.statusCode,
+                statusCode = payment.status.code,
                 paidAt = payment.paidAt,
                 reservationList = payment.reservationList
             )

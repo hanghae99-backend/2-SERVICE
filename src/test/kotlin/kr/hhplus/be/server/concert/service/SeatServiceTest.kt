@@ -13,12 +13,16 @@ import kr.hhplus.be.server.concert.exception.ConcertNotFoundException
 import kr.hhplus.be.server.concert.exception.SeatNotFoundException
 import kr.hhplus.be.server.concert.repository.ConcertScheduleRepository
 import kr.hhplus.be.server.concert.repository.SeatRepository
+import kr.hhplus.be.server.concert.repository.SeatStatusTypePojoRepository
+import java.math.BigDecimal
+import java.time.LocalDateTime
 
 class SeatServiceTest : DescribeSpec({
     
     val seatRepository = mockk<SeatRepository>()
     val concertScheduleRepository = mockk<ConcertScheduleRepository>()
-    val seatService = SeatService(seatRepository, concertScheduleRepository)
+    val seatStatusTypePojoRepository = mockk<SeatStatusTypePojoRepository>()
+    val seatService = SeatService(seatRepository, concertScheduleRepository,seatStatusTypePojoRepository)
     
     describe("getAvailableSeats") {
         context("존재하는 스케줄의 예약 가능한 좌석을 조회할 때") {
@@ -26,14 +30,16 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val scheduleId = 1L
                 val schedule = mockk<ConcertSchedule>(relaxed = true)
+                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, LocalDateTime.now())
                 val seats = listOf(
                     mockk<Seat>(relaxed = true),
                     mockk<Seat>(relaxed = true)
                 )
                 
                 every { concertScheduleRepository.findById(scheduleId) } returns schedule
+                every { seatStatusTypePojoRepository.getAvailableStatus() } returns availableStatus
                 every { 
-                    seatRepository.findByScheduleIdAndStatusCodeOrderBySeatNumberAsc(scheduleId, SeatStatusType.AVAILABLE) 
+                    seatRepository.findByScheduleIdAndStatusCodeOrderBySeatNumberAsc(scheduleId, availableStatus.code) 
                 } returns seats
                 
                 // when
@@ -212,10 +218,12 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val seatId = 1L
                 val seat = mockk<Seat>(relaxed = true)
+                val occupiedStatus = SeatStatusType("OCCUPIED", "점유", "점유된 좌석", true, LocalDateTime.now())
                 val confirmedSeat = mockk<Seat>(relaxed = true)
                 
                 every { seatRepository.findById(seatId) } returns seat
-                every { seat.confirm() } returns confirmedSeat
+                every { seatStatusTypePojoRepository.getOccupiedStatus() } returns occupiedStatus
+                every { seat.confirm(occupiedStatus) } returns confirmedSeat
                 every { seatRepository.save(confirmedSeat) } returns confirmedSeat
                 
                 // when

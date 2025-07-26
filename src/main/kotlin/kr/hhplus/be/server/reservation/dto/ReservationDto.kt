@@ -36,7 +36,7 @@ data class ReservationDto(
                 seatId = reservation.seatId,
                 seatNumber = reservation.seatNumber,
                 price = reservation.price,
-                statusCode = reservation.statusCode,
+                statusCode = reservation.status.code,
                 statusName = reservation.statusName,
                 statusDescription = reservation.statusDescription,
                 reservedAt = reservation.reservedAt,
@@ -47,15 +47,15 @@ data class ReservationDto(
 
         
         private fun generateDefaultMessage(reservation: Reservation): String {
-            return when (reservation.statusCode) {
-                ReservationStatusType.TEMPORARY -> {
+            return when (reservation.status.code) {
+                "TEMPORARY" -> {
                     val expiresAt = reservation.expiresAt?.let { 
                         it.format(java.time.format.DateTimeFormatter.ofPattern("MM월 dd일 HH:mm"))
                     } ?: "정해진 시간"
                     "좌석이 임시 배정되었습니다. ${expiresAt}까지 결제를 완료해주세요."
                 }
-                ReservationStatusType.CONFIRMED -> "좌석 예약이 확정되었습니다."
-                ReservationStatusType.CANCELLED -> "좌석 예약이 취소되었습니다."
+                "CONFIRMED" -> "좌석 예약이 확정되었습니다."
+                "CANCELLED" -> "좌석 예약이 취소되었습니다."
                 else -> "예약 상태: ${reservation.statusName}"
             }
         }

@@ -5,6 +5,7 @@ import kr.hhplus.be.server.balance.exception.InvalidPointAmountException
 import kr.hhplus.be.server.balance.exception.PointNotFoundException
 import kr.hhplus.be.server.balance.repository.PointHistoryRepository
 import kr.hhplus.be.server.balance.repository.PointRepository
+import kr.hhplus.be.server.balance.repository.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.service.UserService
 import org.springframework.stereotype.Service
@@ -16,6 +17,7 @@ import java.math.BigDecimal
 class BalanceService(
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
+    private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
     private val userService: UserService
 ) {
     
@@ -46,7 +48,8 @@ class BalanceService(
         val chargedPoint = currentPoint.charge(amount)
         val savedPoint = pointRepository.save(chargedPoint)
         
-        val history = PointHistory.charge(userId, amount, "포인트 충전")
+        val chargeType = pointHistoryTypeRepository.getChargeType()
+        val history = PointHistory.charge(userId, amount, chargeType, "포인트 충전")
         pointHistoryRepository.save(history)
         
         return savedPoint
@@ -73,7 +76,8 @@ class BalanceService(
         val deductedPoint = currentPoint.deduct(amount)
         val savedPoint = pointRepository.save(deductedPoint)
         
-        val history = PointHistory.use(userId, amount, "포인트 사용")
+        val useType = pointHistoryTypeRepository.getUseType()
+        val history = PointHistory.use(userId, amount, useType, "포인트 사용")
         pointHistoryRepository.save(history)
         
         return savedPoint

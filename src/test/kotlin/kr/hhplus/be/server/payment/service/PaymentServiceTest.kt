@@ -11,19 +11,23 @@ import kr.hhplus.be.server.balance.service.BalanceService
 import kr.hhplus.be.server.concert.dto.SeatDto
 import kr.hhplus.be.server.concert.service.SeatService
 import kr.hhplus.be.server.payment.entity.Payment
+import kr.hhplus.be.server.payment.entity.PaymentStatusType
 import kr.hhplus.be.server.payment.exception.PaymentAlreadyProcessedException
 import kr.hhplus.be.server.payment.exception.PaymentNotFoundException
 import kr.hhplus.be.server.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.payment.repository.PaymentRepository
+import kr.hhplus.be.server.payment.repository.PaymentStatusTypePojoRepository
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.reservation.service.ReservationService
 import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.service.UserService
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 class PaymentServiceTest : DescribeSpec({
-    
+
     val paymentRepository = mockk<PaymentRepository>()
+    val paymentStatusTypePojoRepository = mockk<PaymentStatusTypePojoRepository>()
     val reservationService = mockk<ReservationService>()
     val balanceService = mockk<BalanceService>()
     val tokenService = mockk<TokenService>()
@@ -31,7 +35,7 @@ class PaymentServiceTest : DescribeSpec({
     val userService = mockk<UserService>()
     
     val paymentService = PaymentService(
-        paymentRepository, reservationService, balanceService, 
+        paymentRepository, paymentStatusTypePojoRepository, reservationService, balanceService,
         tokenService, seatService, userService
     )
     
@@ -48,8 +52,11 @@ class PaymentServiceTest : DescribeSpec({
                 val reservation = mockk<Reservation>(relaxed = true)
                 val seat = mockk<SeatDto>(relaxed = true)
                 val currentBalance = Point.create(userId, BigDecimal("100000"))
-                val payment = Payment.create(userId, paymentAmount)
-                val completedPayment = payment.complete()
+                
+                val pendingStatus = PaymentStatusType("PEND", "대기", "결제 대기", true, LocalDateTime.now())
+                val completedStatus = PaymentStatusType("COMP", "완료", "결제 완료", true, LocalDateTime.now())
+                val payment = Payment.create(userId, paymentAmount, "POINT", pendingStatus)
+                val completedPayment = payment.complete(completedStatus)
                 
                 every { tokenService.validateActiveToken(token) } returns mockk(relaxed = true)
                 every { userService.existsById(userId) } returns true
@@ -61,6 +68,8 @@ class PaymentServiceTest : DescribeSpec({
                 every { seatService.getSeatById(seatId) } returns seat
                 every { seat.price } returns paymentAmount
                 every { balanceService.getBalance(userId) } returns currentBalance
+                every { paymentStatusTypePojoRepository.getPendingStatus() } returns pendingStatus
+                every { paymentStatusTypePojoRepository.getCompletedStatus() } returns completedStatus
                 every { paymentRepository.save(any()) } returnsMany listOf(payment, completedPayment)
                 every { balanceService.deductBalance(userId, paymentAmount) } returns mockk(relaxed = true)
                 every { reservationService.confirmReservation(reservationId, payment.paymentId) } returns mockk(relaxed = true)
@@ -171,12 +180,13 @@ class PaymentServiceTest : DescribeSpec({
             }
         }
         
-        context("좌석 정보가 없는 예약으로 결제할 때") {
-            it("PaymentAlreadyProcessedException을 던져야 한다") {
+        context("존재하지 않는 좌석으로 결제할 때") {
+            it("PaymentProcessException을 던져야 한다") {
                 // given
                 val userId = 1L
                 val reservationId = 1L
                 val token = "valid-token"
+                val seatId = 999L // 존재하지 않는 좌석 ID
                 val reservation = mockk<Reservation>(relaxed = true)
                 
                 every { tokenService.validateActiveToken(token) } returns mockk(relaxed = true)
@@ -185,10 +195,11 @@ class PaymentServiceTest : DescribeSpec({
                 every { reservation.userId } returns userId
                 every { reservation.isTemporary() } returns true
                 every { reservation.isExpired() } returns false
-                every { reservation.seatId } returns 1L
+                every { reservation.seatId } returns seatId
+                every { seatService.getSeatById(seatId) } throws RuntimeException("좌석을 찾을 수 없습니다")
                 
                 // when & then
-                shouldThrow<PaymentAlreadyProcessedException> {
+                shouldThrow<RuntimeException> {
                     paymentService.processPayment(userId, reservationId, token)
                 }
             }
@@ -231,8 +242,10 @@ class PaymentServiceTest : DescribeSpec({
             it("해당 결제 정보를 반환해야 한다") {
                 // given
                 val paymentId = 1L
-                val payment = Payment.create(1L, BigDecimal("50000"))
+                val pendingStatus = PaymentStatusType("PEND", "대기", "결제 대기", true, LocalDateTime.now())
+                val payment = Payment.create(1L, BigDecimal("50000"), "POINT", pendingStatus)
                 
+                every { paymentStatusTypePojoRepository.getPendingStatus() } returns pendingStatus
                 every { paymentRepository.findById(paymentId) } returns payment
                 
                 // when

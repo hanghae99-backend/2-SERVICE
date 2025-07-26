@@ -7,6 +7,7 @@ import io.mockk.mockk
 import kr.hhplus.be.server.reservation.dto.request.ReservationCancelRequest
 import kr.hhplus.be.server.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.reservation.entity.Reservation
+import kr.hhplus.be.server.reservation.entity.ReservationStatusType
 import kr.hhplus.be.server.reservation.exception.ReservationNotFoundException
 import kr.hhplus.be.server.reservation.service.ReservationService
 import kr.hhplus.be.server.global.exception.GlobalExceptionHandler
@@ -18,6 +19,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 @WebMvcTest(ReservationController::class)
 class ReservationControllerTest : DescribeSpec({
@@ -38,6 +40,7 @@ class ReservationControllerTest : DescribeSpec({
                 val seatId = 1L
                 val token = "test-token"
                 val request = ReservationCreateRequest(userId, concertId, seatId, token)
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
                 val reservation = Reservation(
                     reservationId = 1L,
                     userId = userId,
@@ -45,7 +48,7 @@ class ReservationControllerTest : DescribeSpec({
                     seatId = seatId,
                     seatNumber = "A1",
                     price = BigDecimal("50000"),
-                    statusCode = "TEMPORARY"
+                    status = temporaryStatus
                 )
                 
                 every { reservationService.reserveSeat(userId, concertId, seatId, token) } returns reservation
@@ -111,6 +114,7 @@ class ReservationControllerTest : DescribeSpec({
                 // given
                 val reservationId = 1L
                 val paymentId = 1L
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
                 val reservation = Reservation(
                     reservationId = 1L,
                     userId = 1L,
@@ -118,7 +122,7 @@ class ReservationControllerTest : DescribeSpec({
                     seatId = 1L,
                     seatNumber = "A1",
                     price = BigDecimal("50000"),
-                    statusCode = "TEMPORARY"
+                    status = temporaryStatus
                 )
                 
                 every { reservationService.confirmReservation(reservationId, paymentId) } returns reservation
@@ -159,6 +163,7 @@ class ReservationControllerTest : DescribeSpec({
             it("예약 정보를 반환하고 200 상태코드를 반환해야 한다") {
                 // given
                 val reservationId = 1L
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
                 val reservation = Reservation(
                     reservationId = reservationId,
                     userId = 1L,
@@ -166,7 +171,7 @@ class ReservationControllerTest : DescribeSpec({
                     seatId = 1L,
                     seatNumber = "A1",
                     price = BigDecimal("50000"),
-                    statusCode = "TEMPORARY"
+                    status = temporaryStatus
                 )
                 
                 every { reservationService.getReservationById(reservationId) } returns reservation
@@ -204,6 +209,7 @@ class ReservationControllerTest : DescribeSpec({
                 val userId = 1L
                 val reason = "사용자 요청"
                 val request = ReservationCancelRequest(userId, reason)
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
                 val reservation = Reservation(
                     reservationId = 1L,
                     userId = userId,
@@ -211,7 +217,7 @@ class ReservationControllerTest : DescribeSpec({
                     seatId = 1L,
                     seatNumber = "A1",
                     price = BigDecimal("50000"),
-                    statusCode = "TEMPORARY"
+                    status = temporaryStatus
                 )
                 
                 every { reservationService.cancelReservation(reservationId, userId, reason) } returns reservation

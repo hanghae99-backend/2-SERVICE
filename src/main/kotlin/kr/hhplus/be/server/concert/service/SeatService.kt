@@ -6,6 +6,7 @@ import kr.hhplus.be.server.concert.exception.ConcertNotFoundException
 import kr.hhplus.be.server.concert.exception.SeatNotFoundException
 import kr.hhplus.be.server.concert.repository.ConcertScheduleRepository
 import kr.hhplus.be.server.concert.repository.SeatRepository
+import kr.hhplus.be.server.concert.repository.SeatStatusTypePojoRepository
 import kr.hhplus.be.server.global.extension.orElseThrow
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 class SeatService(
     private val seatRepository: SeatRepository,
     private val concertScheduleRepository: ConcertScheduleRepository,
+    private val seatStatusTypeRepository: SeatStatusTypePojoRepository
 ) {
     
     /**
@@ -22,9 +24,10 @@ class SeatService(
      */
     fun getAvailableSeats(scheduleId: Long): List<SeatDto> {
         val schedule = concertScheduleRepository.findById(scheduleId).orElseThrow { ConcertNotFoundException("콘서트 스케줄을 찾을 수 없습니다. ID: $scheduleId") }
+        val availableStatus = seatStatusTypeRepository.getAvailableStatus()
 
         return seatRepository.findByScheduleIdAndStatusCodeOrderBySeatNumberAsc(
-            scheduleId, SeatStatusType.AVAILABLE
+            scheduleId, availableStatus.code
         ).map { SeatDto.from(it) }
     }
     
@@ -68,8 +71,9 @@ class SeatService(
     @Transactional
     fun confirmSeat(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
+        val occupiedStatus = seatStatusTypeRepository.getOccupiedStatus()
 
-        val confirmedSeat = seat.confirm()
+        val confirmedSeat = seat.confirm(occupiedStatus)
         val savedSeat = seatRepository.save(confirmedSeat)
         return SeatDto.from(savedSeat)
     }

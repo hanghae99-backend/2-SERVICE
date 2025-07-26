@@ -148,9 +148,11 @@ class BalanceControllerTest : DescribeSpec({
             it("포인트 이력을 반환하고 200 상태코드를 반환해야 한다") {
                 // given
                 val userId = 1L
+                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
+                val useType = PointHistoryType("USE", "사용", "포인트 사용", true, LocalDateTime.now())
                 val histories = listOf(
-                    PointHistory.charge(userId, BigDecimal("10000"), "포인트 충전"),
-                    PointHistory.use(userId, BigDecimal("5000"), "포인트 사용")
+                    PointHistory.charge(userId, BigDecimal("10000"), chargeType, "포인트 충전"),
+                    PointHistory.use(userId, BigDecimal("5000"), useType, "포인트 사용")
                 )
                 
                 every { balanceService.getPointHistory(userId) } returns histories

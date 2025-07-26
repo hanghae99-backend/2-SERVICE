@@ -95,7 +95,7 @@ data class BalanceDto(
                     historyId = history.historyId,
                     userId = history.userId,
                     amount = history.amount,
-                    type = history.type,
+                    type = history.typeName,
                     description = history.description,
                     createdAt = history.createdAt.toString()
                 )

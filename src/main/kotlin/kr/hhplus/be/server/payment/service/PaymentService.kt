@@ -9,6 +9,7 @@ import kr.hhplus.be.server.payment.entity.Payment
 import kr.hhplus.be.server.payment.exception.PaymentNotFoundException
 import kr.hhplus.be.server.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.payment.repository.PaymentRepository
+import kr.hhplus.be.server.payment.repository.PaymentStatusTypePojoRepository
 import kr.hhplus.be.server.reservation.service.ReservationService
 import kr.hhplus.be.server.user.service.UserService
 import kr.hhplus.be.server.user.exception.UserNotFoundException
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class PaymentService(
     private val paymentRepository: PaymentRepository,
+    private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
     private val reservationService: ReservationService,
     private val balanceService: BalanceService,
     private val tokenService: TokenService,
@@ -50,8 +52,8 @@ class PaymentService(
             throw PaymentProcessException("예약이 만료되었습니다: $reservationId")
         }
 
-        // 5. 좌석 정보 조회 - reservation에서 seatId가 nullable이므로 체크 필요
-        val seatId = reservation.seatId ?: throw PaymentProcessException("예약에 좌석 정보가 없습니다")
+        // 5. 좌석 정보 조회
+        val seatId = reservation.seatId
         val seat = seatService.getSeatById(seatId)
         val paymentAmount = seat.price
 
@@ -62,7 +64,8 @@ class PaymentService(
         }
 
         // 7. 결제 생성
-        val payment = Payment.create(userId, paymentAmount)
+        val pendingStatus = paymentStatusTypeRepository.getPendingStatus()
+        val payment = Payment.create(userId, paymentAmount, "POINT", pendingStatus)
         val savedPayment = paymentRepository.save(payment)
 
         try {
@@ -76,7 +79,8 @@ class PaymentService(
             seatService.confirmSeat(seatId)
 
             // 11. 결제 완료 처리
-            val completedPayment = savedPayment.complete()
+            val completedStatus = paymentStatusTypeRepository.getCompletedStatus()
+            val completedPayment = savedPayment.complete(completedStatus)
             val finalPayment = paymentRepository.save(completedPayment)
 
             // 12. 토큰 완료 처리
@@ -86,7 +90,8 @@ class PaymentService(
 
         } catch (e: Exception) {
             // 결제 실패 처리
-            val failedPayment = savedPayment.fail()
+            val failedStatus = paymentStatusTypeRepository.getFailedStatus()
+            val failedPayment = savedPayment.fail(failedStatus)
             paymentRepository.save(failedPayment)
             throw PaymentProcessException("결제 처리 중 오류가 발생했습니다: ${e.message}")
         }

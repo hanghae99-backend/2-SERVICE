@@ -35,8 +35,9 @@ class Reservation(
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     val price: BigDecimal,
 
-    @Column(name = "status_code", nullable = false, length = 50)
-    var statusCode: String,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "status_code", referencedColumnName = "code")
+    var status: ReservationStatusType,
 
     @Column(name = "reserved_at", nullable = false)
     val reservedAt: LocalDateTime = LocalDateTime.now(),
@@ -50,21 +51,11 @@ class Reservation(
     
     // 상태 명칭 계산 프로퍼티
     val statusName: String
-        get() = when (statusCode) {
-            ReservationStatusType.TEMPORARY -> "임시 예약"
-            ReservationStatusType.CONFIRMED -> "예약 확정"
-            ReservationStatusType.CANCELLED -> "예약 취소"
-            else -> "알 수 없음"
-        }
+        get() = status.name
     
     // 상태 설명 계산 프로퍼티
     val statusDescription: String
-        get() = when (statusCode) {
-            ReservationStatusType.TEMPORARY -> "결제 대기 중인 임시 예약입니다."
-            ReservationStatusType.CONFIRMED -> "결제가 완료된 확정 예약입니다."
-            ReservationStatusType.CANCELLED -> "취소된 예약입니다."
-            else -> "알 수 없는 상태입니다."
-        }
+        get() = status.description ?: ""
 
     // 필요할 때만 사용하는 연관관계 (조회 전용)
     @ManyToOne(fetch = FetchType.LAZY)
@@ -84,7 +75,7 @@ class Reservation(
     val payment: Payment? = null
 
     companion object {
-        // 상태 코드 상수 - ReservationStatusType과 동일하게 수정
+        // 상태 코드 상수
         const val STATUS_TEMPORARY = "TEMPORARY"
         const val STATUS_CONFIRMED = "CONFIRMED"
         const val STATUS_CANCELLED = "CANCELLED"
@@ -95,6 +86,7 @@ class Reservation(
             seatId: Long,
             seatNumber: String,
             price: BigDecimal,
+            temporaryStatus: ReservationStatusType,
             tempMinutes: Long = 5
         ): Reservation {
             // 입력값 검증
@@ -120,31 +112,31 @@ class Reservation(
                 seatId = seatId,
                 seatNumber = seatNumber,
                 price = price,
-                statusCode = STATUS_TEMPORARY,
+                status = temporaryStatus,
                 expiresAt = LocalDateTime.now().plusMinutes(tempMinutes)
             )
         }
     }
 
-    fun confirm(paymentId: Long) {
-        if (statusCode != STATUS_TEMPORARY) {
-            throw IllegalStateException("임시 예약 상태가 아닙니다. 현재 상태: $statusCode")
+    fun confirm(paymentId: Long, confirmedStatus: ReservationStatusType) {
+        if (status.code != STATUS_TEMPORARY) {
+            throw IllegalStateException("임시 예약 상태가 아닙니다. 현재 상태: ${status.code}")
         }
         if (isExpired()) {
             throw IllegalStateException("예약이 만료되었습니다")
         }
 
         this.paymentId = paymentId
-        this.statusCode = STATUS_CONFIRMED
+        this.status = confirmedStatus
         this.confirmedAt = LocalDateTime.now()
     }
 
-    fun cancel() {
-        if (statusCode == STATUS_CANCELLED) {
+    fun cancel(cancelledStatus: ReservationStatusType) {
+        if (status.code == STATUS_CANCELLED) {
             throw IllegalStateException("이미 취소된 예약입니다")
         }
 
-        this.statusCode = STATUS_CANCELLED
+        this.status = cancelledStatus
     }
 
     fun isExpired(): Boolean {
@@ -152,7 +144,7 @@ class Reservation(
     }
 
     // 상태 체크 메서드들
-    fun isTemporary(): Boolean = statusCode == STATUS_TEMPORARY
-    fun isConfirmed(): Boolean = statusCode == STATUS_CONFIRMED
-    fun isCancelled(): Boolean = statusCode == STATUS_CANCELLED
+    fun isTemporary(): Boolean = status.code == STATUS_TEMPORARY
+    fun isConfirmed(): Boolean = status.code == STATUS_CONFIRMED
+    fun isCancelled(): Boolean = status.code == STATUS_CANCELLED
 }

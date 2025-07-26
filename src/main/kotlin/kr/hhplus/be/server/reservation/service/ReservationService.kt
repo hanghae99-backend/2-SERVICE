@@ -4,6 +4,7 @@ import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.reservation.entity.ReservationStatusType
 import kr.hhplus.be.server.reservation.repository.ReservationRepository
+import kr.hhplus.be.server.reservation.repository.ReservationStatusTypePojoRepository
 import kr.hhplus.be.server.reservation.dto.ReservationDto
 import kr.hhplus.be.server.reservation.dto.request.ReservationSearchCondition
 import org.springframework.data.domain.PageRequest
@@ -16,13 +17,19 @@ import java.time.LocalDateTime
 @Service
 @Transactional(readOnly = true)
 class ReservationService(
-    private val reservationRepository: ReservationRepository
+private val reservationRepository: ReservationRepository,
+private val statusRepository: ReservationStatusTypePojoRepository
 ) {
+        
+        // ========== 비즈니스 메서드들 ==========
     
     @Transactional
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
         // 기존 활성 예약 확인
-        val activeStatuses = listOf(ReservationStatusType.TEMPORARY, ReservationStatusType.CONFIRMED)
+        val activeStatuses = listOf(
+            statusRepository.getTemporaryStatus().code,
+            statusRepository.getConfirmedStatus().code
+        )
         val existingReservation = reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses)
         
         if (existingReservation != null) {
@@ -40,7 +47,8 @@ class ReservationService(
             concertId = concertId,
             seatId = seatId,
             seatNumber = "A${seatId}", // 임시 좌석 번호
-            price = BigDecimal("50000") // 임시 가격
+            price = BigDecimal("50000"), // 임시 가격
+            temporaryStatus = statusRepository.getTemporaryStatus()
         )
         
         return reservationRepository.save(reservation)
@@ -49,7 +57,7 @@ class ReservationService(
     @Transactional
     fun confirmReservation(reservationId: Long, paymentId: Long): Reservation {
         val reservation = getReservationById(reservationId)
-        reservation.confirm(paymentId)
+        reservation.confirm(paymentId, statusRepository.getConfirmedStatus())
         return reservationRepository.save(reservation)
     }
     
@@ -61,7 +69,7 @@ class ReservationService(
             throw IllegalArgumentException("본인의 예약만 취소할 수 있습니다")
         }
         
-        reservation.cancel()
+        reservation.cancel(statusRepository.getCancelledStatus())
         return reservationRepository.save(reservation)
     }
     
@@ -120,7 +128,7 @@ class ReservationService(
     fun getExpiredReservations(pageNumber: Int, pageSize: Int): ReservationDto.Page {
         val expiredReservations = reservationRepository.findByExpiresAtBeforeAndStatusCode(
             LocalDateTime.now(), 
-            ReservationStatusType.TEMPORARY
+            statusRepository.getTemporaryStatus().code
         )
         
         val startIndex = (pageNumber - 1) * pageSize
@@ -143,11 +151,11 @@ class ReservationService(
     fun cleanupExpiredReservations(): Int {
         val expiredReservations = reservationRepository.findByExpiresAtBeforeAndStatusCode(
             LocalDateTime.now(),
-            ReservationStatusType.TEMPORARY
+            statusRepository.getTemporaryStatus().code
         )
         
         expiredReservations.forEach { reservation ->
-            reservation.cancel()
+            reservation.cancel(statusRepository.getCancelledStatus())
             reservationRepository.save(reservation)
         }
         

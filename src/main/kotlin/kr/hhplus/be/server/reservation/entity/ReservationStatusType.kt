@@ -21,10 +21,4 @@ data class ReservationStatusType(
     
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
-) {
-    companion object {
-        const val TEMPORARY = "TEMPORARY"
-        const val CONFIRMED = "CONFIRMED"
-        const val CANCELLED = "CANCELLED"
-    }
-}
+)

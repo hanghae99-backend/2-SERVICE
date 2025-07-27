@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.reservation.service
 
 import kr.hhplus.be.server.global.extension.orElseThrow
+import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.reservation.entity.ReservationStatusType
 import kr.hhplus.be.server.reservation.repository.ReservationRepository
@@ -17,14 +18,27 @@ import java.time.LocalDateTime
 @Service
 @Transactional(readOnly = true)
 class ReservationService(
-private val reservationRepository: ReservationRepository,
-private val statusRepository: ReservationStatusTypePojoRepository
+    private val reservationRepository: ReservationRepository,
+    private val statusRepository: ReservationStatusTypePojoRepository,
+    private val distributedLock: DistributedLock
 ) {
         
         // ========== 비즈니스 메서드들 ==========
     
     @Transactional
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
+        val lockKey = "seat:reservation:$seatId"
+        
+        return distributedLock.executeWithLock(
+            lockKey = lockKey,
+            lockTimeoutMs = 10000L,  // 10초 락 타임아웃
+            waitTimeoutMs = 5000L    // 5초 대기 타임아웃
+        ) {
+            reserveSeatInternal(userId, concertId, seatId)
+        }
+    }
+    
+    private fun reserveSeatInternal(userId: Long, concertId: Long, seatId: Long): Reservation {
         // 기존 활성 예약 확인
         val activeStatuses = listOf(
             statusRepository.getTemporaryStatus().code,
@@ -46,8 +60,8 @@ private val statusRepository: ReservationStatusTypePojoRepository
             userId = userId,
             concertId = concertId,
             seatId = seatId,
-            seatNumber = "A${seatId}", // 임시 좌석 번호
-            price = BigDecimal("50000"), // 임시 가격
+            seatNumber = "${seatId.toString().padStart(2, '0')}", // 01, 02 형식
+            price = BigDecimal("100000"), // 10만원 통일
             temporaryStatus = statusRepository.getTemporaryStatus()
         )
         

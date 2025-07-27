@@ -8,6 +8,7 @@ import kr.hhplus.be.server.concert.repository.ConcertScheduleRepository
 import kr.hhplus.be.server.concert.repository.SeatRepository
 import kr.hhplus.be.server.concert.repository.SeatStatusTypePojoRepository
 import kr.hhplus.be.server.global.extension.orElseThrow
+import kr.hhplus.be.server.global.lock.DistributedLock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -16,7 +17,8 @@ import org.springframework.transaction.annotation.Transactional
 class SeatService(
     private val seatRepository: SeatRepository,
     private val concertScheduleRepository: ConcertScheduleRepository,
-    private val seatStatusTypeRepository: SeatStatusTypePojoRepository
+    private val seatStatusTypeRepository: SeatStatusTypePojoRepository,
+    private val distributedLock: DistributedLock
 ) {
     
     /**
@@ -70,6 +72,18 @@ class SeatService(
 
     @Transactional
     fun confirmSeat(seatId: Long): SeatDto {
+        val lockKey = "seat:confirm:$seatId"
+        
+        return distributedLock.executeWithLock(
+            lockKey = lockKey,
+            lockTimeoutMs = 10000L,
+            waitTimeoutMs = 5000L
+        ) {
+            confirmSeatInternal(seatId)
+        }
+    }
+    
+    private fun confirmSeatInternal(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
         val occupiedStatus = seatStatusTypeRepository.getOccupiedStatus()
 

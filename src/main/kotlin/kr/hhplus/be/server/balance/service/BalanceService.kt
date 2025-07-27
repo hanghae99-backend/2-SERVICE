@@ -6,6 +6,7 @@ import kr.hhplus.be.server.balance.exception.PointNotFoundException
 import kr.hhplus.be.server.balance.repository.PointHistoryRepository
 import kr.hhplus.be.server.balance.repository.PointRepository
 import kr.hhplus.be.server.balance.repository.PointHistoryTypePojoRepository
+import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.service.UserService
 import org.springframework.stereotype.Service
@@ -18,11 +19,24 @@ class BalanceService(
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
     private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
-    private val userService: UserService
+    private val userService: UserService,
+    private val distributedLock: DistributedLock
 ) {
     
     @Transactional
     fun chargeBalance(userId: Long, amount: BigDecimal): Point {
+        val lockKey = "user:balance:$userId"
+        
+        return distributedLock.executeWithLock(
+            lockKey = lockKey,
+            lockTimeoutMs = 10000L,
+            waitTimeoutMs = 5000L
+        ) {
+            chargeBalanceInternal(userId, amount)
+        }
+    }
+    
+    private fun chargeBalanceInternal(userId: Long, amount: BigDecimal): Point {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }
@@ -66,6 +80,18 @@ class BalanceService(
 
     @Transactional
     fun deductBalance(userId: Long, amount: BigDecimal): Point {
+        val lockKey = "user:balance:$userId"
+        
+        return distributedLock.executeWithLock(
+            lockKey = lockKey,
+            lockTimeoutMs = 10000L,
+            waitTimeoutMs = 5000L
+        ) {
+            deductBalanceInternal(userId, amount)
+        }
+    }
+    
+    private fun deductBalanceInternal(userId: Long, amount: BigDecimal): Point {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }

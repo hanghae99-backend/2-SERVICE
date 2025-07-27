@@ -3,6 +3,7 @@ package kr.hhplus.be.server.global.exception
 import kr.hhplus.be.server.auth.exception.*
 import kr.hhplus.be.server.balance.exception.*
 import kr.hhplus.be.server.concert.exception.*
+import kr.hhplus.be.server.global.lock.ConcurrentAccessException
 import kr.hhplus.be.server.payment.exception.*
 import kr.hhplus.be.server.user.exception.*
 import kr.hhplus.be.server.reservation.exception.*
@@ -148,6 +149,18 @@ class GlobalExceptionHandler {
     @ExceptionHandler(UserAlreadyExistsException::class)
     fun handleUserAlreadyExistsException(ex: UserAlreadyExistsException): ResponseEntity<ErrorResponse> {
         return createErrorResponse(ex.message ?: "이미 존재하는 사용자입니다", ex.errorCode, ex.status)
+    }
+
+    /**
+     * Distributed Lock Exceptions
+     */
+    @ExceptionHandler(ConcurrentAccessException::class)
+    fun handleConcurrentAccessException(ex: ConcurrentAccessException): ResponseEntity<ErrorResponse> {
+        return createErrorResponse(
+            ex.message ?: "동시 접근으로 인한 처리 실패입니다. 잠시 후 다시 시도해주세요.",
+            "CONCURRENT_ACCESS_DENIED",
+            HttpStatus.CONFLICT
+        )
     }
 
     /**

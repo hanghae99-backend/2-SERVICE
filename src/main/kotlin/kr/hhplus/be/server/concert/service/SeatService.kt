@@ -9,6 +9,7 @@ import kr.hhplus.be.server.concert.repository.SeatRepository
 import kr.hhplus.be.server.concert.repository.SeatStatusTypePojoRepository
 import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.global.lock.LockKeyManager
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -72,7 +73,7 @@ class SeatService(
 
     @Transactional
     fun confirmSeat(seatId: Long): SeatDto {
-        val lockKey = "seat:confirm:$seatId"
+        val lockKey = LockKeyManager.seatOperation(seatId)
         
         return distributedLock.executeWithLock(
             lockKey = lockKey,
@@ -83,7 +84,11 @@ class SeatService(
         }
     }
     
-    private fun confirmSeatInternal(seatId: Long): SeatDto {
+    /**
+     * PaymentService에서 내부 호출용 (중첩 락 방지)
+     */
+    @Transactional
+    fun confirmSeatInternal(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
         val occupiedStatus = seatStatusTypeRepository.getOccupiedStatus()
 

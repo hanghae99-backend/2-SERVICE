@@ -4,6 +4,8 @@ import kr.hhplus.be.server.auth.service.TokenService
 import kr.hhplus.be.server.balance.service.BalanceService
 import kr.hhplus.be.server.concert.service.SeatService
 import kr.hhplus.be.server.global.extension.orElseThrow
+import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.global.lock.LockKeyManager
 import kr.hhplus.be.server.payment.dto.PaymentDto
 import kr.hhplus.be.server.payment.entity.Payment
 import kr.hhplus.be.server.payment.exception.PaymentNotFoundException
@@ -25,11 +27,24 @@ class PaymentService(
     private val balanceService: BalanceService,
     private val tokenService: TokenService,
     private val seatService: SeatService,
-    private val userService: UserService
+    private val userService: UserService,
+    private val distributedLock: DistributedLock
 ) {
 
     @Transactional
     fun processPayment(userId: Long, reservationId: Long, token: String): PaymentDto {
+        val lockKey = LockKeyManager.paymentProcess(userId, reservationId)
+        
+        return distributedLock.executeWithLock(
+            lockKey = lockKey,
+            lockTimeoutMs = 15000L,  // 결제는 조금 더 긴 시간 허용
+            waitTimeoutMs = 10000L
+        ) {
+            processPaymentInternal(userId, reservationId, token)
+        }
+    }
+    
+    private fun processPaymentInternal(userId: Long, reservationId: Long, token: String): PaymentDto {
         // 1. 토큰 검증
         tokenService.validateActiveToken(token)
 
@@ -69,14 +84,14 @@ class PaymentService(
         val savedPayment = paymentRepository.save(payment)
 
         try {
-            // 8. 잔액 차감
-            balanceService.deductBalance(userId, paymentAmount)
+            // 8. 잔액 차감 (내부 메서드 직접 호출로 중첩 락 방지)
+            balanceService.deductBalanceInternal(userId, paymentAmount)
 
-            // 9. 예약 확정
-            reservationService.confirmReservation(reservationId, savedPayment.paymentId)
+            // 9. 예약 확정 (내부 메서드 직접 호출로 중첩 락 방지)
+            reservationService.confirmReservationInternal(reservationId, savedPayment.paymentId)
 
-            // 10. 좌석 상태 업데이트
-            seatService.confirmSeat(seatId)
+            // 10. 좌석 상태 업데이트 (내부 메서드 직접 호출로 중첩 락 방지)
+            seatService.confirmSeatInternal(seatId)
 
             // 11. 결제 완료 처리
             val completedStatus = paymentStatusTypeRepository.getCompletedStatus()

@@ -7,6 +7,7 @@ import kr.hhplus.be.server.balance.repository.PointHistoryRepository
 import kr.hhplus.be.server.balance.repository.PointRepository
 import kr.hhplus.be.server.balance.repository.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.global.lock.LockKeyManager
 import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.service.UserService
 import org.springframework.stereotype.Service
@@ -25,7 +26,7 @@ class BalanceService(
     
     @Transactional
     fun chargeBalance(userId: Long, amount: BigDecimal): Point {
-        val lockKey = "user:balance:$userId"
+        val lockKey = LockKeyManager.userBalance(userId)
         
         return distributedLock.executeWithLock(
             lockKey = lockKey,
@@ -80,7 +81,7 @@ class BalanceService(
 
     @Transactional
     fun deductBalance(userId: Long, amount: BigDecimal): Point {
-        val lockKey = "user:balance:$userId"
+        val lockKey = LockKeyManager.userBalance(userId)
         
         return distributedLock.executeWithLock(
             lockKey = lockKey,
@@ -91,7 +92,11 @@ class BalanceService(
         }
     }
     
-    private fun deductBalanceInternal(userId: Long, amount: BigDecimal): Point {
+    /**
+     * PaymentService에서 내부 호출용 (중첩 락 방지)
+     */
+    @Transactional
+    fun deductBalanceInternal(userId: Long, amount: BigDecimal): Point {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }

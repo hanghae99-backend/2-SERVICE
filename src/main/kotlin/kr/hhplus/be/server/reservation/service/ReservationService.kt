@@ -2,6 +2,7 @@ package kr.hhplus.be.server.reservation.service
 
 import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.global.lock.LockKeyManager
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.reservation.entity.ReservationStatusType
 import kr.hhplus.be.server.reservation.repository.ReservationRepository
@@ -27,7 +28,7 @@ class ReservationService(
     
     @Transactional
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
-        val lockKey = "seat:reservation:$seatId"
+        val lockKey = LockKeyManager.seatOperation(seatId)
         
         return distributedLock.executeWithLock(
             lockKey = lockKey,
@@ -70,6 +71,22 @@ class ReservationService(
     
     @Transactional
     fun confirmReservation(reservationId: Long, paymentId: Long): Reservation {
+        val lockKey = LockKeyManager.reservationConfirm(reservationId)
+        
+        return distributedLock.executeWithLock(
+            lockKey = lockKey,
+            lockTimeoutMs = 10000L,
+            waitTimeoutMs = 5000L
+        ) {
+            confirmReservationInternal(reservationId, paymentId)
+        }
+    }
+    
+    /**
+     * PaymentService에서 내부 호출용 (중첩 락 방지)
+     */
+    @Transactional
+    fun confirmReservationInternal(reservationId: Long, paymentId: Long): Reservation {
         val reservation = getReservationById(reservationId)
         reservation.confirm(paymentId, statusRepository.getConfirmedStatus())
         return reservationRepository.save(reservation)
@@ -77,6 +94,18 @@ class ReservationService(
     
     @Transactional
     fun cancelReservation(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
+        val lockKey = LockKeyManager.reservationCancel(reservationId)
+        
+        return distributedLock.executeWithLock(
+            lockKey = lockKey,
+            lockTimeoutMs = 10000L,
+            waitTimeoutMs = 5000L
+        ) {
+            cancelReservationInternal(reservationId, userId, cancelReason)
+        }
+    }
+    
+    private fun cancelReservationInternal(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
         val reservation = getReservationById(reservationId)
         
         if (reservation.userId != userId) {

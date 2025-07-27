@@ -15,6 +15,9 @@ interface SeatJpaRepository : JpaRepository<Seat, Long> {
     // 스케줄 ID로 좌석 조회
     fun findByScheduleId(scheduleId: Long): List<Seat>
     
+    // 스케줄별 좌석 총 개수
+    fun countByScheduleId(scheduleId: Long): Int
+    
     // 상태 코드로 조회
     fun findByScheduleIdAndStatusCode(scheduleId: Long, statusCode: String): List<Seat>
     

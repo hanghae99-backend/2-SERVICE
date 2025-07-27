@@ -15,6 +15,10 @@ class SeatRepositoryImpl(
         return seatJpaRepository.save(seat)
     }
     
+    override fun saveAll(seats: List<Seat>): List<Seat> {
+        return seatJpaRepository.saveAll(seats)
+    }
+    
     override fun findById(id: Long): Seat? {
         return seatJpaRepository.findById(id).orElse(null)
     }
@@ -33,6 +37,10 @@ class SeatRepositoryImpl(
     
     override fun findByScheduleIdAndStatusCodeOrderBySeatNumberAsc(scheduleId: Long, statusCode: String): List<Seat> {
         return seatJpaRepository.findByScheduleIdAndStatusCodeOrderBySeatNumberAsc(scheduleId, statusCode)
+    }
+    
+    override fun countByScheduleId(scheduleId: Long): Int {
+        return seatJpaRepository.countByScheduleId(scheduleId)
     }
     
     override fun countByScheduleIdAndStatusCode(scheduleId: Long, statusCode: String): Int {

@@ -10,6 +10,8 @@ import kr.hhplus.be.server.balance.entity.Point
 import kr.hhplus.be.server.balance.service.BalanceService
 import kr.hhplus.be.server.concert.dto.SeatDto
 import kr.hhplus.be.server.concert.service.SeatService
+import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.payment.entity.Payment
 import kr.hhplus.be.server.payment.entity.PaymentStatusType
 import kr.hhplus.be.server.payment.exception.PaymentAlreadyProcessedException
@@ -33,10 +35,12 @@ class PaymentServiceTest : DescribeSpec({
     val tokenService = mockk<TokenService>()
     val seatService = mockk<SeatService>()
     val userService = mockk<UserService>()
-    
+    val distributedLock = mockk<DistributedLock>()
+    val eventPublisher = mockk<DomainEventPublisher>()
+
     val paymentService = PaymentService(
         paymentRepository, paymentStatusTypePojoRepository, reservationService, balanceService,
-        tokenService, seatService, userService
+        tokenService, seatService, userService, distributedLock, eventPublisher
     )
     
     describe("processPayment") {

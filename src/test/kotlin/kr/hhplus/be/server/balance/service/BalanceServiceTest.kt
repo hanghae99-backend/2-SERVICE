@@ -14,6 +14,8 @@ import kr.hhplus.be.server.balance.exception.PointNotFoundException
 import kr.hhplus.be.server.balance.repository.PointHistoryRepository
 import kr.hhplus.be.server.balance.repository.PointRepository
 import kr.hhplus.be.server.balance.repository.PointHistoryTypePojoRepository
+import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.service.UserService
 import java.math.BigDecimal
@@ -25,7 +27,9 @@ class BalanceServiceTest : DescribeSpec({
     val pointHistoryRepository = mockk<PointHistoryRepository>()
     val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
     val userService = mockk<UserService>()
-    val balanceService = BalanceService(pointRepository, pointHistoryRepository, pointHistoryTypeRepository, userService)
+    val distributedLock = mockk<DistributedLock>()
+    val eventPublisher = mockk<DomainEventPublisher>()
+    val balanceService = BalanceService(pointRepository, pointHistoryRepository, pointHistoryTypeRepository, userService, distributedLock, eventPublisher)
     
     describe("chargeBalance") {
         context("유효한 사용자가 적절한 금액으로 충전할 때") {

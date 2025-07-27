@@ -14,6 +14,8 @@ import kr.hhplus.be.server.concert.exception.SeatNotFoundException
 import kr.hhplus.be.server.concert.repository.ConcertScheduleRepository
 import kr.hhplus.be.server.concert.repository.SeatRepository
 import kr.hhplus.be.server.concert.repository.SeatStatusTypePojoRepository
+import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.global.lock.DistributedLock
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -22,7 +24,9 @@ class SeatServiceTest : DescribeSpec({
     val seatRepository = mockk<SeatRepository>()
     val concertScheduleRepository = mockk<ConcertScheduleRepository>()
     val seatStatusTypePojoRepository = mockk<SeatStatusTypePojoRepository>()
-    val seatService = SeatService(seatRepository, concertScheduleRepository,seatStatusTypePojoRepository)
+    val distributedLock = mockk<DistributedLock>()
+    val eventPublisher = mockk<DomainEventPublisher>()
+    val seatService = SeatService(seatRepository, concertScheduleRepository,seatStatusTypePojoRepository, distributedLock, eventPublisher)
     
     describe("getAvailableSeats") {
         context("존재하는 스케줄의 예약 가능한 좌석을 조회할 때") {

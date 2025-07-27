@@ -6,6 +6,8 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
+import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.reservation.dto.request.ReservationSearchCondition
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.reservation.entity.ReservationStatusType
@@ -20,7 +22,10 @@ class ReservationServiceTest : DescribeSpec({
     
     val reservationRepository = mockk<ReservationRepository>()
     val reservationStatusTypePojoRepository = mockk<ReservationStatusTypePojoRepository>()
-    val reservationService = ReservationService(reservationRepository,reservationStatusTypePojoRepository)
+    val distributedLock = mockk<DistributedLock>()
+    val eventPublisher = mockk<DomainEventPublisher>()
+
+    val reservationService = ReservationService(reservationRepository,reservationStatusTypePojoRepository, distributedLock, eventPublisher)
     
     describe("reserveSeat") {
         context("예약 가능한 좌석을 예약할 때") {

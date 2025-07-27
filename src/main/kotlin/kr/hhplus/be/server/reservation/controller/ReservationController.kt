@@ -121,9 +121,14 @@ class ReservationController(
     fun getReservationDetail(
         @Parameter(description = "예약 ID", example = "1")
         @PathVariable @Positive(message = "예약 ID는 양수여야 합니다") reservationId: Long
-    ): ResponseEntity<ReservationDto.Detail> {
+    ): ResponseEntity<CommonApiResponse<ReservationDto.Detail>> {
         val reservation = reservationService.getReservationWithDetails(reservationId)
-        return ResponseEntity.ok(ReservationDto.Detail.fromEntity(reservation))
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = ReservationDto.Detail.fromEntity(reservation),
+                message = "예약 상세 정보를 성공적으로 조회했습니다"
+            )
+        )
     }
 
     @Operation(summary = "사용자별 예약 목록 조회", description = "특정 사용자의 예약 목록을 조회합니다.")
@@ -132,7 +137,7 @@ class ReservationController(
         @Parameter(description = "사용자 ID", example = "1")
         @PathVariable @Positive(message = "사용자 ID는 양수여야 합니다") userId: Long,
         @Valid @RequestBody(required = false) request: ReservationListRequest?
-    ): ResponseEntity<ReservationDto.Page> {
+    ): ResponseEntity<CommonApiResponse<ReservationDto.Page>> {
         val searchCondition = ReservationSearchCondition(
             userId = userId,
             pageNumber = request?.pageNumber ?: 1,
@@ -141,7 +146,12 @@ class ReservationController(
             sortDirection = request?.sortDirection ?: "DESC"
         )
         val result = reservationService.getReservationsByCondition(searchCondition)
-        return ResponseEntity.ok(result)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = result,
+                message = "사용자 예약 목록 조회가 완료되었습니다"
+            )
+        )
     }
 
     @Operation(summary = "콘서트별 예약 목록 조회", description = "특정 콘서트의 예약 목록을 조회합니다. (관리자용)")
@@ -150,7 +160,7 @@ class ReservationController(
         @Parameter(description = "콘서트 ID", example = "1")
         @PathVariable @Positive(message = "콘서트 ID는 양수여야 합니다") concertId: Long,
         @Valid @RequestBody(required = false) request: ReservationConcertListRequest?
-    ): ResponseEntity<ReservationDto.Page> {
+    ): ResponseEntity<CommonApiResponse<ReservationDto.Page>> {
         val searchCondition = ReservationSearchCondition(
             concertId = concertId,
             statusList = request?.statusList,
@@ -160,38 +170,56 @@ class ReservationController(
             sortDirection = request?.sortDirection ?: "DESC"
         )
         val result = reservationService.getReservationsByCondition(searchCondition)
-        return ResponseEntity.ok(result)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = result,
+                message = "콘서트 예약 목록 조회가 완료되었습니다"
+            )
+        )
     }
 
     @Operation(summary = "예약 목록 검색", description = "다양한 조건으로 예약 목록을 검색합니다.")
     @PostMapping("/search")
     fun searchReservations(
         @Valid @RequestBody request: ReservationSearchRequest
-    ): ResponseEntity<ReservationDto.Page> {
+    ): ResponseEntity<CommonApiResponse<ReservationDto.Page>> {
         val result = reservationService.getReservationsByCondition(request.toSearchCondition())
-        return ResponseEntity.ok(result)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = result,
+                message = "예약 검색이 완료되었습니다"
+            )
+        )
     }
 
     @Operation(summary = "만료된 예약 목록 조회", description = "만료된 임시 예약 목록을 조회합니다. (관리자용)")
     @PostMapping("/expired")
     fun getExpiredReservations(
         @Valid @RequestBody(required = false) request: ReservationListRequest?
-    ): ResponseEntity<ReservationDto.Page> {
+    ): ResponseEntity<CommonApiResponse<ReservationDto.Page>> {
         val result = reservationService.getExpiredReservations(
             request?.pageNumber ?: 1,
             request?.pageSize ?: 20
         )
-        return ResponseEntity.ok(result)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = result,
+                message = "만료된 예약 목록 조회가 완료되었습니다"
+            )
+        )
     }
 
     @Operation(summary = "만료된 예약 정리", description = "만료된 임시 예약들을 일괄 취소 처리합니다. (관리자용)")
     @PostMapping("/cleanup-expired")
-    fun cleanupExpiredReservations(): ResponseEntity<ReservationDto.OperationResult> {
+    fun cleanupExpiredReservations(): ResponseEntity<CommonApiResponse<ReservationDto.OperationResult>> {
         val cleanupCount = reservationService.cleanupExpiredReservations()
         return ResponseEntity.ok(
-            ReservationDto.OperationResult(
-                message = "만료된 예약 정리가 완료되었습니다.",
-                affectedCount = cleanupCount
+            CommonApiResponse.success(
+                data = ReservationDto.OperationResult(
+                    message = "만료된 예약 정리가 완료되었습니다.",
+                    affectedCount = cleanupCount
+                ),
+                message = "만료된 예약 ${cleanupCount}건이 정리되었습니다"
             )
         )
     }

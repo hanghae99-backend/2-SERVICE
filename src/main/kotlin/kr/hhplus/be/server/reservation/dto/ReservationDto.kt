@@ -15,11 +15,12 @@ data class ReservationDto(
     val userId: Long,
     val concertId: Long,
     val seatId: Long,
+    val paymentId: Long?,
     val seatNumber: String,
     val price: BigDecimal,
     val statusCode: String,
     val statusName: String,
-    val statusDescription: String,
+    val statusDescription: String?,
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     val reservedAt: LocalDateTime,
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -34,11 +35,12 @@ data class ReservationDto(
                 userId = reservation.userId,
                 concertId = reservation.concertId,
                 seatId = reservation.seatId,
+                paymentId = reservation.paymentId,
                 seatNumber = reservation.seatNumber,
                 price = reservation.price,
                 statusCode = reservation.status.code,
-                statusName = reservation.statusName,
-                statusDescription = reservation.statusDescription,
+                statusName = reservation.status.name,
+                statusDescription = reservation.status.description,
                 reservedAt = reservation.reservedAt,
                 expiresAt = reservation.expiresAt,
                 confirmedAt = reservation.confirmedAt
@@ -56,7 +58,7 @@ data class ReservationDto(
                 }
                 "CONFIRMED" -> "좌석 예약이 확정되었습니다."
                 "CANCELLED" -> "좌석 예약이 취소되었습니다."
-                else -> "예약 상태: ${reservation.statusName}"
+                else -> "예약 상태: ${reservation.status.name}"
             }
         }
     }

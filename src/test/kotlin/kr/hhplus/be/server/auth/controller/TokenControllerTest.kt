@@ -63,12 +63,14 @@ class TokenControllerTest : DescribeSpec({
                         .content(objectMapper.writeValueAsString(request))
                 )
                     .andExpect(status().isCreated)
-                    .andExpect(jsonPath("$.token").value("test-token"))
-                    .andExpect(jsonPath("$.status").value("WAITING"))
-                    .andExpect(jsonPath("$.message").value("대기열에 등록되었습니다"))
-                    .andExpect(jsonPath("$.userId").value(userId))
-                    .andExpect(jsonPath("$.queuePosition").value(5))
-                    .andExpect(jsonPath("$.estimatedWaitingTime").value(10))
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.message").value("대기열 토큰이 성공적으로 발급되었습니다"))
+                    .andExpect(jsonPath("$.data.token").value("test-token"))
+                    .andExpect(jsonPath("$.data.status").value("WAITING"))
+                    .andExpect(jsonPath("$.data.message").value("대기열에 등록되었습니다"))
+                    .andExpect(jsonPath("$.data.userId").value(userId))
+                    .andExpect(jsonPath("$.data.queuePosition").value(5))
+                    .andExpect(jsonPath("$.data.estimatedWaitingTime").value(10))
                 
                 verify { tokenService.issueWaitingToken(userId) }
             }
@@ -136,11 +138,13 @@ class TokenControllerTest : DescribeSpec({
                 // when & then
                 mockMvc.perform(get("/api/v1/tokens/$token"))
                     .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.token").value(token))
-                    .andExpect(jsonPath("$.status").value("WAITING"))
-                    .andExpect(jsonPath("$.message").value("대기 중입니다"))
-                    .andExpect(jsonPath("$.queuePosition").value(3))
-                    .andExpect(jsonPath("$.estimatedWaitingTime").value(6))
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.message").value("토큰 대기열 상태 조회가 완료되었습니다"))
+                    .andExpect(jsonPath("$.data.token").value(token))
+                    .andExpect(jsonPath("$.data.status").value("WAITING"))
+                    .andExpect(jsonPath("$.data.message").value("대기 중입니다"))
+                    .andExpect(jsonPath("$.data.queuePosition").value(3))
+                    .andExpect(jsonPath("$.data.estimatedWaitingTime").value(6))
                 
                 verify { tokenService.getTokenQueueStatus(token) }
             }
@@ -163,11 +167,13 @@ class TokenControllerTest : DescribeSpec({
                 // when & then
                 mockMvc.perform(get("/api/v1/tokens/$token"))
                     .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.token").value(token))
-                    .andExpect(jsonPath("$.status").value("ACTIVE"))
-                    .andExpect(jsonPath("$.message").value("서비스 이용 가능합니다"))
-                    .andExpect(jsonPath("$.queuePosition").doesNotExist())
-                    .andExpect(jsonPath("$.estimatedWaitingTime").doesNotExist())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.message").value("토큰 대기열 상태 조회가 완료되었습니다"))
+                    .andExpect(jsonPath("$.data.token").value(token))
+                    .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                    .andExpect(jsonPath("$.data.message").value("서비스 이용 가능합니다"))
+                    .andExpect(jsonPath("$.data.queuePosition").doesNotExist())
+                    .andExpect(jsonPath("$.data.estimatedWaitingTime").doesNotExist())
                 
                 verify { tokenService.getTokenQueueStatus(token) }
             }
@@ -206,9 +212,11 @@ class TokenControllerTest : DescribeSpec({
                 // when & then
                 mockMvc.perform(get("/api/v1/tokens/$token/status"))
                     .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.token").value(token))
-                    .andExpect(jsonPath("$.status").value("ACTIVE"))
-                    .andExpect(jsonPath("$.message").value("서비스 이용 가능합니다"))
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.message").value("토큰 상태 조회가 완료되었습니다"))
+                    .andExpect(jsonPath("$.data.token").value(token))
+                    .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                    .andExpect(jsonPath("$.data.message").value("서비스 이용 가능합니다"))
                 
                 verify { tokenService.getSimpleTokenStatus(token) }
             }
@@ -229,9 +237,11 @@ class TokenControllerTest : DescribeSpec({
                 // when & then
                 mockMvc.perform(get("/api/v1/tokens/$token/status"))
                     .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.token").value(token))
-                    .andExpect(jsonPath("$.status").value("WAITING"))
-                    .andExpect(jsonPath("$.message").value("대기 중입니다"))
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.message").value("토큰 상태 조회가 완료되었습니다"))
+                    .andExpect(jsonPath("$.data.token").value(token))
+                    .andExpect(jsonPath("$.data.status").value("WAITING"))
+                    .andExpect(jsonPath("$.data.message").value("대기 중입니다"))
                 
                 verify { tokenService.getSimpleTokenStatus(token) }
             }
@@ -252,9 +262,11 @@ class TokenControllerTest : DescribeSpec({
                 // when & then
                 mockMvc.perform(get("/api/v1/tokens/$token/status"))
                     .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.token").value(token))
-                    .andExpect(jsonPath("$.status").value("EXPIRED"))
-                    .andExpect(jsonPath("$.message").value("토큰이 만료되었습니다"))
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.message").value("토큰 상태 조회가 완료되었습니다"))
+                    .andExpect(jsonPath("$.data.token").value(token))
+                    .andExpect(jsonPath("$.data.status").value("EXPIRED"))
+                    .andExpect(jsonPath("$.data.message").value("토큰이 만료되었습니다"))
                 
                 verify { tokenService.getSimpleTokenStatus(token) }
             }

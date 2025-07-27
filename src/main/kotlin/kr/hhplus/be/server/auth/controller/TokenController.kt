@@ -10,6 +10,7 @@ import kr.hhplus.be.server.auth.dto.TokenIssueDetail
 import kr.hhplus.be.server.auth.dto.TokenQueueDetail
 import kr.hhplus.be.server.auth.dto.request.TokenIssueRequest
 import kr.hhplus.be.server.auth.service.TokenService
+import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -27,7 +28,7 @@ class TokenController(
                 description = "토큰 발급 성공",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = TokenIssueDetail::class)
+                    schema = Schema(implementation = CommonApiResponse::class)
                 )]
             ),
             ApiResponse(
@@ -40,9 +41,14 @@ class TokenController(
             ),
         ]
     )
-    fun issueToken(@Valid @RequestBody @Parameter(description = "토큰 발급 요청") request: TokenIssueRequest): ResponseEntity<TokenIssueDetail> {
+    fun issueToken(@Valid @RequestBody @Parameter(description = "토큰 발급 요청") request: TokenIssueRequest): ResponseEntity<CommonApiResponse<TokenIssueDetail>> {
         val response = tokenService.issueWaitingToken(request.userId)
-        return ResponseEntity.status(201).body(response)
+        return ResponseEntity.status(201).body(
+            CommonApiResponse.success(
+                data = response,
+                message = "대기열 토큰이 성공적으로 발급되었습니다"
+            )
+        )
     }
 
     @GetMapping("/{token}")
@@ -53,7 +59,7 @@ class TokenController(
                 description = "상태 조회 성공",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = TokenQueueDetail::class)
+                    schema = Schema(implementation = CommonApiResponse::class)
                 )]
             ),
             ApiResponse(
@@ -62,9 +68,14 @@ class TokenController(
             )
         ]
     )
-    fun getTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<TokenQueueDetail> {
+    fun getTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<CommonApiResponse<TokenQueueDetail>> {
         val response = tokenService.getTokenQueueStatus(token)
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = response,
+                message = "토큰 대기열 상태 조회가 완료되었습니다"
+            )
+        )
     }
 
     @GetMapping("/{token}/status")
@@ -75,7 +86,7 @@ class TokenController(
                 description = "간단 상태 조회 성공",
                 content = [Content(
                     mediaType = "application/json",
-                    schema = Schema(implementation = TokenDto::class)
+                    schema = Schema(implementation = CommonApiResponse::class)
                 )]
             ),
             ApiResponse(
@@ -84,8 +95,13 @@ class TokenController(
             )
         ]
     )
-    fun getSimpleTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<TokenDto> {
+    fun getSimpleTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<CommonApiResponse<TokenDto>> {
         val response = tokenService.getSimpleTokenStatus(token)
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = response,
+                message = "토큰 상태 조회가 완료되었습니다"
+            )
+        )
     }
 }

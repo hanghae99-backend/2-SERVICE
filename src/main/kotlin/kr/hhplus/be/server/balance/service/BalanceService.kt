@@ -1,11 +1,13 @@
 package kr.hhplus.be.server.balance.service
 
 import kr.hhplus.be.server.balance.entity.*
+import kr.hhplus.be.server.balance.event.*
 import kr.hhplus.be.server.balance.exception.InvalidPointAmountException
 import kr.hhplus.be.server.balance.exception.PointNotFoundException
 import kr.hhplus.be.server.balance.repository.PointHistoryRepository
 import kr.hhplus.be.server.balance.repository.PointRepository
 import kr.hhplus.be.server.balance.repository.PointHistoryTypePojoRepository
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.global.lock.LockKeyManager
 import kr.hhplus.be.server.user.exception.UserNotFoundException
@@ -21,7 +23,8 @@ class BalanceService(
     private val pointHistoryRepository: PointHistoryRepository,
     private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
     private val userService: UserService,
-    private val distributedLock: DistributedLock
+    private val distributedLock: DistributedLock,
+    private val eventPublisher: DomainEventPublisher
 ) {
     
     @Transactional
@@ -67,6 +70,14 @@ class BalanceService(
         val history = PointHistory.charge(userId, amount, chargeType, "포인트 충전")
         pointHistoryRepository.save(history)
         
+        // 포인트 충전 이벤트 발행
+        val event = BalanceChargedEvent(
+            userId = userId,
+            amount = amount,
+            newBalance = savedPoint.amount
+        )
+        eventPublisher.publish(event)
+        
         return savedPoint
     }
 
@@ -110,6 +121,14 @@ class BalanceService(
         val useType = pointHistoryTypeRepository.getUseType()
         val history = PointHistory.use(userId, amount, useType, "포인트 사용")
         pointHistoryRepository.save(history)
+        
+        // 포인트 차감 이벤트 발행
+        val event = BalanceDeductedEvent(
+            userId = userId,
+            amount = amount,
+            remainingBalance = savedPoint.amount
+        )
+        eventPublisher.publish(event)
         
         return savedPoint
     }

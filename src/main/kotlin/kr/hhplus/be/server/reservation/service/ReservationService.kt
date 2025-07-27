@@ -1,10 +1,12 @@
 package kr.hhplus.be.server.reservation.service
 
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.global.lock.LockKeyManager
 import kr.hhplus.be.server.reservation.entity.Reservation
 import kr.hhplus.be.server.reservation.entity.ReservationStatusType
+import kr.hhplus.be.server.reservation.event.*
 import kr.hhplus.be.server.reservation.repository.ReservationRepository
 import kr.hhplus.be.server.reservation.repository.ReservationStatusTypePojoRepository
 import kr.hhplus.be.server.reservation.dto.ReservationDto
@@ -21,7 +23,8 @@ import java.time.LocalDateTime
 class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
-    private val distributedLock: DistributedLock
+    private val distributedLock: DistributedLock,
+    private val eventPublisher: DomainEventPublisher
 ) {
         
         // ========== 비즈니스 메서드들 ==========
@@ -61,12 +64,26 @@ class ReservationService(
             userId = userId,
             concertId = concertId,
             seatId = seatId,
-            seatNumber = "${seatId.toString().padStart(2, '0')}", // 01, 02 형식
+            seatNumber = seatId.toString().padStart(2, '0'), // 01, 02 형식
             price = BigDecimal("100000"), // 10만원 통일
             temporaryStatus = statusRepository.getTemporaryStatus()
         )
         
-        return reservationRepository.save(reservation)
+        val savedReservation = reservationRepository.save(reservation)
+        
+        // 예약 생성 이벤트 발행
+        val event = ReservationCreatedEvent(
+            reservationId = savedReservation.reservationId,
+            userId = userId,
+            concertId = concertId,
+            seatId = seatId,
+            seatNumber = savedReservation.seatNumber,
+            price = savedReservation.price,
+            expiresAt = savedReservation.expiresAt
+        )
+        eventPublisher.publish(event)
+        
+        return savedReservation
     }
     
     @Transactional
@@ -89,7 +106,20 @@ class ReservationService(
     fun confirmReservationInternal(reservationId: Long, paymentId: Long): Reservation {
         val reservation = getReservationById(reservationId)
         reservation.confirm(paymentId, statusRepository.getConfirmedStatus())
-        return reservationRepository.save(reservation)
+        val savedReservation = reservationRepository.save(reservation)
+        
+        // 예약 확정 이벤트 발행
+        val event = ReservationConfirmedEvent(
+            reservationId = savedReservation.reservationId,
+            userId = savedReservation.userId,
+            concertId = savedReservation.concertId,
+            seatId = savedReservation.seatId,
+            paymentId = paymentId,
+            price = savedReservation.price
+        )
+        eventPublisher.publish(event)
+        
+        return savedReservation
     }
     
     @Transactional
@@ -113,7 +143,20 @@ class ReservationService(
         }
         
         reservation.cancel(statusRepository.getCancelledStatus())
-        return reservationRepository.save(reservation)
+        val savedReservation = reservationRepository.save(reservation)
+        
+        // 예약 취소 이벤트 발행
+        val event = ReservationCancelledEvent(
+            reservationId = savedReservation.reservationId,
+            userId = savedReservation.userId,
+            concertId = savedReservation.concertId,
+            seatId = savedReservation.seatId,
+            cancelReason = cancelReason ?: "사용자 취소",
+            isExpired = false
+        )
+        eventPublisher.publish(event)
+        
+        return savedReservation
     }
     
     fun getReservationById(reservationId: Long): Reservation {
@@ -199,7 +242,27 @@ class ReservationService(
         
         expiredReservations.forEach { reservation ->
             reservation.cancel(statusRepository.getCancelledStatus())
-            reservationRepository.save(reservation)
+            val savedReservation = reservationRepository.save(reservation)
+            
+            // 예약 만료 이벤트 발행
+            val expiredEvent = ReservationExpiredEvent(
+                reservationId = savedReservation.reservationId,
+                userId = savedReservation.userId,
+                concertId = savedReservation.concertId,
+                seatId = savedReservation.seatId
+            )
+            eventPublisher.publish(expiredEvent)
+            
+            // 예약 취소 이벤트도 발행 (만료로 인한 취소)
+            val cancelledEvent = ReservationCancelledEvent(
+                reservationId = savedReservation.reservationId,
+                userId = savedReservation.userId,
+                concertId = savedReservation.concertId,
+                seatId = savedReservation.seatId,
+                cancelReason = "예약 시간 만료",
+                isExpired = true
+            )
+            eventPublisher.publish(cancelledEvent)
         }
         
         return expiredReservations.size

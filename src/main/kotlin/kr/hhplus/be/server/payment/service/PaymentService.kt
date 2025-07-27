@@ -2,12 +2,16 @@ package kr.hhplus.be.server.payment.service
 
 import kr.hhplus.be.server.auth.service.TokenService
 import kr.hhplus.be.server.balance.service.BalanceService
+import kr.hhplus.be.server.concert.event.SeatConfirmedEvent
 import kr.hhplus.be.server.concert.service.SeatService
 import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.global.lock.LockKeyManager
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.payment.dto.PaymentDto
 import kr.hhplus.be.server.payment.entity.Payment
+import kr.hhplus.be.server.payment.event.PaymentCompletedEvent
+import kr.hhplus.be.server.payment.event.PaymentFailedEvent
 import kr.hhplus.be.server.payment.exception.PaymentNotFoundException
 import kr.hhplus.be.server.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.payment.repository.PaymentRepository
@@ -28,7 +32,8 @@ class PaymentService(
     private val tokenService: TokenService,
     private val seatService: SeatService,
     private val userService: UserService,
-    private val distributedLock: DistributedLock
+    private val distributedLock: DistributedLock,
+    private val domainEventPublisher: DomainEventPublisher
 ) {
 
     @Transactional
@@ -87,19 +92,21 @@ class PaymentService(
             // 8. 잔액 차감 (내부 메서드 직접 호출로 중첩 락 방지)
             balanceService.deductBalanceInternal(userId, paymentAmount)
 
-            // 9. 예약 확정 (내부 메서드 직접 호출로 중첩 락 방지)
-            reservationService.confirmReservationInternal(reservationId, savedPayment.paymentId)
-
-            // 10. 좌석 상태 업데이트 (내부 메서드 직접 호출로 중첩 락 방지)
-            seatService.confirmSeatInternal(seatId)
-
-            // 11. 결제 완료 처리
+            // 9. 결제 완료 처리
             val completedStatus = paymentStatusTypeRepository.getCompletedStatus()
             val completedPayment = savedPayment.complete(completedStatus)
             val finalPayment = paymentRepository.save(completedPayment)
 
-            // 12. 토큰 완료 처리
-            tokenService.completeReservation(token)
+            // 10. 결제 성공 이벤트 발행 (비동기 후속 처리)
+            val paymentCompletedEvent = PaymentCompletedEvent(
+                paymentId = finalPayment.paymentId,
+                userId = userId,
+                reservationId = reservationId,
+                seatId = seatId,
+                amount = paymentAmount,
+                token = token
+            )
+            domainEventPublisher.publish(paymentCompletedEvent)
 
             return PaymentDto.fromEntity(finalPayment)
 
@@ -108,6 +115,17 @@ class PaymentService(
             val failedStatus = paymentStatusTypeRepository.getFailedStatus()
             val failedPayment = savedPayment.fail(failedStatus)
             paymentRepository.save(failedPayment)
+            
+            // 결제 실패 이벤트 발행
+            val paymentFailedEvent = PaymentFailedEvent(
+                paymentId = savedPayment.paymentId,
+                userId = userId,
+                reservationId = reservationId,
+                reason = e.message ?: "Unknown error",
+                token = token
+            )
+            domainEventPublisher.publish(paymentFailedEvent)
+            
             throw PaymentProcessException("결제 처리 중 오류가 발생했습니다: ${e.message}")
         }
     }

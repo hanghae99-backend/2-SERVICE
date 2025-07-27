@@ -56,7 +56,7 @@ class DistributedLock(
      */
     private fun tryAcquireLock(key: String, value: String, timeoutMs: Long): Boolean {
         val result = redisTemplate.opsForValue()
-            .setIfAbsent(key, value, Duration.ofMilliseconds(timeoutMs))
+            .setIfAbsent(key, value, Duration.ofMillis(timeoutMs))
         return result ?: false
     }
     

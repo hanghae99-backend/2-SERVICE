@@ -2,11 +2,13 @@ package kr.hhplus.be.server.concert.service
 
 import kr.hhplus.be.server.concert.dto.SeatDto
 import kr.hhplus.be.server.concert.entity.SeatStatusType
+import kr.hhplus.be.server.concert.event.*
 import kr.hhplus.be.server.concert.exception.ConcertNotFoundException
 import kr.hhplus.be.server.concert.exception.SeatNotFoundException
 import kr.hhplus.be.server.concert.repository.ConcertScheduleRepository
 import kr.hhplus.be.server.concert.repository.SeatRepository
 import kr.hhplus.be.server.concert.repository.SeatStatusTypePojoRepository
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.global.lock.LockKeyManager
@@ -19,7 +21,8 @@ class SeatService(
     private val seatRepository: SeatRepository,
     private val concertScheduleRepository: ConcertScheduleRepository,
     private val seatStatusTypeRepository: SeatStatusTypePojoRepository,
-    private val distributedLock: DistributedLock
+    private val distributedLock: DistributedLock,
+    private val eventPublisher: DomainEventPublisher
 ) {
     
     /**
@@ -91,9 +94,21 @@ class SeatService(
     fun confirmSeatInternal(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
         val occupiedStatus = seatStatusTypeRepository.getOccupiedStatus()
+        val previousStatus = seat.status.name
 
         val confirmedSeat = seat.confirm(occupiedStatus)
         val savedSeat = seatRepository.save(confirmedSeat)
+        
+        // 좌석 상태 변경 이벤트 발행
+        val statusChangeEvent = SeatStatusChangedEvent(
+            seatId = savedSeat.seatId,
+            scheduleId = savedSeat.scheduleId,
+            seatNumber = savedSeat.seatNumber,
+            previousStatus = previousStatus,
+            newStatus = savedSeat.status.name
+        )
+        eventPublisher.publish(statusChangeEvent)
+        
         return SeatDto.from(savedSeat)
     }
 

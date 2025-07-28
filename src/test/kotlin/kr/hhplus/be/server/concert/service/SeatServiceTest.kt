@@ -6,6 +6,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.justRun
 import kr.hhplus.be.server.concert.entity.ConcertSchedule
 import kr.hhplus.be.server.concert.entity.Seat
 import kr.hhplus.be.server.concert.entity.SeatStatusType
@@ -27,6 +28,26 @@ class SeatServiceTest : DescribeSpec({
     val distributedLock = mockk<DistributedLock>()
     val eventPublisher = mockk<DomainEventPublisher>()
     val seatService = SeatService(seatRepository, concertScheduleRepository,seatStatusTypePojoRepository, distributedLock, eventPublisher)
+    
+    // DistributedLock executeWithLock 메서드의 기본 동작 설정
+    fun setupDistributedLockMock() {
+        every { 
+            distributedLock.executeWithLock<Any>(
+                lockKey = any(),
+                lockTimeoutMs = any(),
+                waitTimeoutMs = any(),
+                action = any()
+            )
+        } answers {
+            val action = args[3] as () -> Any
+            action.invoke()
+        }
+    }
+    
+    // EventPublisher mock 설정
+    fun setupEventPublisherMock() {
+        justRun { eventPublisher.publish(any()) }
+    }
     
     describe("getAvailableSeats") {
         context("존재하는 스케줄의 예약 가능한 좌석을 조회할 때") {
@@ -225,6 +246,8 @@ class SeatServiceTest : DescribeSpec({
                 val occupiedStatus = SeatStatusType("OCCUPIED", "점유", "점유된 좌석", true, LocalDateTime.now())
                 val confirmedSeat = mockk<Seat>(relaxed = true)
                 
+                setupDistributedLockMock()
+                setupEventPublisherMock()
                 every { seatRepository.findById(seatId) } returns seat
                 every { seatStatusTypePojoRepository.getOccupiedStatus() } returns occupiedStatus
                 every { seat.confirm(occupiedStatus) } returns confirmedSeat
@@ -243,6 +266,7 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val seatId = 999L
                 
+                setupDistributedLockMock()
                 every { seatRepository.findById(seatId) } returns null
                 
                 // when & then

@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.justRun
 import kr.hhplus.be.server.auth.service.TokenService
 import kr.hhplus.be.server.balance.entity.Point
 import kr.hhplus.be.server.balance.service.BalanceService
@@ -43,6 +44,36 @@ class PaymentServiceTest : DescribeSpec({
         tokenService, seatService, userService, distributedLock, eventPublisher
     )
     
+    // DistributedLock executeWithLock 메서드의 기본 동작 설정
+    fun setupDistributedLockMock() {
+        every { 
+            distributedLock.executeWithLock<Any>(
+                lockKey = any(),
+                lockTimeoutMs = any(),
+                waitTimeoutMs = any(),
+                action = any()
+            )
+        } answers {
+            val action = args[3] as () -> Any
+            action.invoke()
+        }
+    }
+    
+    // PaymentStatusType mock 설정
+    fun setupPaymentStatusTypeMocks() {
+        val now = LocalDateTime.now()
+        every { paymentStatusTypePojoRepository.getPendingStatus() } returns PaymentStatusType("PENDING", "대기", "결제 대기", true, now)
+        every { paymentStatusTypePojoRepository.getCompletedStatus() } returns PaymentStatusType("COMPLETED", "완료", "결제 완료", true, now)
+        every { paymentStatusTypePojoRepository.getFailedStatus() } returns PaymentStatusType("FAILED", "실패", "결제 실패", true, now)
+        every { paymentStatusTypePojoRepository.getCancelledStatus() } returns PaymentStatusType("CANCELLED", "취소", "결제 취소", true, now)
+        every { paymentStatusTypePojoRepository.getRefundedStatus() } returns PaymentStatusType("REFUNDED", "환불", "결제 환불", true, now)
+    }
+    
+    // EventPublisher mock 설정
+    fun setupEventPublisherMock() {
+        justRun { eventPublisher.publish(any()) }
+    }
+    
     describe("processPayment") {
         context("모든 조건이 유효할 때") {
             it("결제를 성공적으로 처리해야 한다") {
@@ -62,6 +93,9 @@ class PaymentServiceTest : DescribeSpec({
                 val payment = Payment.create(userId, paymentAmount, "POINT", pendingStatus)
                 val completedPayment = payment.complete(completedStatus)
                 
+                setupDistributedLockMock()
+                setupPaymentStatusTypeMocks()
+                setupEventPublisherMock()
                 every { tokenService.validateActiveToken(token) } returns mockk(relaxed = true)
                 every { userService.existsById(userId) } returns true
                 every { reservationService.getReservationById(reservationId) } returns reservation
@@ -72,10 +106,8 @@ class PaymentServiceTest : DescribeSpec({
                 every { seatService.getSeatById(seatId) } returns seat
                 every { seat.price } returns paymentAmount
                 every { balanceService.getBalance(userId) } returns currentBalance
-                every { paymentStatusTypePojoRepository.getPendingStatus() } returns pendingStatus
-                every { paymentStatusTypePojoRepository.getCompletedStatus() } returns completedStatus
                 every { paymentRepository.save(any()) } returnsMany listOf(payment, completedPayment)
-                every { balanceService.deductBalance(userId, paymentAmount) } returns mockk(relaxed = true)
+                every { balanceService.deductBalanceInternal(userId, paymentAmount) } returns mockk(relaxed = true)
                 every { reservationService.confirmReservation(reservationId, payment.paymentId) } returns mockk(relaxed = true)
                 every { seatService.confirmSeat(seatId) } returns mockk(relaxed = true)
                 every { tokenService.completeReservation(token) } returns Unit
@@ -95,6 +127,8 @@ class PaymentServiceTest : DescribeSpec({
                 val reservationId = 1L
                 val token = "invalid-token"
                 
+                setupDistributedLockMock()
+                setupPaymentStatusTypeMocks()
                 every { tokenService.validateActiveToken(token) } throws RuntimeException("Invalid token")
                 
                 // when & then
@@ -111,6 +145,8 @@ class PaymentServiceTest : DescribeSpec({
                 val reservationId = 1L
                 val token = "valid-token"
                 
+                setupDistributedLockMock()
+                setupPaymentStatusTypeMocks()
                 every { tokenService.validateActiveToken(token) } returns mockk(relaxed = true)
                 every { userService.existsById(userId) } returns false
                 
@@ -129,6 +165,8 @@ class PaymentServiceTest : DescribeSpec({
                 val token = "valid-token"
                 val reservation = mockk<Reservation>(relaxed = true)
                 
+                setupDistributedLockMock()
+                setupPaymentStatusTypeMocks()
                 every { tokenService.validateActiveToken(token) } returns mockk(relaxed = true)
                 every { userService.existsById(userId) } returns true
                 every { reservationService.getReservationById(reservationId) } returns reservation
@@ -149,6 +187,8 @@ class PaymentServiceTest : DescribeSpec({
                 val token = "valid-token"
                 val reservation = mockk<Reservation>(relaxed = true)
                 
+                setupDistributedLockMock()
+                setupPaymentStatusTypeMocks()
                 every { tokenService.validateActiveToken(token) } returns mockk(relaxed = true)
                 every { userService.existsById(userId) } returns true
                 every { reservationService.getReservationById(reservationId) } returns reservation
@@ -170,6 +210,8 @@ class PaymentServiceTest : DescribeSpec({
                 val token = "valid-token"
                 val reservation = mockk<Reservation>(relaxed = true)
                 
+                setupDistributedLockMock()
+                setupPaymentStatusTypeMocks()
                 every { tokenService.validateActiveToken(token) } returns mockk(relaxed = true)
                 every { userService.existsById(userId) } returns true
                 every { reservationService.getReservationById(reservationId) } returns reservation
@@ -193,6 +235,8 @@ class PaymentServiceTest : DescribeSpec({
                 val seatId = 999L // 존재하지 않는 좌석 ID
                 val reservation = mockk<Reservation>(relaxed = true)
                 
+                setupDistributedLockMock()
+                setupPaymentStatusTypeMocks()
                 every { tokenService.validateActiveToken(token) } returns mockk(relaxed = true)
                 every { userService.existsById(userId) } returns true
                 every { reservationService.getReservationById(reservationId) } returns reservation
@@ -222,6 +266,8 @@ class PaymentServiceTest : DescribeSpec({
                 val seat = mockk<SeatDto>(relaxed = true)
                 val currentBalance = Point.create(userId, BigDecimal("10000")) // 부족한 잔액
                 
+                setupDistributedLockMock()
+                setupPaymentStatusTypeMocks()
                 every { tokenService.validateActiveToken(token) } returns mockk(relaxed = true)
                 every { userService.existsById(userId) } returns true
                 every { reservationService.getReservationById(reservationId) } returns reservation
@@ -249,7 +295,7 @@ class PaymentServiceTest : DescribeSpec({
                 val pendingStatus = PaymentStatusType("PEND", "대기", "결제 대기", true, LocalDateTime.now())
                 val payment = Payment.create(1L, BigDecimal("50000"), "POINT", pendingStatus)
                 
-                every { paymentStatusTypePojoRepository.getPendingStatus() } returns pendingStatus
+                setupPaymentStatusTypeMocks()
                 every { paymentRepository.findById(paymentId) } returns payment
                 
                 // when

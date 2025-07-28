@@ -6,6 +6,8 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.justRun
 import kr.hhplus.be.server.balance.entity.Point
 import kr.hhplus.be.server.balance.entity.PointHistory
 import kr.hhplus.be.server.balance.entity.PointHistoryType
@@ -31,6 +33,27 @@ class BalanceServiceTest : DescribeSpec({
     val eventPublisher = mockk<DomainEventPublisher>()
     val balanceService = BalanceService(pointRepository, pointHistoryRepository, pointHistoryTypeRepository, userService, distributedLock, eventPublisher)
     
+    // DistributedLock executeWithLock 메서드의 기본 동작 설정
+    fun setupDistributedLockMock() {
+        every { 
+            distributedLock.executeWithLock<Any>(
+                lockKey = any(),
+                lockTimeoutMs = any(),
+                waitTimeoutMs = any(),
+
+                action = any()
+            )
+        } answers {
+            val action = args[3] as () -> Any
+            action.invoke()
+        }
+    }
+    
+    // EventPublisher mock 설정
+    fun setupEventPublisherMock() {
+        justRun { eventPublisher.publish(any()) }
+    }
+    
     describe("chargeBalance") {
         context("유효한 사용자가 적절한 금액으로 충전할 때") {
             it("포인트를 충전하고 히스토리를 저장해야 한다") {
@@ -41,6 +64,8 @@ class BalanceServiceTest : DescribeSpec({
                 val chargedPoint = Point.create(userId, BigDecimal("15000"))
                 val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
                 
+                setupDistributedLockMock()
+                setupEventPublisherMock()
                 every { userService.existsById(userId) } returns true
                 every { pointRepository.findByUserId(userId) } returns currentPoint
                 every { pointRepository.save(any()) } returns chargedPoint
@@ -62,6 +87,7 @@ class BalanceServiceTest : DescribeSpec({
                 val userId = 999L
                 val chargeAmount = BigDecimal("10000")
                 
+                setupDistributedLockMock()
                 every { userService.existsById(userId) } returns false
                 
                 // when & then
@@ -78,6 +104,7 @@ class BalanceServiceTest : DescribeSpec({
                 val chargeAmount = BigDecimal("500") // 최소 1000원보다 적음
                 val currentPoint = Point.create(userId, BigDecimal("5000"))
                 
+                setupDistributedLockMock()
                 every { userService.existsById(userId) } returns true
                 every { pointRepository.findByUserId(userId) } returns currentPoint
                 
@@ -95,6 +122,7 @@ class BalanceServiceTest : DescribeSpec({
                 val chargeAmount = BigDecimal("10000000")
                 val currentPoint = Point.create(userId, BigDecimal("45000000"))
                 
+                setupDistributedLockMock()
                 every { userService.existsById(userId) } returns true
                 every { pointRepository.findByUserId(userId) } returns currentPoint
                 
@@ -113,6 +141,8 @@ class BalanceServiceTest : DescribeSpec({
                 val newPoint = Point.create(userId, BigDecimal("10000"))
                 val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
                 
+                setupDistributedLockMock()
+                setupEventPublisherMock()
                 every { userService.existsById(userId) } returns true
                 every { pointRepository.findByUserId(userId) } returns null
                 every { pointRepository.save(any()) } returns newPoint
@@ -190,6 +220,8 @@ class BalanceServiceTest : DescribeSpec({
                 val deductedPoint = Point.create(userId, BigDecimal("5000"))
                 val useType = PointHistoryType("USE", "사용", "포인트 사용", true, LocalDateTime.now())
                 
+                setupDistributedLockMock()
+                setupEventPublisherMock()
                 every { userService.existsById(userId) } returns true
                 every { pointRepository.findByUserId(userId) } returns currentPoint
                 every { pointRepository.save(any()) } returns deductedPoint
@@ -211,6 +243,7 @@ class BalanceServiceTest : DescribeSpec({
                 val userId = 1L
                 val deductAmount = BigDecimal("5000")
                 
+                setupDistributedLockMock()
                 every { userService.existsById(userId) } returns true
                 every { pointRepository.findByUserId(userId) } returns null
                 
@@ -227,6 +260,7 @@ class BalanceServiceTest : DescribeSpec({
                 val userId = 999L
                 val deductAmount = BigDecimal("5000")
                 
+                setupDistributedLockMock()
                 every { userService.existsById(userId) } returns false
                 
                 // when & then

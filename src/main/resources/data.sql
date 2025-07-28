@@ -1,100 +1,78 @@
--- 사용자 초기 데이터
+-- 콘서트 예약 시스템 초기 데이터 (좌석 50개, 10만원 통일)
+
+-- 사용자 데이터
 INSERT INTO users (user_id, created_at, updated_at) VALUES
-(1, NOW(), NOW()),
-(2, NOW(), NOW());
+(1, NOW(), NOW()), (2, NOW(), NOW()), (3, NOW(), NOW());
 
--- 콘서트 초기 데이터
-INSERT INTO concert (title, artist, venue, concert_date, start_time, end_time, base_price, created_at, updated_at) VALUES
-('아이유 2024 콘서트', '아이유', '올림픽공원', '2024-12-15', '19:00:00', '21:00:00', 120000.00, NOW(), NOW()),
-('BTS 월드투어', 'BTS', '잠실종합운동장', '2024-12-22', '20:00:00', '22:30:00', 150000.00, NOW(), NOW()),
-('검정치마 겨울 콘서트', '검정치마', '홍대 V홀', '2024-12-28', '19:30:00', '21:30:00', 80000.00, NOW(), NOW());
+-- 포인트 초기 잔액
+INSERT INTO point (user_id, amount, last_updated, created_at) VALUES
+(1, 500000.00, NOW(), NOW()),
+(2, 300000.00, NOW(), NOW()),
+(3, 800000.00, NOW(), NOW());
 
--- 좌석 초기 데이터 (각 콘서트마다 1~50번 좌석)
--- 아이유 콘서트 좌석 (concert_id = 1)
-INSERT INTO seat (concert_id, seat_number, price, status, created_at, updated_at)
-SELECT 1, seat_num, 
-       CASE 
-           WHEN seat_num <= 10 THEN 150000.00  -- VIP석 (1~10번)
-           WHEN seat_num <= 30 THEN 120000.00  -- 일반석 (11~30번)
-           ELSE 100000.00                      -- 자유석 (31~50번)
-       END as price,
-       'AVAILABLE' as status,
-       NOW() as created_at,
-       NOW() as updated_at
-FROM (
-    SELECT ROW_NUMBER() OVER () as seat_num
-    FROM (
-        SELECT 1 as n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL
-        SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL
-        SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL
-        SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL
-        SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24 UNION ALL SELECT 25 UNION ALL
-        SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29 UNION ALL SELECT 30 UNION ALL
-        SELECT 31 UNION ALL SELECT 32 UNION ALL SELECT 33 UNION ALL SELECT 34 UNION ALL SELECT 35 UNION ALL
-        SELECT 36 UNION ALL SELECT 37 UNION ALL SELECT 38 UNION ALL SELECT 39 UNION ALL SELECT 40 UNION ALL
-        SELECT 41 UNION ALL SELECT 42 UNION ALL SELECT 43 UNION ALL SELECT 44 UNION ALL SELECT 45 UNION ALL
-        SELECT 46 UNION ALL SELECT 47 UNION ALL SELECT 48 UNION ALL SELECT 49 UNION ALL SELECT 50
-    ) numbers
-) seat_numbers
-WHERE seat_num <= 50;
+-- 포인트 히스토리 타입
+INSERT INTO point_history_type (code, name, description, is_active, created_at) VALUES
+('CHARGE', '충전', '포인트 충전', true, NOW()),
+('USE', '사용', '포인트 사용', true, NOW());
 
--- BTS 콘서트 좌석 (concert_id = 2)
-INSERT INTO seat (concert_id, seat_number, price, status, created_at, updated_at)
-SELECT 2, seat_num, 
-       CASE 
-           WHEN seat_num <= 10 THEN 200000.00  -- VIP석 (1~10번)
-           WHEN seat_num <= 30 THEN 150000.00  -- 일반석 (11~30번)
-           ELSE 120000.00                      -- 자유석 (31~50번)
-       END as price,
-       'AVAILABLE' as status,
-       NOW() as created_at,
-       NOW() as updated_at
-FROM (
-    SELECT ROW_NUMBER() OVER () as seat_num
-    FROM (
-        SELECT 1 as n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL
-        SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL
-        SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL
-        SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL
-        SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24 UNION ALL SELECT 25 UNION ALL
-        SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29 UNION ALL SELECT 30 UNION ALL
-        SELECT 31 UNION ALL SELECT 32 UNION ALL SELECT 33 UNION ALL SELECT 34 UNION ALL SELECT 35 UNION ALL
-        SELECT 36 UNION ALL SELECT 37 UNION ALL SELECT 38 UNION ALL SELECT 39 UNION ALL SELECT 40 UNION ALL
-        SELECT 41 UNION ALL SELECT 42 UNION ALL SELECT 43 UNION ALL SELECT 44 UNION ALL SELECT 45 UNION ALL
-        SELECT 46 UNION ALL SELECT 47 UNION ALL SELECT 48 UNION ALL SELECT 49 UNION ALL SELECT 50
-    ) numbers
-) seat_numbers
-WHERE seat_num <= 50;
+-- 포인트 히스토리
+INSERT INTO point_history (user_id, amount, type_code, description, created_at) VALUES
+(1, 500000.00, 'CHARGE', '초기 포인트 충전', NOW()),
+(2, 300000.00, 'CHARGE', '초기 포인트 충전', NOW()),
+(3, 800000.00, 'CHARGE', '초기 포인트 충전', NOW());
 
--- 검정치마 콘서트 좌석 (concert_id = 3)
-INSERT INTO seat (concert_id, seat_number, price, status, created_at, updated_at)
-SELECT 3, seat_num, 
-       CASE 
-           WHEN seat_num <= 10 THEN 100000.00  -- VIP석 (1~10번)
-           WHEN seat_num <= 30 THEN 80000.00   -- 일반석 (11~30번)
-           ELSE 60000.00                       -- 자유석 (31~50번)
-       END as price,
-       'AVAILABLE' as status,
-       NOW() as created_at,
-       NOW() as updated_at
-FROM (
-    SELECT ROW_NUMBER() OVER () as seat_num
-    FROM (
-        SELECT 1 as n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL
-        SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL
-        SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL
-        SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL
-        SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24 UNION ALL SELECT 25 UNION ALL
-        SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29 UNION ALL SELECT 30 UNION ALL
-        SELECT 31 UNION ALL SELECT 32 UNION ALL SELECT 33 UNION ALL SELECT 34 UNION ALL SELECT 35 UNION ALL
-        SELECT 36 UNION ALL SELECT 37 UNION ALL SELECT 38 UNION ALL SELECT 39 UNION ALL SELECT 40 UNION ALL
-        SELECT 41 UNION ALL SELECT 42 UNION ALL SELECT 43 UNION ALL SELECT 44 UNION ALL SELECT 45 UNION ALL
-        SELECT 46 UNION ALL SELECT 47 UNION ALL SELECT 48 UNION ALL SELECT 49 UNION ALL SELECT 50
-    ) numbers
-) seat_numbers
-WHERE seat_num <= 50;
+-- 콘서트 데이터
+INSERT INTO concert (title, artist, is_active, created_at, updated_at) VALUES
+('IU 2024 HEREH WORLD TOUR', 'IU', true, NOW(), NOW()),
+('BTS WORLD TOUR', 'BTS', true, NOW(), NOW());
 
--- 일부 좌석을 예약됨 상태로 변경 (테스트용)
-UPDATE seat SET status = 'RESERVED' WHERE concert_id = 1 AND seat_number IN (1, 2, 15, 16);
-UPDATE seat SET status = 'CONFIRMED' WHERE concert_id = 2 AND seat_number IN (3, 4, 5);
-UPDATE seat SET status = 'RESERVED' WHERE concert_id = 3 AND seat_number IN (10, 25);
+-- 콘서트 스케줄 (50개 좌석으로 통일)
+INSERT INTO concert_schedule (concert_id, concert_date, venue, total_seats, available_seats, created_at) VALUES
+(1, '2024-12-15', '올림픽공원 체조경기장', 50, 50, NOW()),
+(2, '2024-12-22', '잠실종합운동장', 50, 50, NOW());
+
+-- 좌석 상태 타입
+INSERT INTO seat_status_type (code, name, description, is_active, created_at) VALUES
+('AVAILABLE', '예약 가능', '예약 가능한 좌석', true, NOW()),
+('RESERVED', '임시 예약', '결제 대기 중', true, NOW()),
+('OCCUPIED', '예약 완료', '결제 완료', true, NOW());
+
+-- 좌석 데이터 (각 스케줄별 50개, 10만원 통일)
+-- IU 콘서트 좌석 (01~50)
+INSERT INTO seat (schedule_id, seat_number, seat_grade, price, status_code, created_at, updated_at)
+SELECT 1, LPAD(n, 2, '0'), 'STANDARD', 100000.00, 'AVAILABLE', NOW(), NOW()
+FROM (SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION
+      SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION
+      SELECT 11 UNION SELECT 12 UNION SELECT 13 UNION SELECT 14 UNION SELECT 15 UNION
+      SELECT 16 UNION SELECT 17 UNION SELECT 18 UNION SELECT 19 UNION SELECT 20 UNION
+      SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24 UNION SELECT 25 UNION
+      SELECT 26 UNION SELECT 27 UNION SELECT 28 UNION SELECT 29 UNION SELECT 30 UNION
+      SELECT 31 UNION SELECT 32 UNION SELECT 33 UNION SELECT 34 UNION SELECT 35 UNION
+      SELECT 36 UNION SELECT 37 UNION SELECT 38 UNION SELECT 39 UNION SELECT 40 UNION
+      SELECT 41 UNION SELECT 42 UNION SELECT 43 UNION SELECT 44 UNION SELECT 45 UNION
+      SELECT 46 UNION SELECT 47 UNION SELECT 48 UNION SELECT 49 UNION SELECT 50) numbers;
+
+-- BTS 콘서트 좌석 (01~50)
+INSERT INTO seat (schedule_id, seat_number, seat_grade, price, status_code, created_at, updated_at)
+SELECT 2, LPAD(n, 2, '0'), 'STANDARD', 100000.00, 'AVAILABLE', NOW(), NOW()
+FROM (SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION
+      SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION
+      SELECT 11 UNION SELECT 12 UNION SELECT 13 UNION SELECT 14 UNION SELECT 15 UNION
+      SELECT 16 UNION SELECT 17 UNION SELECT 18 UNION SELECT 19 UNION SELECT 20 UNION
+      SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24 UNION SELECT 25 UNION
+      SELECT 26 UNION SELECT 27 UNION SELECT 28 UNION SELECT 29 UNION SELECT 30 UNION
+      SELECT 31 UNION SELECT 32 UNION SELECT 33 UNION SELECT 34 UNION SELECT 35 UNION
+      SELECT 36 UNION SELECT 37 UNION SELECT 38 UNION SELECT 39 UNION SELECT 40 UNION
+      SELECT 41 UNION SELECT 42 UNION SELECT 43 UNION SELECT 44 UNION SELECT 45 UNION
+      SELECT 46 UNION SELECT 47 UNION SELECT 48 UNION SELECT 49 UNION SELECT 50) numbers;
+
+-- 예약/결제 상태 타입
+INSERT INTO reservation_status_type (code, name, description, is_active, created_at) VALUES
+('TEMPORARY', '임시 예약', '결제 대기 중', true, NOW()),
+('CONFIRMED', '예약 확정', '결제 완료', true, NOW()),
+('CANCELLED', '예약 취소', '취소됨', true, NOW());
+
+INSERT INTO payment_status_type (code, name, description, is_active, created_at) VALUES
+('PEND', '결제 대기', '처리 중', true, NOW()),
+('COMP', '결제 완료', '성공', true, NOW()),
+('FAIL', '결제 실패', '실패', true, NOW());

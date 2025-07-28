@@ -1,6 +1,8 @@
 package kr.hhplus.be.server.balance.entity
 
 import jakarta.persistence.*
+import kr.hhplus.be.server.balance.exception.InvalidPointAmountException
+import kr.hhplus.be.server.user.entity.User
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -18,8 +20,9 @@ data class PointHistory(
     @Column(name = "amount", nullable = false, precision = 10, scale = 2)
     val amount: BigDecimal,
     
-    @Column(name = "type_code", nullable = false, length = 50)
-    val typeCode: String,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "type_code", referencedColumnName = "code")
+    val historyType: PointHistoryType,
     
     @Column(name = "description", nullable = false, length = 255)
     val description: String,
@@ -28,13 +31,17 @@ data class PointHistory(
     val createdAt: LocalDateTime = LocalDateTime.now()
 ) {
     
-    // 연관관계 매핑 (읽기 전용)
+    // PointHistory -> User 연관관계 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "type_code", referencedColumnName = "code", insertable = false, updatable = false)
-    val historyType: PointHistoryType? = null
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    val user: User? = null
     
     companion object {
-        fun charge(userId: Long, amount: BigDecimal, description: String = "포인트 충전"): PointHistory {
+        // 타입 코드 상수
+        const val TYPE_CHARGE = "CHARGE"
+        const val TYPE_USE = "USE"
+        
+        fun charge(userId: Long, amount: BigDecimal, chargeType: PointHistoryType, description: String = "포인트 충전"): PointHistory {
             if (amount <= BigDecimal.ZERO) {
                 throw InvalidPointAmountException("충전 금액은 0보다 커야 합니다")
             }
@@ -42,52 +49,25 @@ data class PointHistory(
             return PointHistory(
                 userId = userId,
                 amount = amount,
-                typeCode = PointHistoryType.CHARGE,
+                historyType = chargeType,
                 description = description
             )
         }
         
-        fun use(userId: Long, amount: BigDecimal, description: String = "포인트 사용"): PointHistory {
+        fun use(userId: Long, amount: BigDecimal, useType: PointHistoryType, description: String = "포인트 사용"): PointHistory {
             if (amount <= BigDecimal.ZERO) {
                 throw InvalidPointAmountException("사용 금액은 0보다 커야 합니다")
             }
-            
+
             return PointHistory(
                 userId = userId,
                 amount = amount,
-                typeCode = PointHistoryType.USE,
-                description = description
-            )
-        }
-        
-        fun refund(userId: Long, amount: BigDecimal, description: String = "포인트 환불"): PointHistory {
-            if (amount <= BigDecimal.ZERO) {
-                throw InvalidPointAmountException("환불 금액은 0보다 커야 합니다")
-            }
-            
-            return PointHistory(
-                userId = userId,
-                amount = amount,
-                typeCode = PointHistoryType.REFUND,
-                description = description
-            )
-        }
-        
-        fun bonus(userId: Long, amount: BigDecimal, description: String = "포인트 보너스"): PointHistory {
-            if (amount <= BigDecimal.ZERO) {
-                throw InvalidPointAmountException("보너스 금액은 0보다 커야 합니다")
-            }
-            
-            return PointHistory(
-                userId = userId,
-                amount = amount,
-                typeCode = PointHistoryType.BONUS,
+                historyType = useType,
                 description = description
             )
         }
     }
     
-    // 타입 이름 조회를 위한 편의 메서드
-    val type: String
-        get() = historyType?.name ?: typeCode
+    val typeName: String
+        get() = historyType.name
 }

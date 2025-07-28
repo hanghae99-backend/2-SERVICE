@@ -1,7 +1,8 @@
 package kr.hhplus.be.server.concert.entity
 
-import kr.hhplus.be.server.concert.entity.InvalidSeatStatusException
+import kr.hhplus.be.server.concert.exception.InvalidSeatStatusException
 import kr.hhplus.be.server.global.exception.ParameterValidationException
+import kr.hhplus.be.server.reservation.entity.Reservation
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -14,17 +15,21 @@ data class Seat(
     @Column(name = "id")
     val seatId: Long = 0,
     
-    @Column(name = "concert_id", nullable = false)
-    val concertId: Long,
+    @Column(name = "schedule_id", nullable = false)
+    val scheduleId: Long,
     
     @Column(name = "seat_number", nullable = false, length = 10)
     val seatNumber: String,
     
+    @Column(name = "seat_grade", nullable = false, length = 20)
+    val seatGrade: String = "STANDARD",
+    
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     val price: BigDecimal,
     
-    @Column(name = "status_code", nullable = false, length = 50)
-    val statusCode: String,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "status_code", referencedColumnName = "code")
+    var status: SeatStatusType,
     
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
@@ -33,16 +38,21 @@ data class Seat(
     val updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
     
-    // 연관관계 매핑 (읽기 전용)
+    // Seat -> ConcertSchedule 연관관계 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "status_code", referencedColumnName = "code", insertable = false, updatable = false)
-    val statusType: SeatStatusType? = null
+    @JoinColumn(name = "schedule_id", insertable = false, updatable = false)
+    val concertSchedule: ConcertSchedule? = null
     
     companion object {
-        fun create(concertId: Long, seatNumber: String, price: BigDecimal): Seat {
-            // 파라미터 검증
-            if (concertId <= 0) {
-                throw ParameterValidationException("콘서트 ID는 0보다 커야 합니다: $concertId")
+        // 상태 코드 상수
+        const val STATUS_AVAILABLE = "AVAILABLE"
+        const val STATUS_RESERVED = "RESERVED"
+        const val STATUS_OCCUPIED = "OCCUPIED"
+        const val STATUS_MAINTENANCE = "MAINTENANCE"
+        
+        fun create(scheduleId: Long, seatNumber: String, price: BigDecimal, availableStatus: SeatStatusType): Seat {
+            if (scheduleId <= 0) {
+                throw ParameterValidationException("스케줄 ID는 0보다 커야 합니다: $scheduleId")
             }
             if (seatNumber.isBlank()) {
                 throw ParameterValidationException("좌석 번호는 필수입니다")
@@ -52,92 +62,66 @@ data class Seat(
             }
             
             return Seat(
-                concertId = concertId,
+                scheduleId = scheduleId,
                 seatNumber = seatNumber,
                 price = price,
-                statusCode = SeatStatusType.AVAILABLE
+                status = availableStatus
             )
         }
     }
     
-    fun reserve(): Seat {
-        if (statusCode != SeatStatusType.AVAILABLE) {
-            throw InvalidSeatStatusException("예약 가능한 좌석이 아닙니다. 현재 상태: $statusCode")
+    fun reserve(reservedStatus: SeatStatusType): Seat {
+        if (status.code != STATUS_AVAILABLE) {
+            throw InvalidSeatStatusException("예약 가능한 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
-        
         return this.copy(
-            statusCode = SeatStatusType.RESERVED,
+            status = reservedStatus,
             updatedAt = LocalDateTime.now()
         )
     }
     
-    fun occupy(): Seat {
-        if (statusCode != SeatStatusType.RESERVED) {
-            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $statusCode")
+    fun occupy(occupiedStatus: SeatStatusType): Seat {
+        if (status.code != STATUS_RESERVED) {
+            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
-        
         return this.copy(
-            statusCode = SeatStatusType.OCCUPIED,
+            status = occupiedStatus,
             updatedAt = LocalDateTime.now()
         )
     }
     
-    fun release(): Seat {
-        if (statusCode != SeatStatusType.RESERVED) {
-            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: $statusCode")
+    fun confirm(occupiedStatus: SeatStatusType): Seat {
+        if (status.code != STATUS_RESERVED) {
+            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
-        
         return this.copy(
-            statusCode = SeatStatusType.AVAILABLE,
+            status = occupiedStatus,
             updatedAt = LocalDateTime.now()
         )
     }
     
-    fun setMaintenance(): Seat {
+    fun release(availableStatus: SeatStatusType): Seat {
+        if (status.code != STATUS_RESERVED) {
+            throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
+        }
         return this.copy(
-            statusCode = SeatStatusType.MAINTENANCE,
+            status = availableStatus,
             updatedAt = LocalDateTime.now()
         )
     }
     
-    fun isAvailable(): Boolean {
-        return statusCode == SeatStatusType.AVAILABLE
+    fun setMaintenance(maintenanceStatus: SeatStatusType): Seat {
+        return this.copy(
+            status = maintenanceStatus,
+            updatedAt = LocalDateTime.now()
+        )
     }
     
-    fun isReserved(): Boolean {
-        return statusCode == SeatStatusType.RESERVED
-    }
+    fun isAvailable(): Boolean = status.code == STATUS_AVAILABLE
+    fun isReserved(): Boolean = status.code == STATUS_RESERVED
+    fun isOccupied(): Boolean = status.code == STATUS_OCCUPIED
+    fun canBeReserved(): Boolean = status.code == STATUS_AVAILABLE
     
-    fun isOccupied(): Boolean {
-        return statusCode == SeatStatusType.OCCUPIED
-    }
-    
-    fun canBeReserved(): Boolean {
-        return statusCode == SeatStatusType.AVAILABLE
-    }
-    
-    // 상태 이름 조회를 위한 편의 메서드
-    val status: String
-        get() = statusType?.name ?: statusCode
-}
-
-// DTO for API responses
-data class SeatInfo(
-    val seatId: Long,
-    val seatNumber: String,
-    val price: BigDecimal,
-    val statusCode: String,
-    val status: String
-) {
-    companion object {
-        fun from(seat: Seat): SeatInfo {
-            return SeatInfo(
-                seatId = seat.seatId,
-                seatNumber = seat.seatNumber,
-                price = seat.price,
-                statusCode = seat.statusCode,
-                status = seat.status
-            )
-        }
-    }
+    val statusName: String
+        get() = status.name
 }

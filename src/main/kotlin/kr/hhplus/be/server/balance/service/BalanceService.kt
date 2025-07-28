@@ -1,9 +1,16 @@
 package kr.hhplus.be.server.balance.service
 
 import kr.hhplus.be.server.balance.entity.*
+import kr.hhplus.be.server.balance.event.*
+import kr.hhplus.be.server.balance.exception.InvalidPointAmountException
+import kr.hhplus.be.server.balance.exception.PointNotFoundException
 import kr.hhplus.be.server.balance.repository.PointHistoryRepository
 import kr.hhplus.be.server.balance.repository.PointRepository
-import kr.hhplus.be.server.user.entity.UserNotFoundException
+import kr.hhplus.be.server.balance.repository.PointHistoryTypePojoRepository
+import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.global.lock.LockKeyManager
+import kr.hhplus.be.server.user.exception.UserNotFoundException
 import kr.hhplus.be.server.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -14,11 +21,26 @@ import java.math.BigDecimal
 class BalanceService(
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
-    private val userService: UserService
+    private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
+    private val userService: UserService,
+    private val distributedLock: DistributedLock,
+    private val eventPublisher: DomainEventPublisher
 ) {
     
     @Transactional
     fun chargeBalance(userId: Long, amount: BigDecimal): Point {
+        val lockKey = LockKeyManager.userBalance(userId)
+        
+        return distributedLock.executeWithLock(
+            lockKey = lockKey,
+            lockTimeoutMs = 10000L,
+            waitTimeoutMs = 5000L
+        ) {
+            chargeBalanceInternal(userId, amount)
+        }
+    }
+    
+    private fun chargeBalanceInternal(userId: Long, amount: BigDecimal): Point {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }
@@ -44,12 +66,21 @@ class BalanceService(
         val chargedPoint = currentPoint.charge(amount)
         val savedPoint = pointRepository.save(chargedPoint)
         
-        val history = PointHistory.charge(userId, amount, "포인트 충전")
+        val chargeType = pointHistoryTypeRepository.getChargeType()
+        val history = PointHistory.charge(userId, amount, chargeType, "포인트 충전")
         pointHistoryRepository.save(history)
+        
+        // 포인트 충전 이벤트 발행
+        val event = BalanceChargedEvent(
+            userId = userId,
+            amount = amount,
+            newBalance = savedPoint.amount
+        )
+        eventPublisher.publish(event)
         
         return savedPoint
     }
-    
+
     fun getBalance(userId: Long): Point {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
@@ -58,9 +89,25 @@ class BalanceService(
         return pointRepository.findByUserId(userId)
             ?: Point.create(userId, BigDecimal.ZERO)
     }
-    
+
     @Transactional
     fun deductBalance(userId: Long, amount: BigDecimal): Point {
+        val lockKey = LockKeyManager.userBalance(userId)
+        
+        return distributedLock.executeWithLock(
+            lockKey = lockKey,
+            lockTimeoutMs = 10000L,
+            waitTimeoutMs = 5000L
+        ) {
+            deductBalanceInternal(userId, amount)
+        }
+    }
+    
+    /**
+     * PaymentService에서 내부 호출용 (중첩 락 방지)
+     */
+    @Transactional
+    fun deductBalanceInternal(userId: Long, amount: BigDecimal): Point {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }
@@ -71,19 +118,21 @@ class BalanceService(
         val deductedPoint = currentPoint.deduct(amount)
         val savedPoint = pointRepository.save(deductedPoint)
         
-        val history = PointHistory.usage(userId, amount, "포인트 사용")
+        val useType = pointHistoryTypeRepository.getUseType()
+        val history = PointHistory.use(userId, amount, useType, "포인트 사용")
         pointHistoryRepository.save(history)
+        
+        // 포인트 차감 이벤트 발행
+        val event = BalanceDeductedEvent(
+            userId = userId,
+            amount = amount,
+            remainingBalance = savedPoint.amount
+        )
+        eventPublisher.publish(event)
         
         return savedPoint
     }
-    
-    fun checkBalance(userId: Long, amount: BigDecimal): Boolean {
-        val point = pointRepository.findByUserId(userId)
-            ?: return false
-        
-        return point.hasEnoughBalance(amount)
-    }
-    
+
     fun getPointHistory(userId: Long): List<PointHistory> {
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")

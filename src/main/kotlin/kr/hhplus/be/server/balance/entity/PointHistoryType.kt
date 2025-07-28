@@ -21,9 +21,4 @@ data class PointHistoryType(
     
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
-) {
-    companion object {
-        const val CHARGE = "CHARGE"
-        const val USE = "USE"
-    }
-}
+)

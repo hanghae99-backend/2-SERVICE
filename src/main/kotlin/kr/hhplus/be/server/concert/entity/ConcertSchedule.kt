@@ -1,14 +1,14 @@
 package kr.hhplus.be.server.concert.entity
 
 import kr.hhplus.be.server.global.exception.ParameterValidationException
+import kr.hhplus.be.server.reservation.entity.Reservation
 import jakarta.persistence.*
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.LocalDateTime
 
 @Entity
 @Table(name = "concert_schedule")
-data class ConcertSchedule(
+class ConcertSchedule(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
@@ -27,13 +27,13 @@ data class ConcertSchedule(
     val totalSeats: Int,
     
     @Column(name = "available_seats", nullable = false)
-    val availableSeats: Int,
+    var availableSeats: Int,
     
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 ) {
     
-    // 연관관계 매핑 (읽기 전용)
+    // ConcertSchedule -> Concert 연관관계 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "concert_id", insertable = false, updatable = false)
     val concert: Concert? = null
@@ -45,7 +45,6 @@ data class ConcertSchedule(
             venue: String,
             totalSeats: Int
         ): ConcertSchedule {
-            // 파라미터 검증
             if (concertId <= 0) {
                 throw ParameterValidationException("콘서트 ID는 0보다 커야 합니다: $concertId")
             }
@@ -64,29 +63,23 @@ data class ConcertSchedule(
                 concertDate = concertDate,
                 venue = venue,
                 totalSeats = totalSeats,
-                availableSeats = totalSeats // 초기에는 모든 좌석이 예약 가능
+                availableSeats = totalSeats
             )
         }
     }
     
-    fun reserveSeat(): ConcertSchedule {
+    fun reserveSeat() {
         if (availableSeats <= 0) {
             throw IllegalStateException("예약 가능한 좌석이 없습니다")
         }
-        
-        return this.copy(
-            availableSeats = availableSeats - 1
-        )
+        availableSeats -= 1
     }
     
-    fun releaseSeat(): ConcertSchedule {
+    fun releaseSeat() {
         if (availableSeats >= totalSeats) {
             throw IllegalStateException("이미 모든 좌석이 예약 가능한 상태입니다")
         }
-        
-        return this.copy(
-            availableSeats = availableSeats + 1
-        )
+        availableSeats += 1
     }
     
     fun isBookingAvailable(): Boolean {

@@ -21,11 +21,4 @@ data class SeatStatusType(
     
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
-) {
-    companion object {
-        const val AVAILABLE = "AVAILABLE"
-        const val RESERVED = "RESERVED"
-        const val OCCUPIED = "OCCUPIED"
-        const val MAINTENANCE = "MAINTENANCE"
-    }
-}
+)

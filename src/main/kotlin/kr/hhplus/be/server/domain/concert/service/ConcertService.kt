@@ -10,6 +10,10 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
+/**
+ * 콘서트 도메인 서비스
+ * Repository 접근과 도메인 로직을 담당
+ */
 @Service
 @Transactional(readOnly = true)
 class ConcertService(

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.api.payment.dto.request.PaymentRequest
-import kr.hhplus.be.server.domain.payment.service.PaymentService
+import kr.hhplus.be.server.api.payment.usecase.PaymentUseCase
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/payments")
 @Validated
 class PaymentController(
-    private val paymentService: PaymentService
+    private val paymentUseCase: PaymentUseCase
 ) {
 
     /**
@@ -27,7 +27,7 @@ class PaymentController(
      */
     @PostMapping
     fun processPayment(@Valid @RequestBody request: PaymentRequest): ResponseEntity<CommonApiResponse<PaymentDto>> {
-        val payment = paymentService.processPayment(request.userId, request.reservationId, request.token)
+        val payment = paymentUseCase.processPayment(request.userId, request.reservationId, request.token)
         return ResponseEntity.status(201).body(
             CommonApiResponse.Companion.success(
                 data = payment,
@@ -43,7 +43,7 @@ class PaymentController(
     fun getPayment(
         @PathVariable @Positive(message = "결제 ID는 양수여야 합니다") paymentId: Long
     ): ResponseEntity<CommonApiResponse<PaymentDto>> {
-        val payment = paymentService.getPaymentById(paymentId)
+        val payment = paymentUseCase.getPaymentById(paymentId)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = payment,

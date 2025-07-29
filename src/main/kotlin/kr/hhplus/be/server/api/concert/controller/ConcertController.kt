@@ -4,7 +4,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.api.concert.dto.*
 import kr.hhplus.be.server.api.concert.dto.request.SearchConcertRequest
-import kr.hhplus.be.server.domain.concert.service.ConcertService
+import kr.hhplus.be.server.api.concert.usecase.ConcertUseCase
 import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
@@ -16,7 +16,7 @@ import java.time.LocalDate
 @RequestMapping("/api/v1/concerts")
 @Validated
 class ConcertController(
-    private val concertService: ConcertService,
+    private val concertUseCase: ConcertUseCase,
     private val seatService: SeatService
 ) {
 
@@ -30,7 +30,7 @@ class ConcertController(
     ): ResponseEntity<CommonApiResponse<List<ConcertScheduleWithInfoDto>>> {
         val start = startDate ?: LocalDate.now()
         val end = endDate ?: start.plusMonths(3)
-        val concerts = concertService.getAvailableConcerts(start, end)
+        val concerts = concertUseCase.getAvailableConcerts(start, end)
 
         return ResponseEntity.ok(
             CommonApiResponse.success(
@@ -49,10 +49,10 @@ class ConcertController(
     ): ResponseEntity<CommonApiResponse<List<ConcertScheduleDetail>>> {
         val concerts = when {
             request.startDate != null && request.endDate != null -> {
-                concertService.getAvailableConcerts(request.startDate, request.endDate)
+                concertUseCase.getAvailableConcerts(request.startDate, request.endDate)
             }
             else -> {
-                concertService.getAvailableConcerts()
+                concertUseCase.getAvailableConcerts()
             }
         }
 
@@ -72,7 +72,7 @@ class ConcertController(
     fun getConcert(
         @PathVariable @Positive(message = "콘서트 ID는 양수여야 합니다") concertId: Long
     ): ResponseEntity<CommonApiResponse<ConcertDto>> {
-        val concert = concertService.getConcertById(concertId)
+        val concert = concertUseCase.getConcertById(concertId)
         return ResponseEntity.ok(
             CommonApiResponse.success(
                 data = concert,
@@ -89,7 +89,7 @@ class ConcertController(
         @PathVariable @Positive(message = "콘서트 ID는 양수여야 합니다") concertId: Long,
         @RequestParam(required = false, defaultValue = "false") availableOnly: Boolean
     ): ResponseEntity<CommonApiResponse<List<ConcertWithScheduleDto>>> {
-        val schedules = concertService.getSchedulesByConcertId(concertId)
+        val schedules = concertUseCase.getSchedulesByConcertId(concertId)
 
         return ResponseEntity.ok(
             CommonApiResponse.success(
@@ -106,7 +106,7 @@ class ConcertController(
     fun getConcertSchedule(
         @PathVariable @Positive(message = "스케줄 ID는 양수여야 합니다") scheduleId: Long
     ): ResponseEntity<CommonApiResponse<ConcertDetailDto>> {
-        val detail = concertService.getConcertDetailByScheduleId(scheduleId)
+        val detail = concertUseCase.getConcertDetailByScheduleId(scheduleId)
         return ResponseEntity.ok(
             CommonApiResponse.success(
                 data = detail,

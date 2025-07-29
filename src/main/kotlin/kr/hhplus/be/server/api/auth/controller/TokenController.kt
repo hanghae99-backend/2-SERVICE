@@ -11,7 +11,7 @@ import kr.hhplus.be.server.api.auth.dto.TokenDto
 import kr.hhplus.be.server.api.auth.dto.TokenIssueDetail
 import kr.hhplus.be.server.api.auth.dto.TokenQueueDetail
 import kr.hhplus.be.server.api.auth.dto.request.TokenIssueRequest
-import kr.hhplus.be.server.domain.auth.service.TokenService
+import kr.hhplus.be.server.api.auth.usecase.TokenUseCase
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/tokens")
 @Tag(name = "대기열 토큰", description = "대기열 토큰 관리 API")
 class TokenController(
-    private val tokenService: TokenService
+    private val tokenUseCase: TokenUseCase
 ) {
     @PostMapping
     @ApiResponses(
@@ -49,7 +49,7 @@ class TokenController(
         ]
     )
     fun issueToken(@Valid @RequestBody @Parameter(description = "토큰 발급 요청") request: TokenIssueRequest): ResponseEntity<CommonApiResponse<TokenIssueDetail>> {
-        val response = tokenService.issueWaitingToken(request.userId)
+        val response = tokenUseCase.issueWaitingToken(request.userId)
         return ResponseEntity.status(201).body(
             CommonApiResponse.Companion.success(
                 data = response,
@@ -76,7 +76,7 @@ class TokenController(
         ]
     )
     fun getTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<CommonApiResponse<TokenQueueDetail>> {
-        val response = tokenService.getTokenQueueStatus(token)
+        val response = tokenUseCase.getTokenQueueStatus(token)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = response,
@@ -103,7 +103,7 @@ class TokenController(
         ]
     )
     fun getSimpleTokenStatus(@PathVariable @Parameter(description = "조회할 토큰") token: String): ResponseEntity<CommonApiResponse<TokenDto>> {
-        val response = tokenService.getSimpleTokenStatus(token)
+        val response = tokenUseCase.getSimpleTokenStatus(token)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = response,

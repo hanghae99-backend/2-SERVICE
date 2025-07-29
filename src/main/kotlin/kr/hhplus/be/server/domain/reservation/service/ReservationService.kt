@@ -43,8 +43,9 @@ class ReservationService(
             reserveSeatInternal(userId, concertId, seatId)
         }
     }
-    
-    private fun reserveSeatInternal(userId: Long, concertId: Long, seatId: Long): Reservation {
+
+    @Transactional
+    fun reserveSeatInternal(userId: Long, concertId: Long, seatId: Long): Reservation {
         // 기존 활성 예약 확인
         val activeStatuses = listOf(
             statusRepository.getTemporaryStatus().code,

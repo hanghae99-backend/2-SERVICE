@@ -9,7 +9,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.api.balance.dto.BalanceDto
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
-import kr.hhplus.be.server.domain.balance.service.BalanceService
+import kr.hhplus.be.server.api.balance.usecase.BalanceUseCase
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController
 @Validated
 @Tag(name = "Balance", description = "잔액 관리 API")
 class BalanceController(
-    private val balanceService: BalanceService
+    private val balanceUseCase: BalanceUseCase
 ) {
 
     /**
@@ -42,7 +42,7 @@ class BalanceController(
     fun chargeBalance(
         @Valid @RequestBody request: ChargeBalanceRequest
     ): ResponseEntity<CommonApiResponse<BalanceDto.ChargeResult>> {
-        val point = balanceService.chargeBalance(request.userId, request.amount)
+        val point = balanceUseCase.chargeBalance(request.userId, request.amount)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = BalanceDto.ChargeResult.from(point, request.amount),
@@ -66,7 +66,7 @@ class BalanceController(
         @Parameter(description = "사용자 ID", required = true)
         @Positive(message = "사용자 ID는 양수여야 합니다") userId: Long
     ): ResponseEntity<CommonApiResponse<BalanceDto.Detail>> {
-        val point = balanceService.getBalance(userId)
+        val point = balanceUseCase.getBalance(userId)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = BalanceDto.Detail.from(point),
@@ -90,7 +90,7 @@ class BalanceController(
         @Parameter(description = "사용자 ID", required = true)
         @Positive(message = "사용자 ID는 양수여야 합니다") userId: Long
     ): ResponseEntity<CommonApiResponse<List<BalanceDto.History>>> {
-        val histories = balanceService.getPointHistory(userId)
+        val histories = balanceUseCase.getPointHistory(userId)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = histories.map { BalanceDto.History.from(it) },

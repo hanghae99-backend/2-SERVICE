@@ -34,6 +34,9 @@ class Point(
     val user: User? = null
     
     companion object {
+        private val MAX_BALANCE = BigDecimal("50000000")
+        private val MIN_CHARGE_AMOUNT = BigDecimal("1000")
+        
         fun create(userId: Long, amount: BigDecimal): Point {
             if (amount < BigDecimal.ZERO) {
                 throw InvalidPointAmountException("포인트 잔액은 음수일 수 없습니다")
@@ -47,14 +50,31 @@ class Point(
     }
     
     fun charge(chargeAmount: BigDecimal): Point {
-        if (chargeAmount <= BigDecimal.ZERO) {
-            throw InvalidPointAmountException("충전 금액은 0보다 커야 합니다")
-        }
+        validateChargeAmount(chargeAmount)
+        validateMaxBalance(chargeAmount)
         
         this.amount = this.amount.add(chargeAmount)
         this.lastUpdated = LocalDateTime.now()
 
         return this
+    }
+    
+    private fun validateChargeAmount(amount: BigDecimal) {
+        if (amount <= BigDecimal.ZERO) {
+            throw InvalidPointAmountException("충전 금액은 0보다 커야 합니다: $amount")
+        }
+        if (amount < MIN_CHARGE_AMOUNT) {
+            throw InvalidPointAmountException("최소 충전 금액은 ${MIN_CHARGE_AMOUNT}원입니다: $amount")
+        }
+    }
+    
+    private fun validateMaxBalance(chargeAmount: BigDecimal) {
+        val newAmount = this.amount.add(chargeAmount)
+        if (newAmount > MAX_BALANCE) {
+            throw InvalidPointAmountException(
+                "최대 잔액 한도를 초과합니다. 현재: ${this.amount}, 충전 후: $newAmount, 한도: $MAX_BALANCE"
+            )
+        }
     }
     
     fun deduct(deductAmount: BigDecimal): Point  {

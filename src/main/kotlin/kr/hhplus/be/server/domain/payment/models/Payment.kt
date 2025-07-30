@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.domain.payment.models
 
+import kr.hhplus.be.server.global.common.BaseEntity
+
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import kr.hhplus.be.server.domain.payment.exception.PaymentAlreadyProcessedException
 import jakarta.persistence.*
@@ -31,7 +33,7 @@ data class Payment(
 
     @Column(name = "paid_at")
     val paidAt: LocalDateTime? = null
-) {
+) : BaseEntity() {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)

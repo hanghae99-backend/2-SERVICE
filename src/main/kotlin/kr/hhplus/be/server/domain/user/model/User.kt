@@ -1,18 +1,15 @@
 package kr.hhplus.be.server.domain.user.model
 
-@jakarta.persistence.Entity
-@jakarta.persistence.Table(name = "users")
+import kr.hhplus.be.server.global.common.BaseEntity
+import jakarta.persistence.*
+
+@Entity
+@Table(name = "users")
 class User(
-    @jakarta.persistence.Id
-    @jakarta.persistence.Column(name = "user_id")
-    val userId: Long,
-
-    @jakarta.persistence.Column(name = "created_at", nullable = false)
-    val createdAt: java.time.LocalDateTime = java.time.LocalDateTime.now(),
-
-    @jakarta.persistence.Column(name = "updated_at", nullable = false)
-    val updatedAt: java.time.LocalDateTime = java.time.LocalDateTime.now()
-) {
+    @Id
+    @Column(name = "user_id")
+    val userId: Long
+) : BaseEntity() {
 
     companion object {
         fun create(userId: Long): User {
@@ -20,9 +17,7 @@ class User(
                 throw kr.hhplus.be.server.global.exception.ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
             }
 
-            return User(
-                userId = userId
-            )
+            return User(userId = userId)
         }
     }
 }

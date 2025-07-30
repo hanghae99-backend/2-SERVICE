@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.domain.concert.models
 
+import kr.hhplus.be.server.global.common.BaseEntity
+
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import jakarta.persistence.*
@@ -27,11 +29,8 @@ class ConcertSchedule(
     val totalSeats: Int,
     
     @Column(name = "available_seats", nullable = false)
-    var availableSeats: Int,
-    
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
-) {
+    var availableSeats: Int
+) : BaseEntity() {
     
     // ConcertSchedule -> Concert 연관관계 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)

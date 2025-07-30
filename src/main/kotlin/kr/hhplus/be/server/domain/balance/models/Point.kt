@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.domain.balance.models
 
+import kr.hhplus.be.server.global.common.BaseEntity
+
 import jakarta.persistence.*
 import kr.hhplus.be.server.domain.balance.exception.InvalidPointAmountException
 import kr.hhplus.be.server.domain.balance.exception.InsufficientBalanceException
@@ -22,11 +24,8 @@ class Point(
     var amount: BigDecimal,
     
     @Column(name = "last_updated", nullable = false)
-    var lastUpdated: LocalDateTime = LocalDateTime.now(),
-    
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
-) {
+    var lastUpdated: LocalDateTime = LocalDateTime.now()
+) : BaseEntity() {
     
     // Point -> User 연관관계 (1:1)
     @OneToOne(fetch = FetchType.LAZY)

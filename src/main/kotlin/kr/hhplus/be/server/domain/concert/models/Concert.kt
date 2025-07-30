@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.domain.concert.models
 
+import kr.hhplus.be.server.global.common.BaseEntity
+
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import jakarta.persistence.*
@@ -20,14 +22,8 @@ class Concert(
     val artist: String,
     
     @Column(name = "is_active", nullable = false)
-    val isActive: Boolean = true,
-    
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now(),
-    
-    @Column(name = "updated_at", nullable = false)
-    val updatedAt: LocalDateTime = LocalDateTime.now()
-) {
+    val isActive: Boolean = true
+) : BaseEntity() {
     
     companion object {
         fun create(title: String, artist: String): Concert {

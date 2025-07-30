@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.domain.balance.models
 
+import kr.hhplus.be.server.global.common.BaseEntity
+
 import jakarta.persistence.*
 import kr.hhplus.be.server.domain.balance.exception.InvalidPointAmountException
 import kr.hhplus.be.server.domain.user.model.User
@@ -25,11 +27,8 @@ data class PointHistory(
     val historyType: PointHistoryType,
     
     @Column(name = "description", nullable = false, length = 255)
-    val description: String,
-    
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
-) {
+    val description: String
+) : BaseEntity() {
     
     // PointHistory -> User 연관관계 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)

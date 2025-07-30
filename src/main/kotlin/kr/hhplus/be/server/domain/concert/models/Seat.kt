@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.domain.concert.models
 
+import kr.hhplus.be.server.global.common.BaseEntity
+
 import kr.hhplus.be.server.domain.concert.exception.InvalidSeatStatusException
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import jakarta.persistence.*
@@ -28,14 +30,8 @@ data class Seat(
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "status_code", referencedColumnName = "code")
-    var status: SeatStatusType,
-    
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now(),
-    
-    @Column(name = "updated_at", nullable = false)
-    val updatedAt: LocalDateTime = LocalDateTime.now()
-) {
+    var status: SeatStatusType
+) : BaseEntity() {
     
     // Seat -> ConcertSchedule 연관관계 (N:1)
     @ManyToOne(fetch = FetchType.LAZY)
@@ -73,47 +69,32 @@ data class Seat(
         if (status.code != STATUS_AVAILABLE) {
             throw InvalidSeatStatusException("예약 가능한 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
-        return this.copy(
-            status = reservedStatus,
-            updatedAt = LocalDateTime.now()
-        )
+        return this.copy(status = reservedStatus)
     }
     
     fun occupy(occupiedStatus: SeatStatusType): Seat {
         if (status.code != STATUS_RESERVED) {
             throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
-        return this.copy(
-            status = occupiedStatus,
-            updatedAt = LocalDateTime.now()
-        )
+        return this.copy(status = occupiedStatus)
     }
     
     fun confirm(occupiedStatus: SeatStatusType): Seat {
         if (status.code != STATUS_RESERVED) {
             throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
-        return this.copy(
-            status = occupiedStatus,
-            updatedAt = LocalDateTime.now()
-        )
+        return this.copy(status = occupiedStatus)
     }
     
     fun release(availableStatus: SeatStatusType): Seat {
         if (status.code != STATUS_RESERVED) {
             throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
         }
-        return this.copy(
-            status = availableStatus,
-            updatedAt = LocalDateTime.now()
-        )
+        return this.copy(status = availableStatus)
     }
     
     fun setMaintenance(maintenanceStatus: SeatStatusType): Seat {
-        return this.copy(
-            status = maintenanceStatus,
-            updatedAt = LocalDateTime.now()
-        )
+        return this.copy(status = maintenanceStatus)
     }
     
     fun isAvailable(): Boolean = status.code == STATUS_AVAILABLE

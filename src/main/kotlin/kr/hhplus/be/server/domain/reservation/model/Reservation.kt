@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.domain.reservation.model
 
+import kr.hhplus.be.server.global.common.BaseEntity
+
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import kr.hhplus.be.server.domain.user.model.User
 import kr.hhplus.be.server.domain.concert.models.Concert
@@ -47,7 +49,7 @@ class Reservation(
 
     @Column(name = "confirmed_at", nullable = true)
     var confirmedAt: LocalDateTime? = null
-) {
+) : BaseEntity() {
     
     // 상태 명칭 계산 프로퍼티
     val statusName: String

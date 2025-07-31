@@ -13,6 +13,10 @@ class RedisTokenStore(
     private val redisTemplate: StringRedisTemplate,
     private val objectMapper: ObjectMapper
 ) : TokenStore {
+    // 테스트 격리용 Redis 전체 초기화 메서드
+    fun flushAll() {
+        redisTemplate.connectionFactory?.connection?.flushAll()
+    }
 
     companion object {
         private const val TOKEN_PREFIX = "waiting_token:"

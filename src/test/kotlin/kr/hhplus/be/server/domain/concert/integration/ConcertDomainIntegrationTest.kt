@@ -118,6 +118,20 @@ class ConcertDomainIntegrationTest(
         val savedSchedule = concertScheduleJpaRepository.save(schedule)
 
         When("여러 사용자가 동시에 같은 좌석을 예약할 때") {
+            // 좌석이 존재하는지 확인 후 처리
+            val seats = seatJpaRepository.findByScheduleId(savedSchedule.scheduleId)
+            if (seats.isEmpty()) {
+                // 좌석이 없다면 생성
+                val availableStatus = seatStatusTypeJpaRepository.findByCode("AVAILABLE")!!
+                val seat = Seat.create(
+                    scheduleId = savedSchedule.scheduleId,
+                    seatNumber = "01",
+                    price = BigDecimal("100000"),
+                    availableStatus = availableStatus
+                )
+                seatJpaRepository.save(seat)
+            }
+            
             val targetSeat = seatJpaRepository.findByScheduleId(savedSchedule.scheduleId).first()
             val concurrentCount = 20
             val executor = Executors.newFixedThreadPool(concurrentCount)

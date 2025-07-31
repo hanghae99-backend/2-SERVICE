@@ -26,6 +26,7 @@ import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.payment.exception.PaymentNotFoundException
 import java.math.BigDecimal
 import java.time.LocalDateTime
+import io.mockk.spyk
 
 class PaymentUseCaseTest : DescribeSpec({
 
@@ -281,14 +282,14 @@ class PaymentUseCaseTest : DescribeSpec({
                     val seatId = 1L
 
                     val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정된 예약", true, LocalDateTime.now())
-                    val reservation = Reservation.createTemporary(
+                    val reservation = spyk(Reservation.createTemporary(
                         userId = userId,
                         concertId = 1L,
                         seatId = seatId,
                         seatNumber = "A1",
                         price = BigDecimal("100000"),
                         temporaryStatus = confirmedStatus
-                    )
+                    ))
 
                     val mockToken = WaitingToken.create(token, userId)
 
@@ -315,12 +316,11 @@ class PaymentUseCaseTest : DescribeSpec({
                     val paymentAmount = BigDecimal("100000")
 
                     val temporaryStatus = ReservationStatusType("TEMPORARY", "임시", "임시 예약", true, LocalDateTime.now())
-                    val reservation = mockk<Reservation> {
-                        every { userId } returns userId
-                        every { this@mockk.seatId } returns seatId
-                        every { isTemporary() } returns true
-                        every { isExpired() } returns true
-                    }
+                    val reservation = mockk<Reservation>()
+                    every { reservation.userId } returns userId
+                    every { reservation.seatId } returns seatId
+                    every { reservation.isTemporary() } returns true
+                    every { reservation.isExpired() } returns true
 
                     val mockToken = WaitingToken.create(token, userId)
 

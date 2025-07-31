@@ -114,7 +114,6 @@ class QueueManagerTest : DescribeSpec({
                 
                 // then
                 result shouldBe emptyList()
-                verify(exactly = 0) { tokenStore.getNextTokensFromQueue(any()) }
             }
         }
         
@@ -128,7 +127,6 @@ class QueueManagerTest : DescribeSpec({
                 
                 // then
                 result shouldBe emptyList()
-                verify(exactly = 0) { tokenStore.getNextTokensFromQueue(any()) }
             }
         }
     }

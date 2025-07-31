@@ -13,7 +13,8 @@ import java.time.LocalDateTime
 @Table(
     name = "point",
     indexes = [
-        Index(name = "idx_point_user_id", columnList = "user_id")
+        Index(name = "idx_point_user_id", columnList = "user_id"),
+        Index(name = "idx_point_last_updated", columnList = "last_updated")
     ]
 )
 class Point(

@@ -11,7 +11,9 @@ import java.time.LocalDateTime
 @Table(
     name = "concert",
     indexes = [
-        Index(name = "idx_concert_is_active", columnList = "is_active")
+        Index(name = "idx_concert_is_active", columnList = "is_active"),
+        Index(name = "idx_concert_title", columnList = "title"),
+        Index(name = "idx_concert_artist", columnList = "artist")
     ]
 )
 class Concert(

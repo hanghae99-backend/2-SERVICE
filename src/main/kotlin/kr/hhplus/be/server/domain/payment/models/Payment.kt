@@ -16,7 +16,9 @@ import java.time.LocalDateTime
     indexes = [
         Index(name = "idx_payment_user_id", columnList = "user_id"),
         Index(name = "idx_payment_status_code", columnList = "status_code"),
-        Index(name = "idx_payment_paid_at", columnList = "paid_at")
+        Index(name = "idx_payment_paid_at", columnList = "paid_at"),
+        Index(name = "idx_payment_user_id_status_code", columnList = "user_id, status_code"),
+        Index(name = "idx_payment_amount", columnList = "amount")
     ]
 )
 data class Payment(

@@ -4,7 +4,12 @@ import kr.hhplus.be.server.global.common.BaseEntity
 import jakarta.persistence.*
 
 @Entity
-@Table(name = "users")
+@Table(
+    name = "users",
+    indexes = [
+        Index(name = "idx_users_created_at", columnList = "created_at")
+    ]
+)
 class User(
     @Id
     @Column(name = "user_id")

@@ -206,4 +206,37 @@ class ConcertServiceTest : DescribeSpec({
             }
         }
     }
+    
+    describe("getConcertDetailByScheduleId") {
+        context("존재하는 스케줄 ID로 상세 정보를 조회할 때") {
+            it("콘서트, 스케줄, 좌석 정보를 모두 포함한 상세 정보를 반환해야 한다") {
+                // given
+                val scheduleId = 1L
+                val concertId = 1L
+                
+                val concert = Concert(concertId, "Test Concert", "Test Artist")
+                val schedule = ConcertSchedule(
+                    scheduleId = scheduleId,
+                    concertId = concertId,
+                    concertDate = LocalDate.now(),
+                    venue = "Test Venue",
+                    totalSeats = 100,
+                    availableSeats = 50
+                )
+                
+                every { concertScheduleRepository.findById(scheduleId) } returns schedule
+                every { concertRepository.findById(concertId) } returns concert
+                every { seatRepository.findByScheduleId(scheduleId) } returns emptyList()
+                
+                // when
+                val result = concertService.getConcertDetailByScheduleId(scheduleId)
+                
+                // then
+                result shouldNotBe null
+                result.concert.concertId shouldBe concertId
+                result.schedule.scheduleId shouldBe scheduleId
+                result.seats shouldNotBe null
+            }
+        }
+    }
 })

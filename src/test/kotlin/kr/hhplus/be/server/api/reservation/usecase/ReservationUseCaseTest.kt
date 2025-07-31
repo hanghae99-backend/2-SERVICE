@@ -17,6 +17,8 @@ import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchCondition
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
+import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
+import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -116,6 +118,69 @@ class ReservationUseCaseTest : DescribeSpec({
                 verify { seatService.isSeatAvailable(seatId) }
             }
         }
+
+        context("토큰이 만료된 상태일 때") {
+            it("TokenActivationException을 던져야 한다") {
+                // given
+                val userId = 1L
+                val concertId = 1L
+                val seatId = 1L
+                val token = "expired-token"
+
+                every { tokenUseCase.validateActiveToken(token) } throws TokenActivationException("토큰이 만료되었습니다")
+
+                // when & then
+                shouldThrow<TokenActivationException> {
+                    reservationUseCase.reserveSeat(userId, concertId, seatId, token)
+                }
+
+                verify { tokenUseCase.validateActiveToken(token) }
+            }
+        }
+
+        context("존재하지 않는 토큰으로 예약할 때") {
+            it("TokenNotFoundException을 던져야 한다") {
+                // given
+                val userId = 1L
+                val concertId = 1L
+                val seatId = 1L
+                val token = "non-existent-token"
+
+                every { tokenUseCase.validateActiveToken(token) } throws TokenNotFoundException("토큰을 찾을 수 없습니다")
+
+                // when & then
+                shouldThrow<TokenNotFoundException> {
+                    reservationUseCase.reserveSeat(userId, concertId, seatId, token)
+                }
+
+                verify { tokenUseCase.validateActiveToken(token) }
+            }
+        }
+
+        context("이미 예약된 좌석을 예약할 때") {
+            it("IllegalStateException을 던져야 한다") {
+                // given
+                val userId = 1L
+                val concertId = 1L
+                val seatId = 1L
+                val token = "valid-token"
+
+                val mockToken = WaitingToken.create(token, userId)
+
+                every { tokenUseCase.validateActiveToken(token) } returns mockToken
+                every { userService.existsById(userId) } returns true
+                every { seatService.isSeatAvailable(seatId) } returns false
+
+                // when & then
+                shouldThrow<IllegalStateException> {
+                    reservationUseCase.reserveSeat(userId, concertId, seatId, token)
+                }
+
+                verify { tokenUseCase.validateActiveToken(token) }
+                verify { userService.existsById(userId) }
+                verify { seatService.isSeatAvailable(seatId) }
+            }
+        }
     }
     
     describe("confirmReservation") {
@@ -186,6 +251,58 @@ class ReservationUseCaseTest : DescribeSpec({
                 
                 verify { tokenUseCase.validateActiveToken(token) }
                 verify { userService.existsById(userId) }
+            }
+        }
+
+        context("이미 확정된 예약을 취소하려 할 때") {
+            it("예약 서비스에서 적절한 예외를 던져야 한다") {
+                // given
+                val reservationId = 1L
+                val userId = 1L
+                val cancelReason = "사용자 요청"
+                val token = "valid-token"
+
+                val mockToken = WaitingToken.create(token, userId)
+
+                every { tokenUseCase.validateActiveToken(token) } returns mockToken
+                every { userService.existsById(userId) } returns true
+                every { reservationService.cancelReservation(reservationId, userId, cancelReason) } throws
+                        IllegalStateException("확정된 예약은 취소할 수 없습니다")
+
+                // when & then
+                shouldThrow<IllegalStateException> {
+                    reservationUseCase.cancelReservation(reservationId, userId, cancelReason, token)
+                }
+
+                verify { tokenUseCase.validateActiveToken(token) }
+                verify { userService.existsById(userId) }
+                verify { reservationService.cancelReservation(reservationId, userId, cancelReason) }
+            }
+        }
+
+        context("null 취소 사유로 예약을 취소할 때") {
+            it("null 사유로도 정상 처리되어야 한다") {
+                // given
+                val reservationId = 1L
+                val userId = 1L
+                val cancelReason: String? = null
+                val token = "valid-token"
+
+                val mockToken = WaitingToken.create(token, userId)
+                val reservation = mockk<Reservation>()
+
+                every { tokenUseCase.validateActiveToken(token) } returns mockToken
+                every { userService.existsById(userId) } returns true
+                every { reservationService.cancelReservation(reservationId, userId, cancelReason) } returns reservation
+
+                // when
+                val result = reservationUseCase.cancelReservation(reservationId, userId, cancelReason, token)
+
+                // then
+                result shouldNotBe null
+                verify { tokenUseCase.validateActiveToken(token) }
+                verify { userService.existsById(userId) }
+                verify { reservationService.cancelReservation(reservationId, userId, cancelReason) }
             }
         }
     }

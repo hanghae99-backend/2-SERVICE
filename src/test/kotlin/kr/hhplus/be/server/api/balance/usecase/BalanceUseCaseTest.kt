@@ -9,6 +9,7 @@ import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kr.hhplus.be.server.domain.balance.exception.InsufficientBalanceException
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistory
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
@@ -86,6 +87,58 @@ class BalanceUseCaseTest : DescribeSpec({
                 }
                 
                 verify { userService.existsById(userId) }
+            }
+        }
+
+        context("동시에 여러 요청이 들어올 때") {
+            it("분산 락을 통해 순차 처리되어야 한다") {
+                // given
+                val userId = 1L
+                val chargeAmount = BigDecimal("10000")
+                val chargedPoint = Point.create(userId, BigDecimal("15000"))
+
+                setupDistributedLockMock<Point>(distributedLock)
+                every { userService.existsById(userId) } returns true
+                every { balanceService.chargeBalance(userId, chargeAmount) } returns chargedPoint
+
+                // when
+                val result = balanceUseCase.chargeBalance(userId, chargeAmount)
+
+                // then
+                result shouldNotBe null
+                result.amount shouldBe BigDecimal("15000")
+                verify { userService.existsById(userId) }
+                verify { balanceService.chargeBalance(userId, chargeAmount) }
+                verify {
+                    distributedLock.executeWithLock<Point>(
+                        lockKey = any(),
+                        lockTimeoutMs = 10000L,
+                        waitTimeoutMs = 5000L,
+                        action = any()
+                    )
+                }
+            }
+        }
+
+        context("락 타임아웃이 발생할 때") {
+            it("적절한 예외를 던져야 한다") {
+                // given
+                val userId = 1L
+                val chargeAmount = BigDecimal("10000")
+
+                every {
+                    distributedLock.executeWithLock<Point>(
+                        lockKey = any(),
+                        lockTimeoutMs = any(),
+                        waitTimeoutMs = any(),
+                        action = any()
+                    )
+                } throws RuntimeException("Lock timeout")
+
+                // when & then
+                shouldThrow<RuntimeException> {
+                    balanceUseCase.chargeBalance(userId, chargeAmount)
+                }
             }
         }
     }
@@ -166,6 +219,49 @@ class BalanceUseCaseTest : DescribeSpec({
                 }
                 
                 verify { userService.existsById(userId) }
+            }
+        }
+
+        context("잔액 차감 중 예외 발생시") {
+            it("InsufficientBalanceException을 던져야 한다") {
+                // given
+                val userId = 1L
+                val deductAmount = BigDecimal("50000")
+
+                setupDistributedLockMock<Point>(distributedLock)
+                every { userService.existsById(userId) } returns true
+                every { balanceService.deductBalance(userId, deductAmount) } throws
+                        InsufficientBalanceException("잔액이 부족합니다")
+
+                // when & then
+                shouldThrow<InsufficientBalanceException> {
+                    balanceUseCase.deductBalance(userId, deductAmount)
+                }
+
+                verify { userService.existsById(userId) }
+                verify { balanceService.deductBalance(userId, deductAmount) }
+            }
+        }
+
+        context("0원 차감 요청시") {
+            it("정상 처리되어야 한다") {
+                // given
+                val userId = 1L
+                val deductAmount = BigDecimal.ZERO
+                val currentPoint = Point.create(userId, BigDecimal("10000"))
+
+                setupDistributedLockMock<Point>(distributedLock)
+                every { userService.existsById(userId) } returns true
+                every { balanceService.deductBalance(userId, deductAmount) } returns currentPoint
+
+                // when
+                val result = balanceUseCase.deductBalance(userId, deductAmount)
+
+                // then
+                result shouldNotBe null
+                result.amount shouldBe BigDecimal("10000")
+                verify { userService.existsById(userId) }
+                verify { balanceService.deductBalance(userId, deductAmount) }
             }
         }
     }

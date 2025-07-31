@@ -20,8 +20,10 @@ import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
 import kr.hhplus.be.server.api.concert.dto.SeatDto
+import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
+import kr.hhplus.be.server.domain.payment.exception.PaymentNotFoundException
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -250,6 +252,324 @@ class PaymentUseCaseTest : DescribeSpec({
                 }
                 
                 verify { paymentService.failPayment(payment.paymentId, reservationId, any(), token) }
+            }
+            context("토큰이 비활성화 상태일 때") {
+                it("TokenActivationException을 던져야 한다") {
+                    // given
+                    val userId = 1L
+                    val reservationId = 1L
+                    val token = "inactive-token"
+
+                    setupDistributedLockMock<PaymentDto>(distributedLock)
+                    every { tokenUseCase.validateActiveToken(token) } throws TokenActivationException("토큰이 비활성화 상태입니다")
+
+                    // when & then
+                    shouldThrow<TokenActivationException> {
+                        paymentUseCase.processPayment(userId, reservationId, token)
+                    }
+
+                    verify { tokenUseCase.validateActiveToken(token) }
+                }
+            }
+
+            context("이미 확정된 예약으로 결제할 때") {
+                it("PaymentProcessException을 던져야 한다") {
+                    // given
+                    val userId = 1L
+                    val reservationId = 1L
+                    val token = "valid-token"
+                    val seatId = 1L
+
+                    val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정된 예약", true, LocalDateTime.now())
+                    val reservation = Reservation.createTemporary(
+                        userId = userId,
+                        concertId = 1L,
+                        seatId = seatId,
+                        seatNumber = "A1",
+                        price = BigDecimal("100000"),
+                        temporaryStatus = confirmedStatus
+                    )
+
+                    val mockToken = WaitingToken.create(token, userId)
+
+                    setupDistributedLockMock<PaymentDto>(distributedLock)
+                    every { tokenUseCase.validateActiveToken(token) } returns mockToken
+                    every { userService.existsById(userId) } returns true
+                    every { reservationService.getReservationById(reservationId) } returns reservation
+                    every { reservation.isTemporary() } returns false
+
+                    // when & then
+                    shouldThrow<PaymentProcessException> {
+                        paymentUseCase.processPayment(userId, reservationId, token)
+                    }
+                }
+            }
+
+            context("만료된 예약으로 결제할 때") {
+                it("PaymentProcessException을 던져야 한다") {
+                    // given
+                    val userId = 1L
+                    val reservationId = 1L
+                    val token = "valid-token"
+                    val seatId = 1L
+                    val paymentAmount = BigDecimal("100000")
+
+                    val temporaryStatus = ReservationStatusType("TEMPORARY", "임시", "임시 예약", true, LocalDateTime.now())
+                    val reservation = mockk<Reservation> {
+                        every { userId } returns userId
+                        every { this@mockk.seatId } returns seatId
+                        every { isTemporary() } returns true
+                        every { isExpired() } returns true
+                    }
+
+                    val mockToken = WaitingToken.create(token, userId)
+
+                    setupDistributedLockMock<PaymentDto>(distributedLock)
+                    every { tokenUseCase.validateActiveToken(token) } returns mockToken
+                    every { userService.existsById(userId) } returns true
+                    every { reservationService.getReservationById(reservationId) } returns reservation
+
+                    // when & then
+                    shouldThrow<PaymentProcessException> {
+                        paymentUseCase.processPayment(userId, reservationId, token)
+                    }
+                }
+            }
+
+            context("좌석 조회 실패시") {
+                it("좌석 서비스에서 예외를 던져야 한다") {
+                    // given
+                    val userId = 1L
+                    val reservationId = 1L
+                    val token = "valid-token"
+                    val seatId = 1L
+                    val paymentAmount = BigDecimal("100000")
+
+                    val temporaryStatus = ReservationStatusType("TEMPORARY", "임시", "임시 예약", true, LocalDateTime.now())
+                    val reservation = Reservation.createTemporary(
+                        userId = userId,
+                        concertId = 1L,
+                        seatId = seatId,
+                        seatNumber = "A1",
+                        price = paymentAmount,
+                        temporaryStatus = temporaryStatus
+                    )
+
+                    val mockToken = WaitingToken.create(token, userId)
+
+                    setupDistributedLockMock<PaymentDto>(distributedLock)
+                    every { tokenUseCase.validateActiveToken(token) } returns mockToken
+                    every { userService.existsById(userId) } returns true
+                    every { reservationService.getReservationById(reservationId) } returns reservation
+                    every { seatService.getSeatById(seatId) } throws RuntimeException("좌석을 찾을 수 없습니다")
+
+                    // when & then
+                    shouldThrow<RuntimeException> {
+                        paymentUseCase.processPayment(userId, reservationId, token)
+                    }
+                }
+            }
+
+            context("결제 생성 실패시") {
+                it("결제 서비스에서 예외를 던져야 한다") {
+                    // given
+                    val userId = 1L
+                    val reservationId = 1L
+                    val token = "valid-token"
+                    val seatId = 1L
+                    val paymentAmount = BigDecimal("100000")
+
+                    val temporaryStatus = ReservationStatusType("TEMPORARY", "임시", "임시 예약", true, LocalDateTime.now())
+                    val reservation = Reservation.createTemporary(
+                        userId = userId,
+                        concertId = 1L,
+                        seatId = seatId,
+                        seatNumber = "A1",
+                        price = paymentAmount,
+                        temporaryStatus = temporaryStatus
+                    )
+
+                    val seat = SeatDto(
+                        seatId = seatId,
+                        scheduleId = 1L,
+                        seatNumber = "A1",
+                        price = paymentAmount,
+                        statusCode = "AVAILABLE"
+                    )
+
+                    val mockToken = WaitingToken.create(token, userId)
+
+                    setupDistributedLockMock<PaymentDto>(distributedLock)
+                    every { tokenUseCase.validateActiveToken(token) } returns mockToken
+                    every { userService.existsById(userId) } returns true
+                    every { reservationService.getReservationById(reservationId) } returns reservation
+                    every { seatService.getSeatById(seatId) } returns seat
+                    every { paymentService.createPayment(userId, paymentAmount) } throws RuntimeException("결제 생성 실패")
+
+                    // when & then
+                    shouldThrow<RuntimeException> {
+                        paymentUseCase.processPayment(userId, reservationId, token)
+                    }
+                }
+            }
+
+            context("예약 확정 실패시") {
+                it("실패한 결제로 처리하고 예외를 던져야 한다") {
+                    // given
+                    val userId = 1L
+                    val reservationId = 1L
+                    val token = "valid-token"
+                    val seatId = 1L
+                    val paymentAmount = BigDecimal("100000")
+
+                    val temporaryStatus = ReservationStatusType("TEMPORARY", "임시", "임시 예약", true, LocalDateTime.now())
+                    val reservation = Reservation.createTemporary(
+                        userId = userId,
+                        concertId = 1L,
+                        seatId = seatId,
+                        seatNumber = "A1",
+                        price = paymentAmount,
+                        temporaryStatus = temporaryStatus
+                    )
+
+                    val seat = SeatDto(
+                        seatId = seatId,
+                        scheduleId = 1L,
+                        seatNumber = "A1",
+                        price = paymentAmount,
+                        statusCode = "AVAILABLE"
+                    )
+
+                    val currentBalance = Point.create(userId, BigDecimal("150000"))
+                    val payment = PaymentDto(
+                        paymentId = 1L,
+                        userId = userId,
+                        amount = paymentAmount,
+                        paymentMethod = "POINT",
+                        statusCode = "PENDING",
+                        paidAt = LocalDateTime.now(),
+                        reservationList = emptyList(),
+                    )
+                    val failedPayment = payment.copy(statusCode = "FAILED")
+
+                    val mockToken = WaitingToken.create(token, userId)
+
+                    setupDistributedLockMock<PaymentDto>(distributedLock)
+                    every { tokenUseCase.validateActiveToken(token) } returns mockToken
+                    every { userService.existsById(userId) } returns true
+                    every { reservationService.getReservationById(reservationId) } returns reservation
+                    every { seatService.getSeatById(seatId) } returns seat
+                    every { paymentService.createPayment(userId, paymentAmount) } returns payment
+                    every { balanceUseCase.getBalance(userId) } returns currentBalance
+                    justRun { paymentService.validatePaymentAmount(any(), any()) }
+                    every { balanceUseCase.deductBalanceInternal(userId, payment.amount) } returns currentBalance.deduct(payment.amount)
+                    every { reservationService.confirmReservationInternal(reservationId, payment.paymentId) } throws RuntimeException("예약 확정 실패")
+                    every { paymentService.failPayment(any(), any(), any(), any()) } returns failedPayment
+
+                    // when & then
+                    shouldThrow<PaymentProcessException> {
+                        paymentUseCase.processPayment(userId, reservationId, token)
+                    }
+
+                    verify { paymentService.failPayment(payment.paymentId, reservationId, any(), token) }
+                }
+            }
+
+            context("좌석 확정 실패시") {
+                it("실패한 결제로 처리하고 예외를 던져야 한다") {
+                    // given
+                    val userId = 1L
+                    val reservationId = 1L
+                    val token = "valid-token"
+                    val seatId = 1L
+                    val paymentAmount = BigDecimal("100000")
+
+                    val temporaryStatus = ReservationStatusType("TEMPORARY", "임시", "임시 예약", true, LocalDateTime.now())
+                    val reservation = Reservation.createTemporary(
+                        userId = userId,
+                        concertId = 1L,
+                        seatId = seatId,
+                        seatNumber = "A1",
+                        price = paymentAmount,
+                        temporaryStatus = temporaryStatus
+                    )
+
+                    val seat = SeatDto(
+                        seatId = seatId,
+                        scheduleId = 1L,
+                        seatNumber = "A1",
+                        price = paymentAmount,
+                        statusCode = "AVAILABLE"
+                    )
+
+                    val currentBalance = Point.create(userId, BigDecimal("150000"))
+                    val payment = PaymentDto(
+                        paymentId = 1L,
+                        userId = userId,
+                        amount = paymentAmount,
+                        paymentMethod = "POINT",
+                        statusCode = "PENDING",
+                        paidAt = LocalDateTime.now(),
+                        reservationList = emptyList(),
+                    )
+                    val failedPayment = payment.copy(statusCode = "FAILED")
+
+                    val mockToken = WaitingToken.create(token, userId)
+
+                    setupDistributedLockMock<PaymentDto>(distributedLock)
+                    every { tokenUseCase.validateActiveToken(token) } returns mockToken
+                    every { userService.existsById(userId) } returns true
+                    every { reservationService.getReservationById(reservationId) } returns reservation
+                    every { seatService.getSeatById(seatId) } returns seat
+                    every { paymentService.createPayment(userId, paymentAmount) } returns payment
+                    every { balanceUseCase.getBalance(userId) } returns currentBalance
+                    justRun { paymentService.validatePaymentAmount(any(), any()) }
+                    every { balanceUseCase.deductBalanceInternal(userId, payment.amount) } returns currentBalance.deduct(payment.amount)
+                    every { reservationService.confirmReservationInternal(reservationId, payment.paymentId) } returns reservation
+                    every { seatService.confirmSeatInternal(seatId) } throws RuntimeException("좌석 확정 실패")
+                    every { paymentService.failPayment(any(), any(), any(), any()) } returns failedPayment
+
+                    // when & then
+                    shouldThrow<PaymentProcessException> {
+                        paymentUseCase.processPayment(userId, reservationId, token)
+                    }
+
+                    verify { paymentService.failPayment(payment.paymentId, reservationId, any(), token) }
+                }
+            }
+        }
+
+        describe("getPaymentById - 추가 케이스") {
+            context("존재하지 않는 결제 ID로 조회할 때") {
+                it("PaymentNotFoundException을 던져야 한다") {
+                    // given
+                    val paymentId = 999L
+
+                    every { paymentService.getPaymentById(paymentId) } throws PaymentNotFoundException("결제를 찾을 수 없습니다")
+
+                    // when & then
+                    shouldThrow<PaymentNotFoundException> {
+                        paymentUseCase.getPaymentById(paymentId)
+                    }
+
+                    verify { paymentService.getPaymentById(paymentId) }
+                }
+            }
+
+            context("음수 결제 ID로 조회할 때") {
+                it("IllegalArgumentException을 던져야 한다") {
+                    // given
+                    val paymentId = -1L
+
+                    every { paymentService.getPaymentById(paymentId) } throws IllegalArgumentException("잘못된 결제 ID입니다")
+
+                    // when & then
+                    shouldThrow<IllegalArgumentException> {
+                        paymentUseCase.getPaymentById(paymentId)
+                    }
+
+                    verify { paymentService.getPaymentById(paymentId) }
+                }
             }
         }
     }

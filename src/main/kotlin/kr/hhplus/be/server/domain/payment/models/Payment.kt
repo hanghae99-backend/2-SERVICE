@@ -11,7 +11,14 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "payment")
+@Table(
+    name = "payment",
+    indexes = [
+        Index(name = "idx_payment_user_id", columnList = "user_id"),
+        Index(name = "idx_payment_status_code", columnList = "status_code"),
+        Index(name = "idx_payment_paid_at", columnList = "paid_at")
+    ]
+)
 data class Payment(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

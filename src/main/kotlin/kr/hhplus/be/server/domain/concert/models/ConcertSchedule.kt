@@ -9,7 +9,13 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "concert_schedule")
+@Table(
+    name = "concert_schedule",
+    indexes = [
+        Index(name = "idx_concert_schedule_concert_id_concert_date", columnList = "concert_id, concert_date"),
+        Index(name = "idx_concert_schedule_available_seats", columnList = "available_seats")
+    ]
+)
 class ConcertSchedule(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

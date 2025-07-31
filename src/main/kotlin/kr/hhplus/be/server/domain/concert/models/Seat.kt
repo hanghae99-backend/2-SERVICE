@@ -9,7 +9,14 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "seat")
+@Table(
+    name = "seat",
+    indexes = [
+        Index(name = "idx_seat_schedule_id_status_code", columnList = "schedule_id, status_code"),
+        Index(name = "idx_seat_schedule_id_seat_number", columnList = "schedule_id, seat_number"),
+        Index(name = "idx_seat_schedule_id_price", columnList = "schedule_id, price")
+    ]
+)
 data class Seat(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

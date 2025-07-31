@@ -9,7 +9,12 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "point_history")
+@Table(
+    name = "point_history",
+    indexes = [
+        Index(name = "idx_point_history_user_id_created_at", columnList = "user_id, created_at")
+    ]
+)
 data class PointHistory(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

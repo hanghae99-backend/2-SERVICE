@@ -4,11 +4,11 @@
 INSERT INTO users (user_id, created_at, updated_at) VALUES
 (1, NOW(), NOW()), (2, NOW(), NOW()), (3, NOW(), NOW());
 
--- 포인트 초기 잔액
-INSERT INTO point (user_id, amount, last_updated, created_at) VALUES
-(1, 500000.00, NOW(), NOW()),
-(2, 300000.00, NOW(), NOW()),
-(3, 800000.00, NOW(), NOW());
+-- 포인트 초기 잔액 (updated_at 필드 추가)
+INSERT INTO point (user_id, amount, last_updated, created_at, updated_at) VALUES
+(1, 500000.00, NOW(), NOW(), NOW()),
+(2, 300000.00, NOW(), NOW(), NOW()),
+(3, 800000.00, NOW(), NOW(), NOW());
 
 -- 포인트 히스토리 타입
 INSERT INTO point_history_type (code, name, description, is_active, created_at) VALUES
@@ -16,10 +16,10 @@ INSERT INTO point_history_type (code, name, description, is_active, created_at) 
 ('USE', '사용', '포인트 사용', true, NOW());
 
 -- 포인트 히스토리
-INSERT INTO point_history (user_id, amount, type_code, description, created_at) VALUES
-(1, 500000.00, 'CHARGE', '초기 포인트 충전', NOW()),
-(2, 300000.00, 'CHARGE', '초기 포인트 충전', NOW()),
-(3, 800000.00, 'CHARGE', '초기 포인트 충전', NOW());
+INSERT INTO point_history (user_id, amount, type_code, description, created_at, updated_at) VALUES
+(1, 500000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+(2, 300000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+(3, 800000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW());
 
 -- 콘서트 데이터
 INSERT INTO concert (title, artist, is_active, created_at, updated_at) VALUES
@@ -27,9 +27,9 @@ INSERT INTO concert (title, artist, is_active, created_at, updated_at) VALUES
 ('BTS WORLD TOUR', 'BTS', true, NOW(), NOW());
 
 -- 콘서트 스케줄 (50개 좌석으로 통일)
-INSERT INTO concert_schedule (concert_id, concert_date, venue, total_seats, available_seats, created_at) VALUES
-(1, '2024-12-15', '올림픽공원 체조경기장', 50, 50, NOW()),
-(2, '2024-12-22', '잠실종합운동장', 50, 50, NOW());
+INSERT INTO concert_schedule (concert_id, concert_date, venue, total_seats, available_seats, created_at, updated_at) VALUES
+(1, '2024-12-15', '올림픽공원 체조경기장', 50, 50, NOW(), NOW()),
+(2, '2024-12-22', '잠실종합운동장', 50, 50, NOW(), NOW());
 
 -- 좌석 상태 타입
 INSERT INTO seat_status_type (code, name, description, is_active, created_at) VALUES

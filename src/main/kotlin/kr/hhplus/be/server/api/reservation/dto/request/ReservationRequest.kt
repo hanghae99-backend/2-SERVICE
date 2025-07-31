@@ -41,7 +41,12 @@ data class ReservationCancelRequest(
     
     @field:Size(max = 500, message = "취소 사유는 500자를 초과할 수 없습니다")
     @Schema(description = "취소 사유", example = "개인 사정으로 인한 취소", required = false)
-    val cancelReason: String? = null
+    val cancelReason: String? = null,
+    
+    @field:NotBlank(message = "토큰은 필수입니다")
+    @field:Size(min = 10, max = 200, message = "토큰 길이는 10-200자 사이여야 합니다")
+    @Schema(description = "대기열 토큰", example = "abc123def456", required = true)
+    val token: String
 )
 
 /**

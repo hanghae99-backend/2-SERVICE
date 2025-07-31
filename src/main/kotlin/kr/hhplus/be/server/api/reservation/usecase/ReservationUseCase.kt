@@ -8,8 +8,7 @@ import kr.hhplus.be.server.api.reservation.dto.ReservationDto
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchCondition
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.user.exception.UserNotFoundException
-import kr.hhplus.be.server.global.lock.DistributedLock
-import kr.hhplus.be.server.global.lock.LockKeyManager
+
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -20,39 +19,26 @@ class ReservationUseCase(
     private val reservationService: ReservationService,
     private val seatService: SeatService,
     private val userService: UserService,
-    private val tokenUseCase: TokenUseCase,
-    private val distributedLock: DistributedLock
+    private val tokenUseCase: TokenUseCase
 ) {
 
     @Transactional
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
-        val lockKey = LockKeyManager.seatOperation(seatId)
-        
-        return distributedLock.executeWithLock(
-            lockKey = lockKey,
-            lockTimeoutMs = 10000L,
-            waitTimeoutMs = 5000L
-        ) {
-            reserveSeatInternal(userId, concertId, seatId, token)
-        }
-    }
-    
-    private fun reserveSeatInternal(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
-
+        // 1. 토큰 검증
         tokenUseCase.validateActiveToken(token)
         
-
+        // 2. 사용자 존재 확인
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }
         
-
+        // 3. 좌석 가용성 확인
         if (!seatService.isSeatAvailable(seatId)) {
             throw IllegalStateException("예약할 수 없는 좌석입니다: $seatId")
         }
         
-
-        return reservationService.reserveSeatInternal(userId, concertId, seatId)
+        // 4. Service의 External 메서드 호출 (분산 락 포함)
+        return reservationService.reserveSeat(userId, concertId, seatId)
     }
     
     @Transactional
@@ -62,14 +48,15 @@ class ReservationUseCase(
     
     @Transactional
     fun cancelReservation(reservationId: Long, userId: Long, cancelReason: String?, token: String): Reservation {
-
+        // 1. 토큰 검증
         tokenUseCase.validateActiveToken(token)
         
-
+        // 2. 사용자 존재 확인
         if (!userService.existsById(userId)) {
             throw UserNotFoundException("존재하지 않는 사용자입니다: $userId")
         }
         
+        // 3. Service 호출
         return reservationService.cancelReservation(reservationId, userId, cancelReason)
     }
     

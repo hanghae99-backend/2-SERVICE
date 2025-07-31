@@ -32,7 +32,7 @@ class ReservationService(
         // ========== 비즈니스 메서드들 ==========
     
     @Transactional
-    fun reserveSeat(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
+    fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
         val lockKey = LockKeyManager.seatOperation(seatId)
         
         return distributedLock.executeWithLock(

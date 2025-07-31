@@ -15,7 +15,7 @@ import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationListRequest
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchCondition
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchRequest
-import kr.hhplus.be.server.domain.reservation.service.ReservationService
+import kr.hhplus.be.server.api.reservation.usecase.ReservationUseCase
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController
 @Validated
 @Tag(name = "Reservation", description = "예약 관리 API")
 class ReservationController(
-    private val reservationService: ReservationService
+    private val reservationUseCase: ReservationUseCase
 ) {
 
     @Operation(summary = "좌석 예약 생성", description = "사용자가 선택한 좌석을 예약합니다.")
@@ -46,7 +46,7 @@ class ReservationController(
     fun createReservation(
         @Valid @RequestBody request: ReservationCreateRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        val reservation = reservationService.reserveSeat(
+        val reservation = reservationUseCase.reserveSeat(
             request.userId,
             request.concertId,
             request.seatId,
@@ -72,7 +72,7 @@ class ReservationController(
         @PathVariable @Positive(message = "예약 ID는 양수여야 합니다") reservationId: Long,
         @RequestParam @Positive(message = "결제 ID는 양수여야 합니다") paymentId: Long
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        val reservation = reservationService.confirmReservation(reservationId, paymentId)
+        val reservation = reservationUseCase.confirmReservation(reservationId, paymentId)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = ReservationDto.Companion.fromEntity(reservation),
@@ -93,10 +93,11 @@ class ReservationController(
         @PathVariable @Positive(message = "예약 ID는 양수여야 합니다") reservationId: Long,
         @Valid @RequestBody request: ReservationCancelRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        val reservation = reservationService.cancelReservation(
+        val reservation = reservationUseCase.cancelReservation(
             reservationId,
             request.userId,
-            request.cancelReason
+            request.cancelReason,
+            request.token
         )
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
@@ -116,7 +117,7 @@ class ReservationController(
         @Parameter(description = "예약 ID", example = "1")
         @PathVariable @Positive(message = "예약 ID는 양수여야 합니다") reservationId: Long
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        val reservation = reservationService.getReservationById(reservationId)
+        val reservation = reservationUseCase.getReservationById(reservationId)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = ReservationDto.Companion.fromEntity(reservation),
@@ -135,7 +136,7 @@ class ReservationController(
         @Parameter(description = "예약 ID", example = "1")
         @PathVariable @Positive(message = "예약 ID는 양수여야 합니다") reservationId: Long
     ): ResponseEntity<CommonApiResponse<ReservationDto.Detail>> {
-        val reservation = reservationService.getReservationWithDetails(reservationId)
+        val reservation = reservationUseCase.getReservationWithDetails(reservationId)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = ReservationDto.Detail.fromEntity(reservation),
@@ -158,7 +159,7 @@ class ReservationController(
             sortBy = request?.sortBy ?: "reservedAt",
             sortDirection = request?.sortDirection ?: "DESC"
         )
-        val result = reservationService.getReservationsByCondition(searchCondition)
+        val result = reservationUseCase.getReservationsByCondition(searchCondition)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = result,
@@ -182,7 +183,7 @@ class ReservationController(
             sortBy = request?.sortBy ?: "reservedAt",
             sortDirection = request?.sortDirection ?: "DESC"
         )
-        val result = reservationService.getReservationsByCondition(searchCondition)
+        val result = reservationUseCase.getReservationsByCondition(searchCondition)
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = result,
@@ -196,7 +197,7 @@ class ReservationController(
     fun searchReservations(
         @Valid @RequestBody request: ReservationSearchRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto.Page>> {
-        val result = reservationService.getReservationsByCondition(request.toSearchCondition())
+        val result = reservationUseCase.getReservationsByCondition(request.toSearchCondition())
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = result,
@@ -210,7 +211,7 @@ class ReservationController(
     fun getExpiredReservations(
         @Valid @RequestBody(required = false) request: ReservationListRequest?
     ): ResponseEntity<CommonApiResponse<ReservationDto.Page>> {
-        val result = reservationService.getExpiredReservations(
+        val result = reservationUseCase.getExpiredReservations(
             request?.pageNumber ?: 1,
             request?.pageSize ?: 20
         )
@@ -225,7 +226,7 @@ class ReservationController(
     @Operation(summary = "만료된 예약 정리", description = "만료된 임시 예약들을 일괄 취소 처리합니다. (관리자용)")
     @PostMapping("/cleanup-expired")
     fun cleanupExpiredReservations(): ResponseEntity<CommonApiResponse<ReservationDto.OperationResult>> {
-        val cleanupCount = reservationService.cleanupExpiredReservations()
+        val cleanupCount = reservationUseCase.cleanupExpiredReservations()
         return ResponseEntity.ok(
             CommonApiResponse.Companion.success(
                 data = ReservationDto.OperationResult(

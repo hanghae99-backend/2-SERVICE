@@ -6,11 +6,7 @@ import kr.hhplus.be.server.domain.concert.exception.SeatNotFoundException
 import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatStatusTypePojoRepository
-import kr.hhplus.be.server.domain.concert.event.SeatStatusChangedEvent
-import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.extension.orElseThrow
-import kr.hhplus.be.server.global.lock.DistributedLock
-import kr.hhplus.be.server.global.lock.LockKeyManager
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -19,9 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 class SeatService(
     private val seatRepository: SeatRepository,
     private val concertScheduleRepository: ConcertScheduleRepository,
-    private val seatStatusTypeRepository: SeatStatusTypePojoRepository,
-    private val distributedLock: DistributedLock,
-    private val eventPublisher: DomainEventPublisher
+    private val seatStatusTypeRepository: SeatStatusTypePojoRepository
 ) {
     
     /**
@@ -60,7 +54,6 @@ class SeatService(
      */
     fun isSeatAvailable(seatId: Long): Boolean {
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
-        
         return seat.isAvailable()
     }
 
@@ -75,15 +68,13 @@ class SeatService(
 
     @Transactional
     fun confirmSeat(seatId: Long): SeatDto {
-        val lockKey = LockKeyManager.seatOperation(seatId)
+        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
+        val occupiedStatus = seatStatusTypeRepository.getOccupiedStatus()
+
+        val confirmedSeat = seat.confirm(occupiedStatus)
+        val savedSeat = seatRepository.save(confirmedSeat)
         
-        return distributedLock.executeWithLock(
-            lockKey = lockKey,
-            lockTimeoutMs = 10000L,
-            waitTimeoutMs = 5000L
-        ) {
-            confirmSeatInternal(seatId)
-        }
+        return SeatDto.from(savedSeat)
     }
     
     /**
@@ -91,24 +82,6 @@ class SeatService(
      */
     @Transactional
     fun confirmSeatInternal(seatId: Long): SeatDto {
-        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
-        val occupiedStatus = seatStatusTypeRepository.getOccupiedStatus()
-        val previousStatus = seat.status.name
-
-        val confirmedSeat = seat.confirm(occupiedStatus)
-        val savedSeat = seatRepository.save(confirmedSeat)
-        
-        // 좌석 상태 변경 이벤트 발행
-        val statusChangeEvent = SeatStatusChangedEvent(
-            seatId = savedSeat.seatId,
-            scheduleId = savedSeat.scheduleId,
-            seatNumber = savedSeat.seatNumber,
-            previousStatus = previousStatus,
-            newStatus = savedSeat.status.name
-        )
-        eventPublisher.publish(statusChangeEvent)
-        
-        return SeatDto.from(savedSeat)
+        return confirmSeat(seatId)
     }
-
 }

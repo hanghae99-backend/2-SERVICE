@@ -19,6 +19,7 @@ import java.time.LocalDateTime
         Index(name = "idx_reservation_concert_id_reserved_at", columnList = "concert_id, reserved_at"),
         Index(name = "idx_reservation_seat_id_status_code", columnList = "seat_id, status_code"),
         Index(name = "idx_reservation_status_code_reserved_at", columnList = "status_code, reserved_at"),
+        Index(name = "idx_reservation_status_expires", columnList = "status_code, expires_at"),
         Index(name = "idx_reservation_expires_at", columnList = "expires_at")
     ]
 )

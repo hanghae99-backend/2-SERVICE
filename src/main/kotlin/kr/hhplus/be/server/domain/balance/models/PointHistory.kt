@@ -13,7 +13,8 @@ import java.time.LocalDateTime
     name = "point_history",
     indexes = [
         Index(name = "idx_point_history_user_id_created_at", columnList = "user_id, created_at"),
-        Index(name = "idx_point_history_type_code_created_at", columnList = "type_code, created_at")
+        Index(name = "idx_point_history_type_code_created_at", columnList = "type_code, created_at"),
+        Index(name = "idx_point_history_user_created_desc", columnList = "user_id, created_at DESC")
     ]
 )
 data class PointHistory(

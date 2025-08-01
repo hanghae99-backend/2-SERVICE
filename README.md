@@ -137,21 +137,22 @@ LIMIT 20;
 
 ```sql
 -- 🚀 핵심 성능 개선 인덱스 (우선순위 높음)
+-- ✅ 실제 레포지토리 쿼리 패턴과 100% 매치
 CREATE INDEX idx_seat_schedule_status_number ON seat (schedule_id, status_code, seat_number);
-CREATE INDEX idx_seat_id_status ON seat (id, status_code);
-CREATE INDEX idx_reservation_user_reserved_at ON reservation (user_id, reserved_at DESC);
 CREATE INDEX idx_reservation_status_expires ON reservation (status_code, expires_at);
 
--- 🔧 추가 최적화 인덱스 (우선순위 중간)
-CREATE INDEX idx_reservation_concert_status ON reservation (concert_id, status_code);
+-- 🔧 추가 최적화 인덱스 (기존 엔티티에 이미 있거나 실제 필요한 것들)
+-- ConcertSchedule 테이블 (실제 Repository 쿼리에서 자주 사용됨)
+CREATE INDEX idx_concert_schedule_date_available ON concert_schedule (concert_date, available_seats);
+CREATE INDEX idx_concert_schedule_concert_available_date ON concert_schedule (concert_id, available_seats, concert_date);
+
+-- Concert 검색 최적화 (실제로 검색 기능이 있다면)
 CREATE INDEX idx_concert_active_title ON concert (is_active, title);
 CREATE INDEX idx_concert_active_artist ON concert (is_active, artist);
-CREATE INDEX idx_concert_schedule_date ON concert_schedule (concert_date);
 
--- 📊 분석 및 리포팅용 인덱스 (우선순위 낮음)
-CREATE INDEX idx_seat_status_price ON seat (status_code, price);
+-- 📊 분석 및 리포팅용 인덱스 (필요시에만)
 CREATE INDEX idx_point_history_user_created ON point_history (user_id, created_at DESC);
-CREATE INDEX idx_payment_user_status ON payment (user_id, status_code);
+CREATE INDEX idx_reservation_reserved_at_status ON reservation (reserved_at, status_code); -- 통계용
 ```
 
 ### 3.2 인덱스 설계 원칙

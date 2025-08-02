@@ -43,8 +43,8 @@ class AuthDomainIntegrationTest(
     private val pointHistoryJpaRepository: PointHistoryJpaRepository
 ) : BehaviorSpec({
 
-    beforeTest {
-        // 외래키 제약 조건을 고려한 순서로 데이터 정리
+    beforeSpec {
+        // 스펙 시작 전 한 번만 초기화
         try {
             // 1. Redis 초기화
             redisTokenStore.flushAll()
@@ -58,6 +58,17 @@ class AuthDomainIntegrationTest(
         } catch (e: Exception) {
             // 정리 중 오류 발생 시 로깅하고 계속 진행
             println("테스트 데이터 정리 중 오류: ${e.message}")
+        }
+    }
+    
+    beforeContainer {
+        // 각 Given 블록 시작 전에만 실행 (When-Then 사이에는 실행되지 않음)
+        try {
+            // Redis만 초기화 (DB는 @Transactional로 자동 롤백)
+            redisTokenStore.flushAll()
+            println("Given 블록 시작 - Redis 초기화 완료")
+        } catch (e: Exception) {
+            println("컨테이너 초기화 중 오류: ${e.message}")
         }
     }
 
@@ -131,7 +142,7 @@ class AuthDomainIntegrationTest(
             val queuePositions = mutableListOf<Int>()
 
             // 사용자들 미리 생성
-            val userIds = (2000L..2000L + userCount).toList()
+            val userIds = (2000L until 2000L + userCount).toList()
             userIds.forEach { userId ->
                 val user = User.create(userId)
                 userJpaRepository.save(user)
@@ -178,7 +189,7 @@ class AuthDomainIntegrationTest(
             val activationCount = 0
 
             // 대기 중인 사용자들 생성
-            val waitingTokens = (3000L..3000L + waitingUsers).map { userId ->
+            val waitingTokens = (3000L until 3000L + waitingUsers).map { userId ->
                 val user = User.create(userId)
                 userJpaRepository.save(user)
                 tokenService.issueWaitingToken(userId)
@@ -320,7 +331,7 @@ class AuthDomainIntegrationTest(
             val failureCount = AtomicInteger(0)
 
             // 사용자들 미리 생성
-            val userIds = (6000L..6000L + userCount).toList()
+            val userIds = (6000L until 6000L + userCount).toList()
             userIds.forEach { userId ->
                 val user = User.create(userId)
                 userJpaRepository.save(user)

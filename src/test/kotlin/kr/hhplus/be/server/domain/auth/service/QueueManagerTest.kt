@@ -3,17 +3,19 @@ package kr.hhplus.be.server.domain.auth.service
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.verify
+import io.mockk.*
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 
 class QueueManagerTest : DescribeSpec({
     
-    val tokenStore = mockk<TokenStore>()
+    lateinit var tokenStore: TokenStore
+    lateinit var queueManager: QueueManager
     
-    val queueManager = QueueManager(tokenStore)
+    beforeEach {
+        tokenStore = mockk<TokenStore>(relaxed = true)
+        queueManager = QueueManager(tokenStore)
+    }
     
     describe("addToQueue") {
         context("토큰을 대기열에 추가할 때") {
@@ -21,13 +23,13 @@ class QueueManagerTest : DescribeSpec({
                 // given
                 val token = "test-token"
                 
-                every { tokenStore.addToWaitingQueue(token) } returns Unit
+                every { tokenStore.addToWaitingQueue(token) } just Runs
                 
                 // when
                 queueManager.addToQueue(token)
                 
                 // then
-                verify { tokenStore.addToWaitingQueue(token) }
+                verify(exactly = 1) { tokenStore.addToWaitingQueue(token) }
             }
         }
     }
@@ -46,7 +48,7 @@ class QueueManagerTest : DescribeSpec({
                 
                 // then
                 result shouldBe expectedAvailableSlots
-                verify { tokenStore.countActiveTokens() }
+                verify(exactly = 1) { tokenStore.countActiveTokens() }
             }
         }
         
@@ -63,7 +65,7 @@ class QueueManagerTest : DescribeSpec({
                 
                 // then
                 result shouldBe expectedAvailableSlots
-                verify { tokenStore.countActiveTokens() }
+                verify(exactly = 1) { tokenStore.countActiveTokens() }
             }
         }
         
@@ -80,7 +82,7 @@ class QueueManagerTest : DescribeSpec({
                 
                 // then
                 result shouldBe expectedAvailableSlots
-                verify { tokenStore.countActiveTokens() }
+                verify(exactly = 1) { tokenStore.countActiveTokens() }
             }
         }
     }
@@ -100,7 +102,7 @@ class QueueManagerTest : DescribeSpec({
                 // then
                 result shouldBe expectedTokens
                 result.size shouldBe count
-                verify { tokenStore.getNextTokensFromQueue(count) }
+                verify(exactly = 1) { tokenStore.getNextTokensFromQueue(count) }
             }
         }
         
@@ -137,13 +139,13 @@ class QueueManagerTest : DescribeSpec({
                 // given
                 val token = "test-token"
                 
-                every { tokenStore.activateToken(token) } returns Unit
+                every { tokenStore.activateToken(token) } just Runs
                 
                 // when
                 queueManager.activateToken(token)
                 
                 // then
-                verify { tokenStore.activateToken(token) }
+                verify(exactly = 1) { tokenStore.activateToken(token) }
             }
         }
     }
@@ -157,34 +159,53 @@ class QueueManagerTest : DescribeSpec({
                 
                 every { tokenStore.countActiveTokens() } returns 97L // 100 - 97 = 3 slots
                 every { tokenStore.getNextTokensFromQueue(availableSlots) } returns tokensToActivate
-                every { tokenStore.activateToken("token1") } returns Unit
-                every { tokenStore.activateToken("token2") } returns Unit
-                every { tokenStore.activateToken("token3") } returns Unit
+                every { tokenStore.activateToken(any()) } just Runs
                 
                 // when
                 queueManager.processQueueAutomatically()
                 
                 // then
-                verify { tokenStore.countActiveTokens() }
-                verify { tokenStore.getNextTokensFromQueue(availableSlots) }
-                verify { tokenStore.activateToken("token1") }
-                verify { tokenStore.activateToken("token2") }
-                verify { tokenStore.activateToken("token3") }
+                verify(exactly = 1) { tokenStore.countActiveTokens() }
+                verify(exactly = 1) { tokenStore.getNextTokensFromQueue(availableSlots) }
+                verify(exactly = 1) { tokenStore.activateToken("token1") }
+                verify(exactly = 1) { tokenStore.activateToken("token2") }
+                verify(exactly = 1) { tokenStore.activateToken("token3") }
             }
         }
         
         context("가용 슬롯이 없을 때") {
             it("대기자를 활성화하지 않아야 한다") {
                 // given
-                every { tokenStore.countActiveTokens() } returns 100L // 가용 슬롯 0
+                val isolatedTokenStore = mockk<TokenStore>(relaxed = true)
+                val isolatedQueueManager = QueueManager(isolatedTokenStore)
+                
+                every { isolatedTokenStore.countActiveTokens() } returns 100L // 가용 슬롯 0 (100 - 100 = 0)
                 
                 // when
-                queueManager.processQueueAutomatically()
+                isolatedQueueManager.processQueueAutomatically()
                 
                 // then
-                verify { tokenStore.countActiveTokens() }
-                verify(exactly = 0) { tokenStore.getNextTokensFromQueue(any()) }
-                verify(exactly = 0) { tokenStore.activateToken(any()) }
+                verify(exactly = 1) { isolatedTokenStore.countActiveTokens() }
+                verify(exactly = 0) { isolatedTokenStore.getNextTokensFromQueue(any()) }
+                verify(exactly = 0) { isolatedTokenStore.activateToken(any()) }
+            }
+        }
+        
+        context("가용 슬롯이 음수일 때") {
+            it("대기자를 활성화하지 않아야 한다") {
+                // given
+                val isolatedTokenStore = mockk<TokenStore>(relaxed = true)
+                val isolatedQueueManager = QueueManager(isolatedTokenStore)
+                
+                every { isolatedTokenStore.countActiveTokens() } returns 105L // 가용 슬롯 -5 (100 - 105 = -5)
+                
+                // when
+                isolatedQueueManager.processQueueAutomatically()
+                
+                // then
+                verify(exactly = 1) { isolatedTokenStore.countActiveTokens() }
+                verify(exactly = 0) { isolatedTokenStore.getNextTokensFromQueue(any()) }
+                verify(exactly = 0) { isolatedTokenStore.activateToken(any()) }
             }
         }
         
@@ -196,17 +217,17 @@ class QueueManagerTest : DescribeSpec({
                 
                 every { tokenStore.countActiveTokens() } returns 97L // 3 slots available
                 every { tokenStore.getNextTokensFromQueue(availableSlots) } returns tokensToActivate
-                every { tokenStore.activateToken("token1") } returns Unit
+                every { tokenStore.activateToken("token1") } just Runs
                 every { tokenStore.activateToken("token2") } throws RuntimeException("활성화 실패")
-                every { tokenStore.activateToken("token3") } returns Unit
+                every { tokenStore.activateToken("token3") } just Runs
                 
                 // when
                 queueManager.processQueueAutomatically()
                 
                 // then
-                verify { tokenStore.activateToken("token1") }
-                verify { tokenStore.activateToken("token2") }
-                verify { tokenStore.activateToken("token3") }
+                verify(exactly = 1) { tokenStore.activateToken("token1") }
+                verify(exactly = 1) { tokenStore.activateToken("token2") }
+                verify(exactly = 1) { tokenStore.activateToken("token3") }
             }
         }
     }
@@ -232,8 +253,8 @@ class QueueManagerTest : DescribeSpec({
                 result.queuePosition shouldBe queuePosition + 1 // 1부터 시작
                 result.estimatedWaitingTime shouldNotBe null
                 
-                verify { tokenStore.getTokenStatus(token) }
-                verify { tokenStore.getQueuePosition(token) }
+                verify(exactly = 1) { tokenStore.getTokenStatus(token) }
+                verify(exactly = 1) { tokenStore.getQueuePosition(token) }
             }
         }
         
@@ -256,8 +277,8 @@ class QueueManagerTest : DescribeSpec({
                 result.queuePosition shouldBe null
                 result.estimatedWaitingTime shouldBe null
                 
-                verify { tokenStore.getTokenStatus(token) }
-                verify { tokenStore.getQueuePosition(token) }
+                verify(exactly = 1) { tokenStore.getTokenStatus(token) }
+                verify(exactly = 1) { tokenStore.getQueuePosition(token) }
             }
         }
     }
@@ -276,7 +297,7 @@ class QueueManagerTest : DescribeSpec({
                 
                 // then
                 result shouldBe expectedPosition
-                verify { tokenStore.getQueuePosition(token) }
+                verify(exactly = 1) { tokenStore.getQueuePosition(token) }
             }
         }
     }

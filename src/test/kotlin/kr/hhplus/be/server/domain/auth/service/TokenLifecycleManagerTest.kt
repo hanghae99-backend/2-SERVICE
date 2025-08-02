@@ -3,22 +3,24 @@ package kr.hhplus.be.server.domain.auth.service
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.verify
+import io.mockk.*
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
 
 class TokenLifecycleManagerTest : DescribeSpec({
     
-    val tokenStore = mockk<TokenStore>()
-    val queueManager = mockk<QueueManager>()
+    val tokenStore = mockk<TokenStore>(relaxed = true)
+    val queueManager = mockk<QueueManager>(relaxed = true)
     
     val tokenLifecycleManager = TokenLifecycleManager(
         tokenStore,
         queueManager
     )
+    
+    beforeEach {
+        clearAllMocks()
+    }
     
     describe("saveToken") {
         context("새로운 토큰을 저장할 때") {
@@ -26,13 +28,13 @@ class TokenLifecycleManagerTest : DescribeSpec({
                 // given
                 val waitingToken = mockk<WaitingToken>()
                 
-                every { tokenStore.save(waitingToken) } returns Unit
+                every { tokenStore.save(waitingToken) } just Runs
                 
                 // when
                 tokenLifecycleManager.saveToken(waitingToken)
                 
                 // then
-                verify { tokenStore.save(waitingToken) }
+                verify(exactly = 1) { tokenStore.save(waitingToken) }
             }
         }
     }
@@ -51,7 +53,7 @@ class TokenLifecycleManagerTest : DescribeSpec({
                 
                 // then
                 result shouldBe expectedStatus
-                verify { tokenStore.getTokenStatus(token) }
+                verify(exactly = 1) { tokenStore.getTokenStatus(token) }
             }
         }
     }
@@ -70,7 +72,7 @@ class TokenLifecycleManagerTest : DescribeSpec({
                 
                 // then
                 result shouldBe waitingToken
-                verify { tokenStore.findByToken(token) }
+                verify(exactly = 1) { tokenStore.findByToken(token) }
             }
         }
         
@@ -86,7 +88,7 @@ class TokenLifecycleManagerTest : DescribeSpec({
                 
                 // then
                 result shouldBe null
-                verify { tokenStore.findByToken(token) }
+                verify(exactly = 1) { tokenStore.findByToken(token) }
             }
         }
     }
@@ -97,13 +99,13 @@ class TokenLifecycleManagerTest : DescribeSpec({
                 // given
                 val token = "test-token"
                 
-                every { tokenStore.expireToken(token) } returns Unit
+                every { tokenStore.expireToken(token) } just Runs
                 
                 // when
                 tokenLifecycleManager.expireToken(token)
                 
                 // then
-                verify { tokenStore.expireToken(token) }
+                verify(exactly = 1) { tokenStore.expireToken(token) }
             }
         }
     }
@@ -115,33 +117,29 @@ class TokenLifecycleManagerTest : DescribeSpec({
                 val expiredTokens = listOf("token1", "token2", "token3")
                 
                 every { tokenStore.findExpiredActiveTokens() } returns expiredTokens
-                every { tokenStore.expireToken("token1") } returns Unit
-                every { tokenStore.expireToken("token2") } returns Unit
-                every { tokenStore.expireToken("token3") } returns Unit
+                every { tokenStore.expireToken(any()) } just Runs
                 
                 // when
                 tokenLifecycleManager.cleanupExpiredTokens()
                 
                 // then
-                verify { tokenStore.findExpiredActiveTokens() }
-                verify { tokenStore.expireToken("token1") }
-                verify { tokenStore.expireToken("token2") }
-                verify { tokenStore.expireToken("token3") }
+                verify(exactly = 1) { tokenStore.findExpiredActiveTokens() }
+                verify(exactly = 1) { tokenStore.expireToken("token1") }
+                verify(exactly = 1) { tokenStore.expireToken("token2") }
+                verify(exactly = 1) { tokenStore.expireToken("token3") }
             }
         }
         
         context("만료된 토큰이 없을 때") {
-            it("아무 작업도 하지 않아야 한다") {
+            it("토큰 조회만 수행하고 만료 처리는 하지 않아야 한다") {
                 // given
-                val expiredTokens = emptyList<String>()
-                
-                every { tokenStore.findExpiredActiveTokens() } returns expiredTokens
+                every { tokenStore.findExpiredActiveTokens() } returns emptyList()
                 
                 // when
                 tokenLifecycleManager.cleanupExpiredTokens()
                 
                 // then
-                verify { tokenStore.findExpiredActiveTokens() }
+                verify(exactly = 1) { tokenStore.findExpiredActiveTokens() }
                 verify(exactly = 0) { tokenStore.expireToken(any()) }
             }
         }
@@ -152,18 +150,18 @@ class TokenLifecycleManagerTest : DescribeSpec({
                 val expiredTokens = listOf("token1", "token2", "token3")
                 
                 every { tokenStore.findExpiredActiveTokens() } returns expiredTokens
-                every { tokenStore.expireToken("token1") } returns Unit
+                every { tokenStore.expireToken("token1") } just Runs
                 every { tokenStore.expireToken("token2") } throws RuntimeException("처리 실패")
-                every { tokenStore.expireToken("token3") } returns Unit
+                every { tokenStore.expireToken("token3") } just Runs
                 
                 // when
                 tokenLifecycleManager.cleanupExpiredTokens()
                 
                 // then
-                verify { tokenStore.findExpiredActiveTokens() }
-                verify { tokenStore.expireToken("token1") }
-                verify { tokenStore.expireToken("token2") }
-                verify { tokenStore.expireToken("token3") }
+                verify(exactly = 1) { tokenStore.findExpiredActiveTokens() }
+                verify(exactly = 1) { tokenStore.expireToken("token1") }
+                verify(exactly = 1) { tokenStore.expireToken("token2") }
+                verify(exactly = 1) { tokenStore.expireToken("token3") }
             }
         }
     }
@@ -174,15 +172,15 @@ class TokenLifecycleManagerTest : DescribeSpec({
                 // given
                 val token = "complete-token"
                 
-                every { tokenStore.expireToken(token) } returns Unit
-                every { queueManager.processQueueAutomatically() } returns Unit
+                every { tokenStore.expireToken(token) } just Runs
+                every { queueManager.processQueueAutomatically() } just Runs
                 
                 // when
                 tokenLifecycleManager.completeToken(token)
                 
                 // then
-                verify { tokenStore.expireToken(token) }
-                verify { queueManager.processQueueAutomatically() }
+                verify(exactly = 1) { tokenStore.expireToken(token) }
+                verify(exactly = 1) { queueManager.processQueueAutomatically() }
             }
         }
     }

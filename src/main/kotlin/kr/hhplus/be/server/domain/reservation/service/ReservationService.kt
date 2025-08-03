@@ -29,7 +29,7 @@ class ReservationService(
     private val eventPublisher: DomainEventPublisher
 ) {
         
-        // ========== 비즈니스 메서드들 ==========
+
     
     @Transactional
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
@@ -102,9 +102,7 @@ class ReservationService(
         }
     }
     
-    /**
-     * PaymentService에서 내부 호출용 (중첩 락 방지)
-     */
+    // 중첩 락 방지용 Internal 메서드
     @Transactional
     fun confirmReservationInternal(reservationId: Long, paymentId: Long): Reservation {
         val reservation = getReservationById(reservationId)

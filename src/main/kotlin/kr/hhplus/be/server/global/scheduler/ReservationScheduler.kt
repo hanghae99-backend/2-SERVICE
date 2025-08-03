@@ -11,10 +11,8 @@ class ReservationScheduler(
     private val tokenService: TokenService
 ) {
     
-    /**
-     * 매 1분마다 만료된 예약들을 정리
-     */
-    @Scheduled(fixedRate = 60000) // 1분마다 실행
+    // 매 1분마다 만료된 예약 정리
+    @Scheduled(fixedRate = 60000)
     fun cleanupExpiredReservations() {
         try {
             val cleanedCount = reservationService.cleanupExpiredReservations()
@@ -26,10 +24,8 @@ class ReservationScheduler(
         }
     }
     
-    /**
-     * 매 30초마다 대기열 자동 처리
-     */
-    @Scheduled(fixedRate = 30000) // 30초마다 실행
+    // 매 30초마다 대기열 처리
+    @Scheduled(fixedRate = 30000)
     fun processQueue() {
         try {
             tokenService.processQueueAutomatically()
@@ -38,10 +34,8 @@ class ReservationScheduler(
         }
     }
     
-    /**
-     * 매 5분마다 만료된 토큰 정리
-     */
-    @Scheduled(fixedRate = 300000) // 5분마다 실행
+    // 매 5분마다 만료된 토큰 정리
+    @Scheduled(fixedRate = 300000)
     fun cleanupExpiredTokens() {
         try {
             tokenService.cleanupExpiredActiveTokens()

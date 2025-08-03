@@ -20,9 +20,7 @@ class ConcertController(
     private val seatService: SeatService
 ) {
 
-    /**
-     * 예약 가능한 콘서트 일정 목록 조회
-     */
+
     @GetMapping
     fun getAvailableConcerts(
         @RequestParam(required = false) startDate: LocalDate?,
@@ -40,9 +38,7 @@ class ConcertController(
         )
     }
 
-    /**
-     * 콘서트 검색
-     */
+
     @PostMapping("/search")
     fun searchConcerts(
         @Valid @RequestBody request: SearchConcertRequest
@@ -65,9 +61,7 @@ class ConcertController(
         )
     }
 
-    /**
-     * 특정 콘서트의 상세 정보 조회
-     */
+
     @GetMapping("/{concertId}")
     fun getConcert(
         @PathVariable @Positive(message = "콘서트 ID는 양수여야 합니다") concertId: Long
@@ -81,9 +75,7 @@ class ConcertController(
         )
     }
 
-    /**
-     * 특정 콘서트의 스케줄 목록 조회
-     */
+
     @GetMapping("/{concertId}/schedules")
     fun getConcertSchedules(
         @PathVariable @Positive(message = "콘서트 ID는 양수여야 합니다") concertId: Long,
@@ -99,9 +91,7 @@ class ConcertController(
         )
     }
 
-    /**
-     * 특정 스케줄의 상세 정보 조회
-     */
+
     @GetMapping("/schedules/{scheduleId}")
     fun getConcertSchedule(
         @PathVariable @Positive(message = "스케줄 ID는 양수여야 합니다") scheduleId: Long
@@ -115,9 +105,7 @@ class ConcertController(
         )
     }
 
-    /**
-     * 특정 스케줄의 좌석 조회
-     */
+
     @GetMapping("/schedules/{scheduleId}/seats")
     fun getScheduleSeats(
         @PathVariable @Positive(message = "스케줄 ID는 양수여야 합니다") scheduleId: Long,

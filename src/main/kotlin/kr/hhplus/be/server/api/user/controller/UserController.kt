@@ -27,9 +27,7 @@ import org.springframework.web.bind.annotation.RestController
 class UserController(
     private val userService: UserService
 ) {
-    /**
-     * 사용자 생성
-     */
+
     @PostMapping
     @Operation(summary = "사용자 생성", description = "새로운 사용자를 생성합니다.")
     @ApiResponses(
@@ -48,9 +46,7 @@ class UserController(
         )
     }
 
-    /**
-     * 사용자 정보 조회
-     */
+
     @GetMapping("/{userId}")
     @Operation(summary = "사용자 상세 조회", description = "특정 사용자의 상세 정보를 조회합니다.")
     @ApiResponses(

@@ -87,7 +87,7 @@ class Reservation(
     val payment: Payment? = null
 
     companion object {
-        // 상태 코드 상수
+    // 상태 코드 상수
         const val STATUS_TEMPORARY = "TEMPORARY"
         const val STATUS_CONFIRMED = "CONFIRMED"
         const val STATUS_CANCELLED = "CANCELLED"

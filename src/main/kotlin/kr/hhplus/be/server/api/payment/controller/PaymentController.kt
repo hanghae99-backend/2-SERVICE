@@ -22,9 +22,7 @@ class PaymentController(
     private val paymentUseCase: PaymentUseCase
 ) {
 
-    /**
-     * 결제 처리 (예약 기반)
-     */
+
     @PostMapping
     fun processPayment(@Valid @RequestBody request: PaymentRequest): ResponseEntity<CommonApiResponse<PaymentDto>> {
         val payment = paymentUseCase.processPayment(request.userId, request.reservationId, request.token)
@@ -36,9 +34,7 @@ class PaymentController(
         )
     }
 
-    /**
-     * 특정 결제 정보 조회
-     */
+
     @GetMapping("/{paymentId}")
     fun getPayment(
         @PathVariable @Positive(message = "결제 ID는 양수여야 합니다") paymentId: Long

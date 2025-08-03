@@ -10,9 +10,7 @@ import kr.hhplus.be.server.global.exception.ParameterValidationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 콘서트 스케줄 관리 서비스
- */
+
 @Service
 @Transactional
 class ConcertScheduleService(
@@ -21,9 +19,7 @@ class ConcertScheduleService(
     private val seatGenerationService: SeatGenerationService
 ) {
     
-    /**
-     * 콘서트 스케줄 생성 (좌석 자동 생성 포함 - 50개 고정)
-     */
+    // 콘서트 스케줄 생성 및 좌석 자동 생성 (50개 고정)
     fun createConcertSchedule(request: ConcertScheduleCreateRequest): ConcertSchedule {
         // 1. 콘서트 존재 확인
         val concert = concertRepository.findById(request.concertId)

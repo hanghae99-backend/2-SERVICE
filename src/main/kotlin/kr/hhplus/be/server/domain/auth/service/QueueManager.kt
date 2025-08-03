@@ -4,9 +4,7 @@ import kr.hhplus.be.server.domain.auth.repositories.TokenStore
 import kr.hhplus.be.server.api.auth.dto.TokenQueueDetail
 import org.springframework.stereotype.Component
 
-/**
- * 대기열 관리의 단일 책임을 가진다
- */
+
 @Component
 class QueueManager(
     private val tokenStore: TokenStore
@@ -16,24 +14,18 @@ class QueueManager(
         private const val MAX_ACTIVE_TOKENS = 100L
     }
 
-    /**
-     * 토큰을 대기열에 추가
-     */
+
     fun addToQueue(token: String) {
         tokenStore.addToWaitingQueue(token)
     }
 
-    /**
-     * 가용 슬롯 계산
-     */
+
     fun calculateAvailableSlots(): Int {
         val currentActiveCount = tokenStore.countActiveTokens()
         return (MAX_ACTIVE_TOKENS - currentActiveCount).toInt()
     }
 
-    /**
-     * 대기열에서 다음 토큰들 가져오기
-     */
+
     fun getNextTokensFromQueue(count: Int): List<String> {
         return if (count > 0) {
             tokenStore.getNextTokensFromQueue(count)
@@ -42,16 +34,12 @@ class QueueManager(
         }
     }
 
-    /**
-     * 토큰을 활성화
-     */
+
     fun activateToken(token: String) {
         tokenStore.activateToken(token)
     }
 
-    /**
-     * 자동으로 대기열 처리 (가용 슬롯만큼 활성화)
-     */
+    // 가용 슬롯만큼 대기열에서 토큰 활성화
     fun processQueueAutomatically() {
         val availableSlots = calculateAvailableSlots()
         if (availableSlots > 0) {
@@ -67,9 +55,7 @@ class QueueManager(
         }
     }
 
-    /**
-     * 큐 상태 조회
-     */
+
     fun getQueueStatus(token: String): TokenQueueDetail {
         val tokenStatus = tokenStore.getTokenStatus(token)
         val queuePosition = tokenStore.getQueuePosition(token)
@@ -87,26 +73,21 @@ class QueueManager(
             token = token,
             status = status,
             message = message,
-            queuePosition = if (isActive || queuePosition == -1) null else queuePosition + 1, // 1부터 시작하도록 조정
             estimatedWaitingTime = estimatedWaitingTime
         )
     }
 
-    /**
-     * 예상 대기 시간 계산 (분 단위)
-     */
+    // 대기열 예상 대기 시간 계산
     private fun calculateEstimatedWaitingTime(queuePosition: Int): Int? {
         return if (queuePosition >= 0) {
-            // 대략적인 계산: 1분에 10명씩 처리된다고 가정
+            // 1분에 10명씩 처리 가정
             ((queuePosition + 1) / 10).coerceAtLeast(1)
         } else {
             null
         }
     }
 
-    /**
-     * 대기 순서 조회
-     */
+
     fun getQueuePosition(token: String): Int {
         return tokenStore.getQueuePosition(token)
     }

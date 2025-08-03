@@ -67,8 +67,6 @@ class PaymentUseCase(
         val seatId = reservation.seatId
         val seat = seatService.getSeatById(seatId)
         val paymentAmount = seat.price
-
-
         val payment = paymentService.createPayment(userId, paymentAmount)
 
         try {
@@ -77,12 +75,8 @@ class PaymentUseCase(
             paymentService.validatePaymentAmount(currentBalance.amount, payment.amount)
             balanceUseCase.deductBalanceInternal(userId, payment.amount)
 
-
             reservationService.confirmReservationInternal(reservationId, payment.paymentId)
-
-
             seatService.confirmSeatInternal(seatId)
-
 
             val completedPayment = paymentService.completePayment(
                 paymentId = payment.paymentId,

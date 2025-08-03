@@ -5,46 +5,34 @@ import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
 import org.springframework.stereotype.Component
 
-/**
- * 토큰 생명주기 관리의 단일 책임을 가진다
- */
+
 @Component
 class TokenLifecycleManager(
     private val tokenStore: TokenStore,
     private val queueManager: QueueManager
 ) {
     
-    /**
-     * 토큰 저장
-     */
+
     fun saveToken(waitingToken: WaitingToken) {
         tokenStore.save(waitingToken)
     }
     
-    /**
-     * 토큰 상태 조회
-     */
+
     fun getTokenStatus(token: String): TokenStatus {
         return tokenStore.getTokenStatus(token)
     }
     
-    /**
-     * 토큰 조회
-     */
+
     fun findToken(token: String): WaitingToken? {
         return tokenStore.findByToken(token)
     }
     
-    /**
-     * 토큰 만료
-     */
+
     fun expireToken(token: String) {
         tokenStore.expireToken(token)
     }
     
-    /**
-     * 만료된 토큰들 정리
-     */
+
     fun cleanupExpiredTokens() {
         val expiredTokens = tokenStore.findExpiredActiveTokens()
         expiredTokens.forEach { expiredToken ->
@@ -57,9 +45,7 @@ class TokenLifecycleManager(
         }
     }
     
-    /**
-     * 토큰 완료 처리 (예약/결제 완료 시)
-     */
+    // 예약/결제 완료 시 토큰 만료 및 다음 사용자 활성화
     fun completeToken(token: String) {
         // 토큰 만료
         expireToken(token)

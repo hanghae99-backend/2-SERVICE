@@ -10,10 +10,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
-/**
- * 콘서트 도메인 서비스
- * Repository 접근과 도메인 로직을 담당
- */
+
 @Service
 @Transactional(readOnly = true)
 class ConcertService(
@@ -22,9 +19,7 @@ class ConcertService(
     private val seatRepository: SeatRepository
 ) {
     
-    /**
-     * 예약 가능한 콘서트 목록 조회 (기간별)
-     */
+    // 기간별 예약 가능 콘서트 조회 (좌석수 > 0)
     fun getAvailableConcerts(
         startDate: LocalDate = LocalDate.now(), 
         endDate: LocalDate = LocalDate.now().plusMonths(3)
@@ -48,9 +43,7 @@ class ConcertService(
         }
     }
     
-    /**
-     * 특정 날짜의 콘서트 목록 조회
-     */
+
     fun getConcertsByDate(date: LocalDate): List<ConcertScheduleWithInfoDto> {
         val schedules = concertScheduleRepository.findByConcertDate(date)
         
@@ -68,9 +61,7 @@ class ConcertService(
         }
     }
     
-    /**
-     * 콘서트 상세 정보 조회
-     */
+
     fun getConcertById(concertId: Long): ConcertDto {
         val concert = concertRepository.findById(concertId)
             .orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId") }
@@ -78,9 +69,7 @@ class ConcertService(
         return ConcertDto.from(concert)
     }
     
-    /**
-     * 콘서트 스케줄 상세 정보 조회
-     */
+
     fun getConcertScheduleById(scheduleId: Long): ConcertScheduleWithInfoDto {
         val schedule = concertScheduleRepository.findById(scheduleId)
             .orElseThrow { ConcertNotFoundException("콘서트 스케줄을 찾을 수 없습니다. ID: $scheduleId") }
@@ -91,9 +80,7 @@ class ConcertService(
         return ConcertScheduleWithInfoDto.from(concert, schedule)
     }
     
-    /**
-     * 콘서트 상세 정보 조회 (스케줄과 좌석 정보 포함)
-     */
+    // 스케줄 + 좌석 정보 포함한 상세 조회
     fun getConcertDetailByScheduleId(scheduleId: Long): ConcertDetailDto {
         val schedule = concertScheduleRepository.findById(scheduleId)
             .orElseThrow { ConcertNotFoundException("콘서트 스케줄을 찾을 수 없습니다. ID: $scheduleId") }
@@ -108,9 +95,7 @@ class ConcertService(
     
 
     
-    /**
-     * 특정 콘서트의 모든 스케줄 조회
-     */
+
     fun getSchedulesByConcertId(concertId: Long): List<ConcertWithScheduleDto> {
         val concert = concertRepository.findById(concertId).orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId") }
         
@@ -121,9 +106,7 @@ class ConcertService(
         }
     }
     
-    /**
-     * 특정 콘서트의 예약 가능한 스케줄 조회
-     */
+    // 예약 가능한 스케줄만 필터링 (좌석수 > 0, 미래 날짜)
     fun getAvailableSchedulesByConcertId(concertId: Long): List<ConcertWithScheduleDto> {
         val concert = concertRepository.findById(concertId).orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId")}
         

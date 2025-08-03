@@ -29,16 +29,16 @@ class BalanceService(
         val currentPoint = pointRepository.findByUserId(userId)
             ?: Point.create(userId, BigDecimal.ZERO)
 
-        // 도메인 모델의 charge 메서드 호출 (검증 로직 포함)
+        // 도메인 모델의 charge 메서드로 검증 및 충전
         val chargedPoint = currentPoint.charge(amount)
         val savedPoint = pointRepository.save(chargedPoint)
 
-        // 히스토리 저장 (도메인 모델의 정적 팩토리 메서드 사용)
+        // 히스토리 저장
         val chargeType = pointHistoryTypeRepository.getChargeType()
         val history = PointHistory.charge(userId, amount, chargeType, "포인트 충전")
         pointHistoryRepository.save(history)
 
-        // 포인트 충전 이벤트 발행
+        // 충전 이벤트 발행
         val event = BalanceChargedEvent(
             userId = userId,
             amount = amount,
@@ -60,16 +60,16 @@ class BalanceService(
         val currentPoint = pointRepository.findByUserId(userId)
             ?: throw PointNotFoundException("포인트 정보를 찾을 수 없습니다")
 
-        // 도메인 모델의 deduct 메서드 호출 (검증 로직 포함)
+        // 도메인 모델의 deduct 메서드로 검증 및 차감
         val deductedPoint = currentPoint.deduct(amount)
         val savedPoint = pointRepository.save(deductedPoint)
 
-        // 히스토리 저장 (도메인 모델의 정적 팩토리 메서드 사용)
+        // 히스토리 저장
         val useType = pointHistoryTypeRepository.getUseType()
         val history = PointHistory.use(userId, amount, useType, "포인트 사용")
         pointHistoryRepository.save(history)
 
-        // 포인트 차감 이벤트 발행
+        // 차감 이벤트 발행
         val event = BalanceDeductedEvent(
             userId = userId,
             amount = amount,

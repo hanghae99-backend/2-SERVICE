@@ -37,9 +37,7 @@ import java.time.LocalDateTime
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
-    /**
-     * 요청 검증 실패
-     */
+
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleMethodArgumentNotValid(ex: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {
         val errorMessage = ex.bindingResult.fieldErrors.joinToString(", ") { it.defaultMessage ?: "잘못된 값입니다" }
@@ -50,9 +48,7 @@ class GlobalExceptionHandler {
         )
     }
 
-    /**
-     * Concert Domain Exceptions
-     */
+
     @ExceptionHandler(
         ConcertNotFoundException::class,
         SeatNotFoundException::class,
@@ -83,9 +79,7 @@ class GlobalExceptionHandler {
         return createErrorResponse(ex.message ?: "비즈니스 규칙을 위반했습니다", errorCode, status)
     }
 
-    /**
-     * Balance Domain Exceptions
-     */
+
     @ExceptionHandler(
         InsufficientBalanceException::class,
         InvalidPointAmountException::class
@@ -105,9 +99,7 @@ class GlobalExceptionHandler {
         return createErrorResponse(ex.message ?: "포인트 정보를 찾을 수 없습니다", ex.errorCode, ex.status)
     }
 
-    /**
-     * Payment Domain Exceptions
-     */
+
     @ExceptionHandler(PaymentNotFoundException::class)
     fun handlePaymentNotFoundException(ex: PaymentNotFoundException): ResponseEntity<ErrorResponse> {
         return createErrorResponse(ex.message ?: "결제 정보를 찾을 수 없습니다", ex.errorCode, ex.status)
@@ -127,9 +119,7 @@ class GlobalExceptionHandler {
         return createErrorResponse(ex.message ?: "결제 관련 오류가 발생했습니다", errorCode, status)
     }
 
-    /**
-     * Reservation Domain Exceptions
-     */
+
     @ExceptionHandler(ReservationNotFoundException::class)
     fun handleReservationNotFoundException(ex: ReservationNotFoundException): ResponseEntity<ErrorResponse> {
         return createErrorResponse(ex.message ?: "예약 정보를 찾을 수 없습니다", ex.errorCode, ex.status)
@@ -154,9 +144,7 @@ class GlobalExceptionHandler {
         return createErrorResponse(ex.message ?: "예약 관련 오류가 발생했습니다", errorCode, status)
     }
 
-    /**
-     * User Domain Exceptions
-     */
+
     @ExceptionHandler(UserNotFoundException::class)
     fun handleUserNotFoundException(ex: UserNotFoundException): ResponseEntity<ErrorResponse> {
         return createErrorResponse(ex.message ?: "사용자를 찾을 수 없습니다", ex.errorCode, ex.status)
@@ -167,9 +155,7 @@ class GlobalExceptionHandler {
         return createErrorResponse(ex.message ?: "이미 존재하는 사용자입니다", ex.errorCode, ex.status)
     }
 
-    /**
-     * Distributed Lock Exceptions
-     */
+    // 분산락 실패: 동시 접근으로 인한 충돌
     @ExceptionHandler(ConcurrentAccessException::class)
     fun handleConcurrentAccessException(ex: ConcurrentAccessException): ResponseEntity<ErrorResponse> {
         return createErrorResponse(
@@ -179,9 +165,7 @@ class GlobalExceptionHandler {
         )
     }
 
-    /**
-     * Auth Domain Exceptions
-     */
+
     @ExceptionHandler(
         TokenNotFoundException::class,
         TokenExpiredException::class,
@@ -208,9 +192,7 @@ class GlobalExceptionHandler {
         return createErrorResponse(ex.message ?: "대기열이 가득 찼습니다", ex.errorCode, ex.status)
     }
 
-    /**
-     * 일반적인 RuntimeException 처리
-     */
+
     @ExceptionHandler(RuntimeException::class)
     fun handleRuntimeException(ex: RuntimeException): ResponseEntity<ErrorResponse> {
         return createErrorResponse(
@@ -220,9 +202,7 @@ class GlobalExceptionHandler {
         )
     }
 
-    /**
-     * 일반 예외 처리
-     */
+
     @ExceptionHandler(Exception::class)
     fun handleGenericException(ex: Exception): ResponseEntity<ErrorResponse> {
         return createErrorResponse(
@@ -232,9 +212,7 @@ class GlobalExceptionHandler {
         )
     }
 
-    /**
-     * IllegalStateException 처리 (이미 예약된 좌석 등)
-     */
+    // 비즈니스 상태 충돌: 이미 예약된 좌석 등
     @ExceptionHandler(IllegalStateException::class)
     fun handleIllegalStateException(ex: IllegalStateException): ResponseEntity<ErrorResponse> {
         // 이미 예약된 좌석의 경우 409 Conflict 반환
@@ -251,9 +229,7 @@ class GlobalExceptionHandler {
         )
     }
 
-    /**
-     * IllegalArgumentException 처리 (권한 없음, 잘못된 매개변수 등)
-     */
+    // 권한 및 매개변수 검증 예외
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgumentException(ex: IllegalArgumentException): ResponseEntity<ErrorResponse> {
         // 권한 관련 에러의 경우 403 Forbidden 반환
@@ -272,9 +248,7 @@ class GlobalExceptionHandler {
         )
     }
 
-    /**
-     * 공통 ErrorResponse 생성 메서드
-     */
+
     private fun createErrorResponse(
         message: String,
         errorCode: String,

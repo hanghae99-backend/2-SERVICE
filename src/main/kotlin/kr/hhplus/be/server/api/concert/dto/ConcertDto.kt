@@ -5,14 +5,9 @@ import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
 import kr.hhplus.be.server.domain.concert.models.Seat
 import java.time.LocalDate
 
-/**
- * Concert Domain DTOs
- * 콘서트 관련 DTO 클래스들
- */
 
-/**
- * 콘서트 기본 정보 DTO
- */
+
+
 data class ConcertDto(
     val concertId: Long,
     val title: String,

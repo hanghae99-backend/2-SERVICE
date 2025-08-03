@@ -10,9 +10,7 @@ import java.util.concurrent.Executor
 @EnableAsync
 class AsyncConfig {
     
-    /**
-     * 도메인 이벤트 처리용 비동기 실행기
-     */
+    // 도메인 이벤트 전용 비동기 처리 스레드풀
     @Bean("domainEventExecutor")
     fun domainEventExecutor(): Executor {
         val executor = ThreadPoolTaskExecutor()

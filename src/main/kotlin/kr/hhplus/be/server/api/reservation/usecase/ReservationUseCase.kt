@@ -37,7 +37,7 @@ class ReservationUseCase(
             throw IllegalStateException("예약할 수 없는 좌석입니다: $seatId")
         }
         
-        // 4. Service의 External 메서드 호출 (분산 락 포함)
+        // 4. 분산 락으로 좌석 예약
         return reservationService.reserveSeat(userId, concertId, seatId)
     }
     

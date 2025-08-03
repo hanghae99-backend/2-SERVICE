@@ -13,14 +13,7 @@ import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 결제 관련 이벤트를 처리하는 핸들러
- * 
- * 이벤트 기반으로 처리하여:
- * 1. PaymentService와 다른 도메인 간의 결합도 감소
- * 2. 비동기 처리로 성능 향상
- * 3. 확장성 있는 아키텍처 구현
- */
+// 이벤트 기반 비동기 처리로 도메인 간 결합도 감소
 @Component
 class PaymentEventHandler(
     private val reservationService: ReservationService,
@@ -31,12 +24,7 @@ class PaymentEventHandler(
     
     private val logger = LoggerFactory.getLogger(PaymentEventHandler::class.java)
     
-    /**
-     * 결제 완료 이벤트 처리
-     * - 예약 확정
-     * - 좌석 상태 업데이트
-     * - 토큰 완료 처리
-     */
+    // 결제 완료 시 예약 확정, 좌석 업데이트, 토큰 완료 처리
     @Async
     @EventListener
     @Transactional
@@ -44,11 +32,11 @@ class PaymentEventHandler(
         logger.info("결제 완료 이벤트 처리 시작: paymentId=${event.paymentId}")
         
         try {
-            // 1. 예약 확정 (내부 메서드 호출로 락 없이 처리)
+            // 1. 예약 확정 (내부 메서드로 락 없이 처리)
             reservationService.confirmReservationInternal(event.reservationId, event.paymentId)
             logger.info("예약 확정 완료: reservationId=${event.reservationId}")
             
-            // 2. 좌석 상태 업데이트 (내부 메서드 호출로 락 없이 처리)
+            // 2. 좌석 상태 업데이트 (내부 메서드로 락 없이 처리)
             val seatDto = seatService.confirmSeatInternal(event.seatId)
             logger.info("좌석 확정 완료: seatId=${event.seatId}")
             
@@ -75,11 +63,7 @@ class PaymentEventHandler(
         }
     }
     
-    /**
-     * 결제 실패 이벤트 처리
-     * - 예약 취소 처리
-     * - 알림 발송 등
-     */
+    // 결제 실패 시 토큰 해제 및 알림 처리
     @Async
     @EventListener
     @Transactional
@@ -91,7 +75,7 @@ class PaymentEventHandler(
             tokenService.completeReservation(event.token)
             logger.info("토큰 해제 완료: token=${event.token}")
             
-            // 2. 추가 실패 처리 로직 (알림 등)
+            // 2. 결제 실패 알림 처리
             // TODO: 사용자에게 결제 실패 알림 발송
             
             logger.info("결제 실패 이벤트 처리 완료: paymentId=${event.paymentId}")

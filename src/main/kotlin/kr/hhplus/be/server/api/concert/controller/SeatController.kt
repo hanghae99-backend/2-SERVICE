@@ -15,9 +15,7 @@ class SeatController(
     private val seatService: SeatService
 ) {
 
-    /**
-     * 특정 좌석 정보 조회
-     */
+
     @GetMapping("/{seatId}")
     fun getSeat(
         @PathVariable @Positive(message = "좌석 ID는 양수여야 합니다") seatId: Long
@@ -31,9 +29,7 @@ class SeatController(
         )
     }
 
-    /**
-     * 좌석 예약 가능 여부 확인
-     */
+
     @GetMapping("/{seatId}/availability")
     fun checkSeatAvailability(
         @PathVariable @Positive(message = "좌석 ID는 양수여야 합니다") seatId: Long

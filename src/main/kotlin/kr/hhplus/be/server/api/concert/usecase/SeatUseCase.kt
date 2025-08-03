@@ -17,37 +17,27 @@ class SeatUseCase(
     private val eventPublisher: DomainEventPublisher
 ) {
     
-    /**
-     * 특정 스케줄의 예약 가능한 좌석 목록 조회
-     */
+
     fun getAvailableSeats(scheduleId: Long): List<SeatDto> {
         return seatService.getAvailableSeats(scheduleId)
     }
     
-    /**
-     * 특정 스케줄의 모든 좌석 목록 조회
-     */
+
     fun getAllSeats(scheduleId: Long): List<SeatDto> {
         return seatService.getAllSeats(scheduleId)
     }
     
-    /**
-     * 좌석 상세 정보 조회
-     */
+
     fun getSeatById(seatId: Long): SeatDto {
         return seatService.getSeatById(seatId)
     }
     
-    /**
-     * 좌석 예약 가능 여부 확인
-     */
+
     fun isSeatAvailable(seatId: Long): Boolean {
         return seatService.isSeatAvailable(seatId)
     }
 
-    /**
-     * 좌석 번호 패턴으로 좌석 검색
-     */
+
     fun getSeatsByNumberPattern(scheduleId: Long, pattern: String): List<SeatDto> {
         return seatService.getSeatsByNumberPattern(scheduleId, pattern)
     }

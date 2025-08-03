@@ -2,18 +2,14 @@ package kr.hhplus.be.server.domain.reservation.exception
 
 import org.springframework.http.HttpStatus
 
-/**
- * 예약을 찾을 수 없을 때 발생하는 예외
- */
+
 data class ReservationNotFoundException(
     override val message: String = ReservationErrorCode.NotFound.defaultMessage,
     val errorCode: String = ReservationErrorCode.NotFound.code,
     val status: HttpStatus = ReservationErrorCode.NotFound.httpStatus
 ) : RuntimeException(message)
 
-/**
- * 예약이 만료되었을 때 발생하는 예외
- */
+
 data class ReservationExpiredException(
     override val message: String = ReservationErrorCode.Expired.defaultMessage,
     val errorCode: String = ReservationErrorCode.Expired.code,

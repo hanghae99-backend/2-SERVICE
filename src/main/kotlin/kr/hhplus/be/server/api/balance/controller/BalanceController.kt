@@ -28,9 +28,7 @@ class BalanceController(
     private val balanceUseCase: BalanceUseCase
 ) {
 
-    /**
-     * 잔액 충전
-     */
+
     @PostMapping
     @Operation(summary = "잔액 충전", description = "사용자의 포인트를 충전합니다.")
     @ApiResponses(
@@ -51,9 +49,7 @@ class BalanceController(
         )
     }
 
-    /**
-     * 잔액 조회
-     */
+
     @GetMapping("/{userId}")
     @Operation(summary = "잔액 조회", description = "사용자의 현재 잔액을 조회합니다.")
     @ApiResponses(
@@ -75,9 +71,7 @@ class BalanceController(
         )
     }
 
-    /**
-     * 포인트 이력 조회
-     */
+
     @GetMapping("/history/{userId}")
     @Operation(summary = "포인트 이력 조회", description = "사용자의 포인트 충전/사용 이력을 조회합니다.")
     @ApiResponses(

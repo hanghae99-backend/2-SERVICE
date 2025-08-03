@@ -8,9 +8,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
-/**
- * 콘서트 스케줄 생성 시 좌석을 자동으로 생성하는 서비스
- */
+
 @Service
 @Transactional
 class SeatGenerationService(

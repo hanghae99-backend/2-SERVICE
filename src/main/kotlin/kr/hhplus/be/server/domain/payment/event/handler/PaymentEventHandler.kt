@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.domain.payment.event.handler
 
-import kr.hhplus.be.server.domain.auth.service.TokenService
+import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
+import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
 import kr.hhplus.be.server.domain.concert.event.SeatConfirmedEvent
 import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.global.event.DomainEventPublisher
@@ -18,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional
 class PaymentEventHandler(
     private val reservationService: ReservationService,
     private val seatService: SeatService,
-    private val tokenService: TokenService,
+    private val tokenLifecycleManager: TokenLifecycleManager,
     private val eventPublisher: DomainEventPublisher
 ) {
     
@@ -51,8 +52,10 @@ class PaymentEventHandler(
             )
             eventPublisher.publish(seatConfirmedEvent)
             
-            // 3. 토큰 완료 처리
-            tokenService.completeReservation(event.token)
+            // 3. 토큰 완료 처리 (단순한 로직 - service 직접 호출)
+            tokenLifecycleManager.findToken(event.token)
+                ?: throw TokenNotFoundException("토큰을 찾을 수 없습니다.")
+            tokenLifecycleManager.completeToken(event.token)
             logger.info("토큰 완료 처리: token=${event.token}")
             
             logger.info("결제 완료 이벤트 처리 완료: paymentId=${event.paymentId}")
@@ -71,8 +74,10 @@ class PaymentEventHandler(
         logger.info("결제 실패 이벤트 처리 시작: paymentId=${event.paymentId}, reason=${event.reason}")
         
         try {
-            // 1. 토큰 완료 처리 (실패해도 토큰은 해제)
-            tokenService.completeReservation(event.token)
+            // 1. 토큰 완료 처리 (실패해도 토큰은 해제) - 단순한 로직, service 직접 호출
+            tokenLifecycleManager.findToken(event.token)
+                ?: throw TokenNotFoundException("토큰을 찾을 수 없습니다.")
+            tokenLifecycleManager.completeToken(event.token)
             logger.info("토큰 해제 완료: token=${event.token}")
             
             // 2. 결제 실패 알림 처리

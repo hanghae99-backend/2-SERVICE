@@ -29,13 +29,6 @@ class UserController(
 ) {
 
     @PostMapping
-    @Operation(summary = "사용자 생성", description = "새로운 사용자를 생성합니다.")
-    @ApiResponses(
-        ApiResponse(responseCode = "201", description = "생성 성공"),
-        ApiResponse(responseCode = "400", description = "잘못된 요청 데이터"),
-        ApiResponse(responseCode = "409", description = "이미 존재하는 사용자"),
-        ApiResponse(responseCode = "500", description = "서버 오류")
-    )
     fun createUser(@RequestBody @Valid userCreateRequest : UserCreateRequest) : ResponseEntity<CommonApiResponse<UserDto>> {
         val userDto = userService.createUser(userCreateRequest)
         return ResponseEntity.status(201).body(
@@ -48,12 +41,6 @@ class UserController(
 
 
     @GetMapping("/{userId}")
-    @Operation(summary = "사용자 상세 조회", description = "특정 사용자의 상세 정보를 조회합니다.")
-    @ApiResponses(
-        ApiResponse(responseCode = "200", description = "조회 성공"),
-        ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음"),
-        ApiResponse(responseCode = "500", description = "서버 오류")
-    )
     fun getUser(
         @PathVariable
         @Parameter(

@@ -8,7 +8,9 @@ import kr.hhplus.be.server.domain.balance.exception.PointNotFoundException
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
+import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.global.lock.LockGuard
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,21 +26,19 @@ class BalanceService(
 ) {
 
     @Transactional
+    @ValidateUserId
+    @LockGuard(key = "balance:#userId")
     fun chargeBalance(userId: Long, amount: BigDecimal): Point {
-        // 현재 포인트 조회 또는 생성
         val currentPoint = pointRepository.findByUserId(userId)
             ?: Point.create(userId, BigDecimal.ZERO)
 
-        // 도메인 모델의 charge 메서드로 검증 및 충전
         val chargedPoint = currentPoint.charge(amount)
         val savedPoint = pointRepository.save(chargedPoint)
 
-        // 히스토리 저장
         val chargeType = pointHistoryTypeRepository.getChargeType()
         val history = PointHistory.charge(userId, amount, chargeType, "포인트 충전")
         pointHistoryRepository.save(history)
 
-        // 충전 이벤트 발행
         val event = BalanceChargedEvent(
             userId = userId,
             amount = amount,
@@ -49,12 +49,9 @@ class BalanceService(
         return savedPoint
     }
 
-    fun getBalance(userId: Long): Point {
-        return pointRepository.findByUserId(userId)
-            ?: Point.create(userId, BigDecimal.ZERO)
-    }
-
     @Transactional
+    @ValidateUserId
+    @LockGuard(key = "balance:#userId")
     fun deductBalance(userId: Long, amount: BigDecimal): Point {
         // 현재 포인트 조회
         val currentPoint = pointRepository.findByUserId(userId)
@@ -80,6 +77,14 @@ class BalanceService(
         return savedPoint
     }
 
+
+    @ValidateUserId
+    fun getBalance(userId: Long): Point {
+        return pointRepository.findByUserId(userId)
+            ?: Point.create(userId, BigDecimal.ZERO)
+    }
+
+    @ValidateUserId
     fun getPointHistory(userId: Long): List<PointHistory> {
         return pointHistoryRepository.findByUserIdOrderByCreatedAtDesc(userId)
     }

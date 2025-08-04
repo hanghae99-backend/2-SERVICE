@@ -2,8 +2,7 @@ package kr.hhplus.be.server.domain.reservation.service
 
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.extension.orElseThrow
-import kr.hhplus.be.server.global.lock.DistributedLock
-import kr.hhplus.be.server.global.lock.LockKeyManager
+import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
 import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
@@ -25,28 +24,17 @@ import java.time.LocalDateTime
 class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
-    private val distributedLock: DistributedLock,
     private val eventPublisher: DomainEventPublisher
 ) {
-        
-
     
     @Transactional
+    @LockGuard(key = "seat:#seatId")
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
-        val lockKey = LockKeyManager.seatOperation(seatId)
-        
-        return distributedLock.executeWithLock(
-            lockKey = lockKey,
-            lockTimeoutMs = 10000L,  // 10초 락 타임아웃
-            waitTimeoutMs = 5000L    // 5초 대기 타임아웃
-        ) {
-            reserveSeatInternal(userId, concertId, seatId)
-        }
+        return reserveSeatInternal(userId, concertId, seatId)
     }
 
     @Transactional
     fun reserveSeatInternal(userId: Long, concertId: Long, seatId: Long): Reservation {
-        // 기존 활성 예약 확인
         val activeStatuses = listOf(
             statusRepository.getTemporaryStatus().code,
             statusRepository.getConfirmedStatus().code
@@ -62,19 +50,17 @@ class ReservationService(
             }
         }
         
-        // 예약 생성
         val reservation = Reservation.createTemporary(
             userId = userId,
             concertId = concertId,
             seatId = seatId,
-            seatNumber = seatId.toString().padStart(2, '0'), // 01, 02 형식
-            price = BigDecimal("100000"), // 10만원 통일
+            seatNumber = seatId.toString().padStart(2, '0'),
+            price = BigDecimal("100000"),
             temporaryStatus = statusRepository.getTemporaryStatus()
         )
         
         val savedReservation = reservationRepository.save(reservation)
         
-        // 예약 생성 이벤트 발행
         val event = ReservationCreatedEvent(
             reservationId = savedReservation.reservationId,
             userId = userId,
@@ -90,26 +76,17 @@ class ReservationService(
     }
     
     @Transactional
+    @LockGuard(key = "reservation:#reservationId")
     fun confirmReservation(reservationId: Long, paymentId: Long): Reservation {
-        val lockKey = LockKeyManager.reservationConfirm(reservationId)
-        
-        return distributedLock.executeWithLock(
-            lockKey = lockKey,
-            lockTimeoutMs = 10000L,
-            waitTimeoutMs = 5000L
-        ) {
-            confirmReservationInternal(reservationId, paymentId)
-        }
+        return confirmReservationInternal(reservationId, paymentId)
     }
     
-    // 중첩 락 방지용 Internal 메서드
     @Transactional
     fun confirmReservationInternal(reservationId: Long, paymentId: Long): Reservation {
         val reservation = getReservationById(reservationId)
         reservation.confirm(paymentId, statusRepository.getConfirmedStatus())
         val savedReservation = reservationRepository.save(reservation)
         
-        // 예약 확정 이벤트 발행
         val event = ReservationConfirmedEvent(
             reservationId = savedReservation.reservationId,
             userId = savedReservation.userId,
@@ -124,16 +101,9 @@ class ReservationService(
     }
     
     @Transactional
+    @LockGuard(key = "reservation:#reservationId")
     fun cancelReservation(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
-        val lockKey = LockKeyManager.reservationCancel(reservationId)
-        
-        return distributedLock.executeWithLock(
-            lockKey = lockKey,
-            lockTimeoutMs = 10000L,
-            waitTimeoutMs = 5000L
-        ) {
-            cancelReservationInternal(reservationId, userId, cancelReason)
-        }
+        return cancelReservationInternal(reservationId, userId, cancelReason)
     }
     
     private fun cancelReservationInternal(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
@@ -146,7 +116,6 @@ class ReservationService(
         reservation.cancel(statusRepository.getCancelledStatus())
         val savedReservation = reservationRepository.save(reservation)
         
-        // 예약 취소 이벤트 발행
         val event = ReservationCancelledEvent(
             reservationId = savedReservation.reservationId,
             userId = savedReservation.userId,
@@ -245,7 +214,6 @@ class ReservationService(
             reservation.cancel(statusRepository.getCancelledStatus())
             val savedReservation = reservationRepository.save(reservation)
             
-            // 예약 만료 이벤트 발행
             val expiredEvent = ReservationExpiredEvent(
                 reservationId = savedReservation.reservationId,
                 userId = savedReservation.userId,
@@ -254,7 +222,6 @@ class ReservationService(
             )
             eventPublisher.publish(expiredEvent)
             
-            // 예약 취소 이벤트도 발행 (만료로 인한 취소)
             val cancelledEvent = ReservationCancelledEvent(
                 reservationId = savedReservation.reservationId,
                 userId = savedReservation.userId,

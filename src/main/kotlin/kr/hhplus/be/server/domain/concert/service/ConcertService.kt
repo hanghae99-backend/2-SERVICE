@@ -43,41 +43,11 @@ class ConcertService(
         }
     }
     
-
-    fun getConcertsByDate(date: LocalDate): List<ConcertScheduleWithInfoDto> {
-        val schedules = concertScheduleRepository.findByConcertDate(date)
-        
-        if (schedules.isEmpty()) return emptyList()
-        
-        val concertIds = schedules.map { it.concertId }.distinct()
-        val concerts = concertIds.mapNotNull { concertRepository.findById(it) }
-        val concertMap = concerts.associateBy { it.concertId }
-        
-        return schedules.mapNotNull { schedule ->
-            val concert = concertMap[schedule.concertId]
-            if (concert != null) {
-                ConcertScheduleWithInfoDto.from(concert, schedule)
-            } else null
-        }
-    }
-    
-
     fun getConcertById(concertId: Long): ConcertDto {
         val concert = concertRepository.findById(concertId)
             .orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId") }
         
         return ConcertDto.from(concert)
-    }
-    
-
-    fun getConcertScheduleById(scheduleId: Long): ConcertScheduleWithInfoDto {
-        val schedule = concertScheduleRepository.findById(scheduleId)
-            .orElseThrow { ConcertNotFoundException("콘서트 스케줄을 찾을 수 없습니다. ID: $scheduleId") }
-        
-        val concert = concertRepository.findById(schedule.concertId)
-            .orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: ${schedule.concertId}") }
-            
-        return ConcertScheduleWithInfoDto.from(concert, schedule)
     }
     
     // 스케줄 + 좌석 정보 포함한 상세 조회
@@ -93,26 +63,10 @@ class ConcertService(
         return ConcertDetailDto.from(concert, schedule, seats)
     }
     
-
-    
-
     fun getSchedulesByConcertId(concertId: Long): List<ConcertWithScheduleDto> {
         val concert = concertRepository.findById(concertId).orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId") }
         
         val schedules = concertScheduleRepository.findByConcertId(concertId)
-        
-        return schedules.map { schedule ->
-            ConcertWithScheduleDto.from(concert, schedule)
-        }
-    }
-    
-    // 예약 가능한 스케줄만 필터링 (좌석수 > 0, 미래 날짜)
-    fun getAvailableSchedulesByConcertId(concertId: Long): List<ConcertWithScheduleDto> {
-        val concert = concertRepository.findById(concertId).orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId")}
-        
-        val schedules = concertScheduleRepository.findByConcertIdAndAvailableSeatsGreaterThanAndConcertDateGreaterThanEqualOrderByConcertDateAsc(
-            concertId, 0, LocalDate.now()
-        )
         
         return schedules.map { schedule ->
             ConcertWithScheduleDto.from(concert, schedule)

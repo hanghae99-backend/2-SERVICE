@@ -46,12 +46,6 @@ class SeatService(
         return seat.isAvailable()
     }
 
-    fun getSeatsByNumberPattern(scheduleId: Long, pattern: String): List<SeatDto> {
-        return seatRepository.findByScheduleIdAndSeatNumberContainingOrderBySeatNumberAsc(
-            scheduleId, pattern
-        ).map { SeatDto.from(it) }
-    }
-
     @Transactional
     @LockGuard(key = "seat:#seatId")
     fun confirmSeat(seatId: Long): SeatDto {

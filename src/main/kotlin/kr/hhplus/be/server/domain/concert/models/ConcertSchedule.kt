@@ -12,12 +12,9 @@ import java.time.LocalDateTime
 @Table(
     name = "concert_schedule",
     indexes = [
-        Index(name = "idx_concert_schedule_concert_id_concert_date", columnList = "concert_id, concert_date"),
-        Index(name = "idx_concert_schedule_concert_date", columnList = "concert_date"),
-        Index(name = "idx_concert_schedule_available_seats", columnList = "available_seats"),
-        Index(name = "idx_concert_schedule_venue", columnList = "venue"),
+        Index(name = "idx_concert_schedule_concert_id_date", columnList = "concert_id, concert_date"),
         Index(name = "idx_concert_schedule_date_available", columnList = "concert_date, available_seats"),
-        Index(name = "idx_concert_schedule_concert_available_date", columnList = "concert_id, available_seats, concert_date")
+        Index(name = "idx_concert_schedule_venue", columnList = "venue")
     ]
 )
 class ConcertSchedule(

@@ -15,12 +15,10 @@ import java.time.LocalDateTime
 @Table(
     name = "reservation",
     indexes = [
-        Index(name = "idx_reservation_user_id_reserved_at", columnList = "user_id, reserved_at"),
-        Index(name = "idx_reservation_concert_id_reserved_at", columnList = "concert_id, reserved_at"),
-        Index(name = "idx_reservation_seat_id_status_code", columnList = "seat_id, status_code"),
-        Index(name = "idx_reservation_status_code_reserved_at", columnList = "status_code, reserved_at"),
-        Index(name = "idx_reservation_status_expires", columnList = "status_code, expires_at"),
-        Index(name = "idx_reservation_expires_at", columnList = "expires_at")
+        Index(name = "idx_reservation_user_status_date", columnList = "user_id, status_code, reserved_at"),
+        Index(name = "idx_reservation_seat_status", columnList = "seat_id, status_code"),
+        Index(name = "idx_reservation_expires_status", columnList = "expires_at, status_code"),
+        Index(name = "idx_reservation_concert_date", columnList = "concert_id, reserved_at")
     ]
 )
 class Reservation(

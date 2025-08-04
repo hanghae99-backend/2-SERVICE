@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.api.payment.usecase
 
+import kr.hhplus.be.server.api.balance.usecase.DeductBalanceUseCase
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
@@ -17,6 +18,7 @@ class ProcessPaymentUserCase (
     private val reservationService: ReservationService,
     private val seatService: SeatService,
     private val balanceService: BalanceService,
+    private val deductBalanceUseCase: DeductBalanceUseCase,
     private val tokenDomainService: TokenDomainService,
     private val tokenLifecycleManager: TokenLifecycleManager
 ){
@@ -47,7 +49,7 @@ class ProcessPaymentUserCase (
         try {
             val currentBalance = balanceService.getBalance(userId)
             paymentService.validatePaymentAmount(currentBalance.amount, payment.amount)
-            balanceService.deductBalance(userId, payment.amount)
+            deductBalanceUseCase.execute(userId, payment.amount)
 
             reservationService.confirmReservationInternal(reservationId, payment.paymentId)
             seatService.confirmSeatInternal(seatId)

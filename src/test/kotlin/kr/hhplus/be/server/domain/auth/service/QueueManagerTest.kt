@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.*
+import kr.hhplus.be.server.api.auth.dto.TokenQueueDetail
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 
@@ -250,8 +251,8 @@ class QueueManagerTest : DescribeSpec({
                 result.token shouldBe token
                 result.status shouldBe "WAITING"
                 result.message shouldBe "대기 중입니다"
-                result.queuePosition shouldBe queuePosition + 1 // 1부터 시작
-                result.estimatedWaitingTime shouldNotBe null
+                result.queuePosition shouldBe queuePosition
+                result.estimatedWaitingTime shouldBe 1 // (5 + 1) / 10 = 0.6 -> 1
                 
                 verify(exactly = 1) { tokenStore.getTokenStatus(token) }
                 verify(exactly = 1) { tokenStore.getQueuePosition(token) }

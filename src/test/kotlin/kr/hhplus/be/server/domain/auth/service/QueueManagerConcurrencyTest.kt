@@ -1,8 +1,8 @@
 package kr.hhplus.be.server.domain.auth.service
 
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.matchers.comparables.shouldBeLessThanOrEqualTo
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldBeLessThanOrEqual
 import io.mockk.*
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
@@ -78,8 +78,8 @@ class QueueManagerConcurrencyTest : DescribeSpec({
                 }
                 
                 // then
-                currentActiveCount.get() shouldBeLessThanOrEqual maxActiveTokens
-                successfulActivations.get() shouldBeLessThanOrEqual 5 // 최대 5개만 추가 가능
+                currentActiveCount.get() shouldBeLessThanOrEqualTo maxActiveTokens
+                successfulActivations.get() shouldBeLessThanOrEqualTo 5 // 최대 5개만 추가 가능
             }
         }
         

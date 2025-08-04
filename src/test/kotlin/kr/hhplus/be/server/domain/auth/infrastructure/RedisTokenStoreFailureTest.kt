@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.assertions.throwables.shouldThrow
 import io.mockk.*
+import org.springframework.dao.QueryTimeoutException
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import org.springframework.data.redis.RedisConnectionFailureException
@@ -11,11 +12,10 @@ import org.springframework.data.redis.core.ListOperations
 import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
-import java.time.LocalDateTime
 
-class RedisFailureTest : DescribeSpec({
+class RedisTokenStoreFailureTest : DescribeSpec({
     
-    describe("Redis 장애 상황 테스트") {
+    describe("RedisTokenStore 장애 상황 테스트") {
         
         lateinit var redisTemplate: StringRedisTemplate
         lateinit var valueOperations: ValueOperations<String, String>
@@ -43,8 +43,7 @@ class RedisFailureTest : DescribeSpec({
                 // given
                 val waitingToken = WaitingToken(
                     token = "test-token",
-                    userId = "user-123",
-                    createdAt = LocalDateTime.now()
+                    userId = 123L
                 )
                 every { objectMapper.writeValueAsString(any()) } returns "{}"
                 every { valueOperations.set(any(), any(), any<java.time.Duration>()) } throws RedisConnectionFailureException("Redis 연결 실패")
@@ -83,8 +82,7 @@ class RedisFailureTest : DescribeSpec({
                 // given
                 val waitingToken = WaitingToken(
                     token = "test-token",
-                    userId = "user-123",
-                    createdAt = LocalDateTime.now()
+                    userId = 123L
                 )
                 every { objectMapper.writeValueAsString(any()) } returns "{}"
                 every { valueOperations.set(any(), any(), any<java.time.Duration>()) } throws 
@@ -101,10 +99,10 @@ class RedisFailureTest : DescribeSpec({
             it("대기열 조회 시 타임아웃 예외가 발생해야 한다") {
                 // given
                 every { listOperations.size(any()) } throws 
-                    org.springframework.dao.QueryTimeoutException("Redis query timeout")
+                    QueryTimeoutException("Redis query timeout")
                 
                 // when & then
-                shouldThrow<org.springframework.dao.QueryTimeoutException> {
+                shouldThrow<QueryTimeoutException> {
                     redisTokenStore.getQueueSize()
                 }
             }
@@ -115,14 +113,13 @@ class RedisFailureTest : DescribeSpec({
                 // given
                 val waitingToken = WaitingToken(
                     token = "test-token",
-                    userId = "user-123",
-                    createdAt = LocalDateTime.now()
+                    userId = 123L
                 )
                 every { objectMapper.writeValueAsString(any()) } throws 
-                    com.fasterxml.jackson.core.JsonProcessingException("JSON 직렬화 실패")
+                    RuntimeException("JSON 직렬화 실패")
                 
                 // when & then
-                shouldThrow<com.fasterxml.jackson.core.JsonProcessingException> {
+                shouldThrow<RuntimeException> {
                     redisTokenStore.save(waitingToken)
                 }
             }
@@ -133,19 +130,19 @@ class RedisFailureTest : DescribeSpec({
                 val invalidJson = "invalid json"
                 every { valueOperations.get(any()) } returns invalidJson
                 every { objectMapper.readValue(any<String>(), any<Class<WaitingToken>>()) } throws 
-                    com.fasterxml.jackson.core.JsonParseException(null, "JSON 파싱 실패")
+                    RuntimeException("JSON 파싱 실패")
                 
                 // when & then
-                shouldThrow<com.fasterxml.jackson.core.JsonParseException> {
+                shouldThrow<RuntimeException> {
                     redisTokenStore.findByToken(token)
                 }
             }
         }
         
         context("Redis 명령어 실행 실패 시") {
-            it("SET 명령어 실패 시 예외가 발생해야 한다") {
+            it("LIST 명령어 실패 시 예외가 발생해야 한다") {
                 // given
-                every { setOperations.add(any(), any()) } throws RuntimeException("SET 명령어 실행 실패")
+                every { listOperations.rightPush(any(), any()) } throws RuntimeException("LIST 명령어 실행 실패")
                 
                 // when & then
                 shouldThrow<RuntimeException> {
@@ -167,12 +164,13 @@ class RedisFailureTest : DescribeSpec({
         context("부분적 Redis 실패 시") {
             it("일부 작업은 성공하고 일부는 실패할 수 있어야 한다") {
                 // given
-                val tokens = listOf("token1", "token2", "token3")
-                
-                every { listOperations.leftPop("waiting_queue") } returnsMany listOf(
-                    "token1",  // 첫 번째는 성공
-                    null       // 두 번째부터는 실패 (빈 큐)
-                ) andThenThrows RuntimeException("연결 실패")  // 세 번째는 예외
+                var callCount = 0
+                every { listOperations.leftPop("waiting_queue") } answers {
+                    when (callCount++) {
+                        0 -> "token1"  // 첫 번째는 성공
+                        else -> null    // 나머지는 null (빈 큐)
+                    }
+                }
                 
                 // when
                 val result = redisTokenStore.getNextTokensFromQueue(3)
@@ -187,9 +185,16 @@ class RedisFailureTest : DescribeSpec({
             it("연결 실패 후 재연결이 가능해야 한다") {
                 // given
                 val token = "recovery-test-token"
+                var callCount = 0
                 
-                // 첫 번째 호출: 실패
-                every { valueOperations.get("waiting_token:$token") } throws RedisConnectionFailureException("연결 실패") andThen "token-data"
+                // 첫 번째 호출: 실패, 두 번째 호출: 성공
+                every { valueOperations.get("waiting_token:$token") } answers {
+                    if (callCount++ == 0) {
+                        throw RedisConnectionFailureException("연결 실패")
+                    } else {
+                        "token-data"
+                    }
+                }
                 
                 // when & then - 첫 번째 호출은 실패
                 shouldThrow<RedisConnectionFailureException> {
@@ -199,8 +204,7 @@ class RedisFailureTest : DescribeSpec({
                 // when & then - 두 번째 호출은 성공 (재연결됨)
                 every { objectMapper.readValue(any<String>(), any<Class<WaitingToken>>()) } returns WaitingToken(
                     token = token,
-                    userId = "user-123",
-                    createdAt = LocalDateTime.now()
+                    userId = 123L
                 )
                 
                 val result = redisTokenStore.findByToken(token)

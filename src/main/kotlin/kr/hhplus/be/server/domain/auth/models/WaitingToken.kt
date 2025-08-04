@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.domain.auth.models
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 
 data class WaitingToken(
@@ -24,10 +25,12 @@ data class WaitingToken(
         }
     }
     
+    @JsonIgnore
     fun isValidToken(): Boolean {
         return token.isNotBlank()
     }
     
+    @JsonIgnore
     fun belongsToUser(targetUserId: Long): Boolean {
         return userId == targetUserId
     }

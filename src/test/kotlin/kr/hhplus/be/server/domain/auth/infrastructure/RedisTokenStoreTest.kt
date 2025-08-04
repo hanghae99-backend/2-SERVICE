@@ -15,7 +15,6 @@ import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import java.time.Duration
-import java.time.LocalDateTime
 
 class RedisTokenStoreTest : DescribeSpec({
     
@@ -46,10 +45,9 @@ class RedisTokenStoreTest : DescribeSpec({
                 // given
                 val waitingToken = WaitingToken(
                     token = "test-token-123",
-                    userId = "user-456",
-                    createdAt = LocalDateTime.now()
+                    userId = 456L
                 )
-                val tokenJson = """{"token":"test-token-123","userId":"user-456"}"""
+                val tokenJson = """{"token":"test-token-123","userId":456}"""
                 
                 every { objectMapper.writeValueAsString(waitingToken) } returns tokenJson
                 every { valueOperations.set(any(), any(), any<Duration>()) } just Runs
@@ -67,7 +65,7 @@ class RedisTokenStoreTest : DescribeSpec({
                     )
                 }
                 verify(exactly = 1) { 
-                    setOperations.add("user_tokens:user-456", "test-token-123")
+                    setOperations.add("user_tokens:456", "test-token-123")
                 }
             }
         }
@@ -78,11 +76,10 @@ class RedisTokenStoreTest : DescribeSpec({
             it("JSON에서 WaitingToken 객체로 역직렬화해서 반환해야 한다") {
                 // given
                 val token = "test-token-123"
-                val tokenJson = """{"token":"test-token-123","userId":"user-456"}"""
+                val tokenJson = """{"token":"test-token-123","userId":456}"""
                 val expectedToken = WaitingToken(
                     token = "test-token-123",
-                    userId = "user-456",
-                    createdAt = LocalDateTime.now()
+                    userId = 456L
                 )
                 
                 every { valueOperations.get("waiting_token:test-token-123") } returns tokenJson
@@ -249,13 +246,13 @@ class RedisTokenStoreTest : DescribeSpec({
                 // given
                 val count = 3
                 every { listOperations.leftPop("waiting_queue") } returns null
-                
+
                 // when
                 val result = redisTokenStore.getNextTokensFromQueue(count)
-                
+
                 // then
                 result shouldHaveSize 0
-                verify(exactly = 1) { listOperations.leftPop("waiting_queue") }
+                verify(exactly = 3) { listOperations.leftPop("waiting_queue") }
             }
         }
     }
@@ -400,15 +397,14 @@ class RedisTokenStoreTest : DescribeSpec({
                 val token = "token-to-delete"
                 val waitingToken = WaitingToken(
                     token = token,
-                    userId = "user-123",
-                    createdAt = LocalDateTime.now()
+                    userId = 123L
                 )
-                val tokenJson = """{"token":"token-to-delete","userId":"user-123"}"""
+                val tokenJson = """{"token":"token-to-delete","userId":123}"""
                 
                 every { valueOperations.get("waiting_token:token-to-delete") } returns tokenJson
                 every { objectMapper.readValue(tokenJson, WaitingToken::class.java) } returns waitingToken
                 every { redisTemplate.delete("waiting_token:token-to-delete") } returns true
-                every { setOperations.remove("user_tokens:user-123", token) } returns 1L
+                every { setOperations.remove("user_tokens:123", token) } returns 1L
                 every { listOperations.remove("waiting_queue", 0, token) } returns 1L
                 every { setOperations.remove("active_tokens", token) } returns 1L
                 every { redisTemplate.delete("active_timestamp:token-to-delete") } returns true
@@ -418,7 +414,7 @@ class RedisTokenStoreTest : DescribeSpec({
                 
                 // then
                 verify(exactly = 1) { redisTemplate.delete("waiting_token:token-to-delete") }
-                verify(exactly = 1) { setOperations.remove("user_tokens:user-123", token) }
+                verify(exactly = 1) { setOperations.remove("user_tokens:123", token) }
                 verify(exactly = 1) { listOperations.remove("waiting_queue", 0, token) }
                 verify(exactly = 1) { setOperations.remove("active_tokens", token) }
                 verify(exactly = 1) { redisTemplate.delete("active_timestamp:token-to-delete") }

@@ -30,7 +30,11 @@ class Point(
     var amount: BigDecimal,
     
     @Column(name = "last_updated", nullable = false)
-    var lastUpdated: LocalDateTime = LocalDateTime.now()
+    var lastUpdated: LocalDateTime = LocalDateTime.now(),
+    
+    @Version
+    @Column(name = "version")
+    var version: Long = 0
 ) : BaseEntity() {
     
     // Point -> User 연관관계 (1:1)

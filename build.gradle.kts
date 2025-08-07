@@ -52,6 +52,7 @@ dependencies {
 
 	// DB
 	runtimeOnly("com.mysql:mysql-connector-j")
+	runtimeOnly("com.h2database:h2")
 
 	// Redis
 	implementation("org.springframework.boot:spring-boot-starter-data-redis")
@@ -62,9 +63,10 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation("org.testcontainers:junit-jupiter")
-	testImplementation("org.testcontainers:mysql")
+	testImplementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-	
+
 	// MockK
 	testImplementation("io.mockk:mockk:1.13.8")
 	testImplementation("com.ninja-squad:springmockk:4.0.2")

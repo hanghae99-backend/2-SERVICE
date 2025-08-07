@@ -205,6 +205,7 @@ classDiagram
     PaymentService --> ReservationService
 ```
 
+
 ## 데이터베이스 스키마 (ERD)
 
 ```mermaid
@@ -224,6 +225,7 @@ erDiagram
         bigint id PK
         varchar title
         varchar artist
+        boolean is_active
         timestamp created_at
         timestamp updated_at
     }
@@ -236,12 +238,14 @@ erDiagram
         int total_seats
         int available_seats
         timestamp created_at
+        timestamp updated_at
     }
     
     SEAT {
         bigint id PK
-        bigint concert_id FK
+        bigint schedule_id FK
         varchar seat_number
+        varchar seat_grade
         decimal price
         varchar status_code FK
         timestamp created_at
@@ -268,6 +272,8 @@ erDiagram
         timestamp reserved_at
         timestamp expires_at
         timestamp confirmed_at
+        timestamp created_at
+        timestamp updated_at
     }
     
     RESERVATION_STATUS_TYPE {
@@ -285,6 +291,8 @@ erDiagram
         varchar status_code FK
         varchar payment_method
         timestamp paid_at
+        timestamp created_at
+        timestamp updated_at
     }
     
     PAYMENT_STATUS_TYPE {
@@ -301,6 +309,7 @@ erDiagram
         decimal amount
         timestamp last_updated
         timestamp created_at
+        timestamp updated_at
     }
     
     POINT_HISTORY {
@@ -310,6 +319,7 @@ erDiagram
         varchar type_code FK
         varchar description
         timestamp created_at
+        timestamp updated_at
     }
     
     POINT_HISTORY_TYPE {
@@ -325,7 +335,7 @@ erDiagram
     USER ||--o{ RESERVATION : "makes"
     USER ||--o{ PAYMENT : "makes"
     CONCERT ||--o{ CONCERT_SCHEDULE : "has"
-    CONCERT ||--o{ SEAT : "contains"
+    CONCERT_SCHEDULE ||--o{ SEAT : "contains"
     CONCERT_SCHEDULE ||--o{ RESERVATION : "for"
     SEAT ||--o{ RESERVATION : "reserved"
     PAYMENT ||--o{ RESERVATION : "completes"

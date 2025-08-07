@@ -2,40 +2,40 @@
 
 -- 사용자 데이터
 INSERT INTO users (user_id, created_at, updated_at) VALUES
-(1, NOW(), NOW()), (2, NOW(), NOW()), (3, NOW(), NOW());
+                                                        (1, NOW(), NOW()), (2, NOW(), NOW()), (3, NOW(), NOW());
 
--- 포인트 초기 잔액
-INSERT INTO point (user_id, amount, last_updated, created_at) VALUES
-(1, 500000.00, NOW(), NOW()),
-(2, 300000.00, NOW(), NOW()),
-(3, 800000.00, NOW(), NOW());
+-- 포인트 초기 잔액 (updated_at 필드 추가)
+INSERT INTO point (user_id, amount, last_updated, created_at, updated_at) VALUES
+                                                                              (1, 500000.00, NOW(), NOW(), NOW()),
+                                                                              (2, 300000.00, NOW(), NOW(), NOW()),
+                                                                              (3, 800000.00, NOW(), NOW(), NOW());
 
 -- 포인트 히스토리 타입
 INSERT INTO point_history_type (code, name, description, is_active, created_at) VALUES
-('CHARGE', '충전', '포인트 충전', true, NOW()),
-('USE', '사용', '포인트 사용', true, NOW());
+                                                                                    ('CHARGE', '충전', '포인트 충전', true, NOW()),
+                                                                                    ('USE', '사용', '포인트 사용', true, NOW());
 
 -- 포인트 히스토리
-INSERT INTO point_history (user_id, amount, type_code, description, created_at) VALUES
-(1, 500000.00, 'CHARGE', '초기 포인트 충전', NOW()),
-(2, 300000.00, 'CHARGE', '초기 포인트 충전', NOW()),
-(3, 800000.00, 'CHARGE', '초기 포인트 충전', NOW());
+INSERT INTO point_history (user_id, amount, type_code, description, created_at, updated_at) VALUES
+                                                                                                (1, 500000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (2, 300000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (3, 800000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW());
 
 -- 콘서트 데이터
 INSERT INTO concert (title, artist, is_active, created_at, updated_at) VALUES
-('IU 2024 HEREH WORLD TOUR', 'IU', true, NOW(), NOW()),
-('BTS WORLD TOUR', 'BTS', true, NOW(), NOW());
+                                                                           ('IU 2024 HEREH WORLD TOUR', 'IU', true, NOW(), NOW()),
+                                                                           ('BTS WORLD TOUR', 'BTS', true, NOW(), NOW());
 
 -- 콘서트 스케줄 (50개 좌석으로 통일)
-INSERT INTO concert_schedule (concert_id, concert_date, venue, total_seats, available_seats, created_at) VALUES
-(1, '2024-12-15', '올림픽공원 체조경기장', 50, 50, NOW()),
-(2, '2024-12-22', '잠실종합운동장', 50, 50, NOW());
+INSERT INTO concert_schedule (concert_id, concert_date, venue, total_seats, available_seats, created_at, updated_at) VALUES
+                                                                                                                         (1, '2024-12-15', '올림픽공원 체조경기장', 50, 50, NOW(), NOW()),
+                                                                                                                         (2, '2024-12-22', '잠실종합운동장', 50, 50, NOW(), NOW());
 
 -- 좌석 상태 타입
 INSERT INTO seat_status_type (code, name, description, is_active, created_at) VALUES
-('AVAILABLE', '예약 가능', '예약 가능한 좌석', true, NOW()),
-('RESERVED', '임시 예약', '결제 대기 중', true, NOW()),
-('OCCUPIED', '예약 완료', '결제 완료', true, NOW());
+                                                                                  ('AVAILABLE', '예약 가능', '예약 가능한 좌석', true, NOW()),
+                                                                                  ('RESERVED', '임시 예약', '결제 대기 중', true, NOW()),
+                                                                                  ('OCCUPIED', '예약 완료', '결제 완료', true, NOW());
 
 -- 좌석 데이터 (각 스케줄별 50개, 10만원 통일)
 -- IU 콘서트 좌석 (01~50)
@@ -68,11 +68,11 @@ FROM (SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNI
 
 -- 예약/결제 상태 타입
 INSERT INTO reservation_status_type (code, name, description, is_active, created_at) VALUES
-('TEMPORARY', '임시 예약', '결제 대기 중', true, NOW()),
-('CONFIRMED', '예약 확정', '결제 완료', true, NOW()),
-('CANCELLED', '예약 취소', '취소됨', true, NOW());
+                                                                                         ('TEMPORARY', '임시 예약', '결제 대기 중', true, NOW()),
+                                                                                         ('CONFIRMED', '예약 확정', '결제 완료', true, NOW()),
+                                                                                         ('CANCELLED', '예약 취소', '취소됨', true, NOW());
 
 INSERT INTO payment_status_type (code, name, description, is_active, created_at) VALUES
-('PEND', '결제 대기', '처리 중', true, NOW()),
-('COMP', '결제 완료', '성공', true, NOW()),
-('FAIL', '결제 실패', '실패', true, NOW());
+                                                                                     ('PEND', '결제 대기', '처리 중', true, NOW()),
+                                                                                     ('COMP', '결제 완료', '성공', true, NOW()),
+                                                                                     ('FAIL', '결제 실패', '실패', true, NOW());

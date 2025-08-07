@@ -56,7 +56,11 @@ class Reservation(
     val expiresAt: LocalDateTime? = null,
 
     @Column(name = "confirmed_at", nullable = true)
-    var confirmedAt: LocalDateTime? = null
+    var confirmedAt: LocalDateTime? = null,
+    
+    @Version
+    @Column(name = "version")
+    var version: Long = 0
 ) : BaseEntity() {
     
     // 상태 명칭 계산 프로퍼티

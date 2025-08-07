@@ -10,7 +10,11 @@ import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.payment.service.PaymentService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
+import org.slf4j.LoggerFactory
+import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class ProcessPaymentUserCase (
@@ -23,6 +27,9 @@ class ProcessPaymentUserCase (
     private val tokenLifecycleManager: TokenLifecycleManager
 ){
 
+    private val logger = LoggerFactory.getLogger(ProcessPaymentUserCase::class.java)
+
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, reservationId: Long, token: String): PaymentDto{
         val waitingToken = tokenLifecycleManager.findToken(token)
@@ -51,8 +58,8 @@ class ProcessPaymentUserCase (
             paymentService.validatePaymentAmount(currentBalance.amount, payment.amount)
             deductBalanceUseCase.execute(userId, payment.amount)
 
-            reservationService.confirmReservationInternal(reservationId, payment.paymentId)
-            seatService.confirmSeatInternal(seatId)
+            reservationService.confirmReservation(reservationId, payment.paymentId)
+            seatService.confirmSeat(seatId)
 
             val completedPayment = paymentService.completePayment(
                 paymentId = payment.paymentId,
@@ -63,6 +70,15 @@ class ProcessPaymentUserCase (
 
             return completedPayment
 
+        } catch (e: OptimisticLockingFailureException) {
+            logger.warn("Optimistic lock failure during payment processing. UserId: $userId, ReservationId: $reservationId")
+            paymentService.failPayment(
+                paymentId = payment.paymentId,
+                reservationId = reservationId,
+                reason = "동시 결제 요청으로 인한 처리 실패",
+                token = token
+            )
+            throw PaymentProcessException("동일한 예약에 대한 중복 결제 요청입니다. 결제가 취소되었습니다.")
         } catch (e: Exception) {
             paymentService.failPayment(
                 paymentId = payment.paymentId,

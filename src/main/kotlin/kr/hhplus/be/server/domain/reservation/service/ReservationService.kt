@@ -2,7 +2,6 @@ package kr.hhplus.be.server.domain.reservation.service
 
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.extension.orElseThrow
-import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
 import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
@@ -12,9 +11,12 @@ import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationConfirmedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
+import kr.hhplus.be.server.domain.concert.service.SeatService
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -24,21 +26,19 @@ import java.time.LocalDateTime
 class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
-    private val eventPublisher: DomainEventPublisher
+    private val eventPublisher: DomainEventPublisher,
+    private val seatService: SeatService
 ) {
     
-    @Transactional
-    @LockGuard(key = "seat:#seatId")
+    private val logger = LoggerFactory.getLogger(ReservationService::class.java)
+    
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
-        return reserveSeatInternal(userId, concertId, seatId)
-    }
-
-    @Transactional
-    fun reserveSeatInternal(userId: Long, concertId: Long, seatId: Long): Reservation {
         val activeStatuses = listOf(
             statusRepository.getTemporaryStatus().code,
             statusRepository.getConfirmedStatus().code
         )
+        
         val existingReservation = reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses)
         
         if (existingReservation != null) {
@@ -49,13 +49,14 @@ class ReservationService(
                 throw IllegalStateException("좌석이 임시 점유 중입니다")
             }
         }
-        
+
+        val seat = seatService.getSeatById(seatId)
         val reservation = Reservation.createTemporary(
             userId = userId,
             concertId = concertId,
             seatId = seatId,
-            seatNumber = seatId.toString().padStart(2, '0'),
-            price = BigDecimal("100000"),
+            seatNumber = seat.seatNumber,
+            price = seat.price,
             temporaryStatus = statusRepository.getTemporaryStatus()
         )
         
@@ -71,22 +72,19 @@ class ReservationService(
             expiresAt = savedReservation.expiresAt
         )
         eventPublisher.publish(event)
-        
+
         return savedReservation
     }
     
-    @Transactional
-    @LockGuard(key = "reservation:#reservationId")
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun confirmReservation(reservationId: Long, paymentId: Long): Reservation {
-        return confirmReservationInternal(reservationId, paymentId)
-    }
-    
-    @Transactional
-    fun confirmReservationInternal(reservationId: Long, paymentId: Long): Reservation {
-        val reservation = getReservationById(reservationId)
+        val reservation = reservationRepository.findByIdWithPessimisticLock(reservationId)
+            ?: throw IllegalArgumentException("예약을 찾을 수 없습니다: $reservationId")
+            
         reservation.confirm(paymentId, statusRepository.getConfirmedStatus())
         val savedReservation = reservationRepository.save(reservation)
         
+        // 예약 확정 이벤트 발행
         val event = ReservationConfirmedEvent(
             reservationId = savedReservation.reservationId,
             userId = savedReservation.userId,
@@ -96,18 +94,14 @@ class ReservationService(
             price = savedReservation.price
         )
         eventPublisher.publish(event)
-        
+
         return savedReservation
     }
-    
-    @Transactional
-    @LockGuard(key = "reservation:#reservationId")
+
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun cancelReservation(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
-        return cancelReservationInternal(reservationId, userId, cancelReason)
-    }
-    
-    private fun cancelReservationInternal(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
-        val reservation = getReservationById(reservationId)
+        val reservation = reservationRepository.findByIdWithPessimisticLock(reservationId)
+            ?: throw IllegalArgumentException("예약을 찾을 수 없습니다: $reservationId")
         
         if (reservation.userId != userId) {
             throw IllegalArgumentException("본인의 예약만 취소할 수 있습니다")
@@ -125,6 +119,37 @@ class ReservationService(
             isExpired = false
         )
         eventPublisher.publish(event)
+
+        return savedReservation
+    }
+
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    fun cancelReservationBySystem(reservationId: Long, cancelReason: String): Reservation {
+        val reservation = reservationRepository.findByIdWithPessimisticLock(reservationId)
+            ?: throw IllegalArgumentException("예약을 찾을 수 없습니다: $reservationId")
+        
+        reservation.cancel(statusRepository.getCancelledStatus())
+        val savedReservation = reservationRepository.save(reservation)
+        
+        // 만료 이벤트 발행
+        val expiredEvent = ReservationExpiredEvent(
+            reservationId = savedReservation.reservationId,
+            userId = savedReservation.userId,
+            concertId = savedReservation.concertId,
+            seatId = savedReservation.seatId
+        )
+        eventPublisher.publish(expiredEvent)
+        
+        // 취소 이벤트 발행
+        val cancelledEvent = ReservationCancelledEvent(
+            reservationId = savedReservation.reservationId,
+            userId = savedReservation.userId,
+            concertId = savedReservation.concertId,
+            seatId = savedReservation.seatId,
+            cancelReason = cancelReason,
+            isExpired = true
+        )
+        eventPublisher.publish(cancelledEvent)
         
         return savedReservation
     }
@@ -202,37 +227,28 @@ class ReservationService(
             pageSize = pageSize
         )
     }
-    
-    @Transactional
+
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun cleanupExpiredReservations(): Int {
         val expiredReservations = reservationRepository.findByExpiresAtBeforeAndStatusCode(
             LocalDateTime.now(),
             statusRepository.getTemporaryStatus().code
         )
         
+        var cleanedCount = 0
         expiredReservations.forEach { reservation ->
-            reservation.cancel(statusRepository.getCancelledStatus())
-            val savedReservation = reservationRepository.save(reservation)
-            
-            val expiredEvent = ReservationExpiredEvent(
-                reservationId = savedReservation.reservationId,
-                userId = savedReservation.userId,
-                concertId = savedReservation.concertId,
-                seatId = savedReservation.seatId
-            )
-            eventPublisher.publish(expiredEvent)
-            
-            val cancelledEvent = ReservationCancelledEvent(
-                reservationId = savedReservation.reservationId,
-                userId = savedReservation.userId,
-                concertId = savedReservation.concertId,
-                seatId = savedReservation.seatId,
-                cancelReason = "예약 시간 만료",
-                isExpired = true
-            )
-            eventPublisher.publish(cancelledEvent)
+            try {
+                val lockedReservation = reservationRepository.findByIdWithPessimisticLock(reservation.reservationId)
+                
+                if (lockedReservation != null && lockedReservation.isExpired()) {
+                    cancelReservationBySystem(reservation.reservationId, "예약 시간 만료")
+                    cleanedCount++
+                }
+            } catch (e: Exception) {
+                logger.warn("Failed to cleanup expired reservation: ${reservation.reservationId}", e)
+            }
         }
         
-        return expiredReservations.size
+        return cleanedCount
     }
 }

@@ -38,7 +38,11 @@ data class Payment(
     var status: PaymentStatusType,
 
     @Column(name = "paid_at")
-    val paidAt: LocalDateTime? = null
+    val paidAt: LocalDateTime? = null,
+    
+    @Version
+    @Column(name = "version") 
+    var version: Long = 0
 ) : BaseEntity() {
 
     @ManyToOne(fetch = FetchType.LAZY)

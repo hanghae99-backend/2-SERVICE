@@ -34,11 +34,11 @@ class PaymentEventHandler(
         
         try {
             // 1. 예약 확정 (내부 메서드로 락 없이 처리)
-            reservationService.confirmReservationInternal(event.reservationId, event.paymentId)
+            reservationService.confirmReservation(event.reservationId, event.paymentId)
             logger.info("예약 확정 완료: reservationId=${event.reservationId}")
             
             // 2. 좌석 상태 업데이트 (내부 메서드로 락 없이 처리)
-            val seatDto = seatService.confirmSeatInternal(event.seatId)
+            val seatDto = seatService.confirmSeat(event.seatId)
             logger.info("좌석 확정 완료: seatId=${event.seatId}")
             
             // 2-1. 좌석 확정 이벤트 발행

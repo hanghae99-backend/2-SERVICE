@@ -8,4 +8,5 @@ interface ConcertRepository {
     fun findByIsActiveTrue(): List<Concert>
     fun findAll(): List<Concert>
     fun delete(concert: Concert)
+    fun deleteAll() // 테스트용 - 모든 콘서트 데이터 삭제
 }

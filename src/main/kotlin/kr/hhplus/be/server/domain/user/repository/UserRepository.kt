@@ -8,4 +8,5 @@ interface UserRepository {
     fun existsById(id: Long): Boolean
     fun findAll(): List<User>
     fun delete(user: User)
+    fun deleteAll() // 테스트용 - 모든 사용자 데이터 삭제
 }

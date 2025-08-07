@@ -65,4 +65,8 @@ class PointHistoryTypeRepositoryImpl(
     override fun isValidType(code: String): Boolean {
         return existsByCodeAndIsActiveTrue(code)
     }
+
+    override fun deleteAll() {
+        jpaRepository.deleteAll()
+    }
 }

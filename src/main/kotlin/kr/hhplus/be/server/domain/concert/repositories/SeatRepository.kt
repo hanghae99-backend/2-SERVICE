@@ -26,4 +26,5 @@ interface SeatRepository {
         maxPrice: BigDecimal
     ): List<Seat>
     fun delete(seat: Seat)
+    fun deleteAll() // 테스트용 - 모든 좌석 데이터 삭제
 }

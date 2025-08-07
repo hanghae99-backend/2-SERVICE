@@ -1,17 +1,11 @@
 package kr.hhplus.be.server.api.auth.usecase
 
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kr.hhplus.be.server.api.auth.usecase.TokenIssueUseCase
-import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
-import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
-import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.service.QueueManager
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
@@ -31,43 +25,59 @@ class TokenIssueUseCaseTest : DescribeSpec({
         queueManager
     )
     
-    describe("execute") {
-        context("유효한 사용자가 토큰을 발급받을 때") {
-            it("대기 토큰을 발급하고 대기열에 추가해야 한다") {
-                // given
+    describe("토큰 발급 책임") {
+        context("토큰 발급 요청이 들어왔을 때") {
+            it("각 의존성에게 적절한 책임을 위임하고 결과를 조합해야 한다") {
+                val userId = 1L
+                val tokenValue = "waiting-token-12345"
+                val waitingToken = mockk<WaitingToken> {
+                    every { token } returns tokenValue
+                }
+                val queuePositionFromZero = 4
+                val estimatedWaitingTime = 20
+                
+                every { tokenFactory.createWaitingToken(userId) } returns waitingToken
+                every { tokenLifecycleManager.saveToken(waitingToken) } returns Unit
+                every { queueManager.addToQueue(tokenValue) } returns Unit
+                every { queueManager.getQueuePosition(tokenValue) } returns queuePositionFromZero
+                every { tokenDomainService.calculateWaitingTime(queuePositionFromZero + 1) } returns estimatedWaitingTime
+                
+                val result = tokenIssueUseCase.execute(userId)
+                
+                verify(exactly = 1) { tokenFactory.createWaitingToken(userId) }
+                verify(exactly = 1) { tokenLifecycleManager.saveToken(waitingToken) }
+                verify(exactly = 1) { queueManager.addToQueue(tokenValue) }
+                verify(exactly = 1) { queueManager.getQueuePosition(tokenValue) }
+                verify(exactly = 1) { tokenDomainService.calculateWaitingTime(queuePositionFromZero + 1) }
+                
+                result.token shouldBe tokenValue
+                result.status shouldBe "WAITING"
+                result.queuePosition shouldBe queuePositionFromZero + 1
+                result.estimatedWaitingTime shouldBe estimatedWaitingTime
+                result.message shouldBe "대기열에 등록되었습니다"
+                result.userId shouldBe userId
+            }
+        }
+        
+        context("대기열 위치 계산 책임") {
+            it("0-based 인덱스를 1-based로 변환하여 사용자에게 제공해야 한다") {
                 val userId = 1L
                 val waitingToken = mockk<WaitingToken> {
                     every { token } returns "test-token"
                 }
-                val queuePosition = 4 // 0-based index
-                val estimatedWaitingTime = 10
+                val zeroBasedPosition = 0
                 
                 every { tokenFactory.createWaitingToken(userId) } returns waitingToken
-                every { tokenLifecycleManager.saveToken(waitingToken) } returns Unit
-                every { queueManager.addToQueue("test-token") } returns Unit
-                every { queueManager.getQueuePosition("test-token") } returns queuePosition
-                every { tokenDomainService.calculateWaitingTime(queuePosition + 1) } returns estimatedWaitingTime
+                every { tokenLifecycleManager.saveToken(any()) } returns Unit
+                every { queueManager.addToQueue(any()) } returns Unit
+                every { queueManager.getQueuePosition(any()) } returns zeroBasedPosition
+                every { tokenDomainService.calculateWaitingTime(any()) } returns 5
                 
-                // when
                 val result = tokenIssueUseCase.execute(userId)
                 
-                // then
-                result shouldNotBe null
-                result.token shouldBe "test-token"
-                result.status shouldBe "WAITING"
-                result.queuePosition shouldBe queuePosition + 1
-                result.estimatedWaitingTime shouldBe estimatedWaitingTime
-                result.message shouldBe "대기열에 등록되었습니다"
-                
-                verify { tokenFactory.createWaitingToken(userId) }
-                verify { tokenLifecycleManager.saveToken(waitingToken) }
-                verify { queueManager.addToQueue("test-token") }
-                verify { queueManager.getQueuePosition("test-token") }
-                verify { tokenDomainService.calculateWaitingTime(queuePosition + 1) }
+                result.queuePosition shouldBe 1
+                verify { tokenDomainService.calculateWaitingTime(1) }
             }
         }
-        
-        // @ValidateUserId annotation handles user validation
-        // No need to test UserNotFoundException at this level
     }
 })

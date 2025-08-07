@@ -21,4 +21,6 @@ interface PointHistoryTypePojoRepository {
     // ========== 비즈니스 로직 메서드들 ==========
     fun getAllActiveTypes(): List<PointHistoryType>
     fun isValidType(code: String): Boolean
+
+    fun deleteAll()
 }

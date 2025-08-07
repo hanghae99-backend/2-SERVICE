@@ -9,7 +9,9 @@ import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
 import kr.hhplus.be.server.api.balance.usecase.DeductBalanceUseCase
+import kr.hhplus.be.server.api.concert.dto.SeatDto
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
+import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
@@ -55,9 +57,9 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 val paymentAmount = BigDecimal("50000")
                 
                 val mockToken = mockk<WaitingToken>()
-                val mockStatus = "ACTIVE"
+                val mockStatus = TokenStatus.ACTIVE
                 val mockReservation = mockk<Reservation>(relaxed = true)
-                val mockSeat = mockk<Seat>(relaxed = true)
+                val mockSeat = mockk<SeatDto>(relaxed = true)
                 val mockBalance = mockk<Point>(relaxed = true)
                 val mockPayment = mockk<PaymentDto>()
                 val mockCompletedPayment = mockk<PaymentDto>()
@@ -123,7 +125,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 val token = "valid-token"
                 
                 val mockToken = mockk<WaitingToken>()
-                val mockStatus = "ACTIVE"
+                val mockStatus = TokenStatus.ACTIVE
                 val mockReservation = mockk<Reservation>(relaxed = true)
                 
                 every { mockReservation.userId } returns 2L // 다른 사용자
@@ -165,7 +167,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 val token = "valid-token"
                 
                 val mockToken = mockk<WaitingToken>()
-                val mockStatus = "ACTIVE"
+                val mockStatus = TokenStatus.ACTIVE
                 val mockReservation = mockk<Reservation>(relaxed = true)
                 
                 every { mockReservation.userId } returns userId
@@ -208,7 +210,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 val token = "valid-token"
                 
                 val mockToken = mockk<WaitingToken>()
-                val mockStatus = "ACTIVE"
+                val mockStatus = TokenStatus.ACTIVE
                 val mockReservation = mockk<Reservation>(relaxed = true)
                 
                 every { mockReservation.userId } returns userId
@@ -254,9 +256,9 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 val paymentAmount = BigDecimal("50000")
                 
                 val mockToken = mockk<WaitingToken>()
-                val mockStatus = "ACTIVE"
+                val mockStatus = TokenStatus.ACTIVE
                 val mockReservation = mockk<Reservation>(relaxed = true)
-                val mockSeat = mockk<Seat>(relaxed = true)
+                val mockSeat = mockk<SeatDto>(relaxed = true)
                 val mockBalance = mockk<Point>(relaxed = true)
                 val mockPayment = mockk<PaymentDto>()
                 

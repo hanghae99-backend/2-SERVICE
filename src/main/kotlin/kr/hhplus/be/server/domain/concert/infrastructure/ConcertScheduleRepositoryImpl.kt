@@ -69,4 +69,8 @@ class ConcertScheduleRepositoryImpl(
     override fun delete(concertSchedule: ConcertSchedule) {
         concertScheduleJpaRepository.delete(concertSchedule)
     }
+    
+    override fun deleteAll() {
+        concertScheduleJpaRepository.deleteAll()
+    }
 }

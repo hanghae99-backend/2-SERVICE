@@ -74,4 +74,8 @@ class SeatRepositoryImpl(
     override fun delete(seat: Seat) {
         seatJpaRepository.delete(seat)
     }
+    
+    override fun deleteAll() {
+        seatJpaRepository.deleteAll()
+    }
 }

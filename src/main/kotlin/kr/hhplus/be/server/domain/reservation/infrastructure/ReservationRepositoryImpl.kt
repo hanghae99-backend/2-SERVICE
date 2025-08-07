@@ -71,4 +71,8 @@ class ReservationRepositoryImpl(
     override fun delete(reservation: Reservation) {
         reservationJpaRepository.delete(reservation)
     }
+    
+    override fun deleteAll() {
+        reservationJpaRepository.deleteAll()
+    }
 }

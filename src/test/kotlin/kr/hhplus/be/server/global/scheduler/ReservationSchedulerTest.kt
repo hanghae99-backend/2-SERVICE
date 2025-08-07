@@ -5,6 +5,8 @@ import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kr.hhplus.be.server.domain.auth.service.QueueManager
+import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.auth.service.TokenService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 
@@ -12,10 +14,12 @@ class ReservationSchedulerTest : DescribeSpec({
     
     val reservationService = mockk<ReservationService>()
     val tokenService = mockk<TokenService>()
-    
+    val tokenLifecycleManager = mockk<TokenLifecycleManager>()
+    val queueManager = mockk<QueueManager>()
     val reservationScheduler = ReservationScheduler(
         reservationService,
-        tokenService
+        tokenLifecycleManager,
+        queueManager
     )
     
     describe("cleanupExpiredReservations") {

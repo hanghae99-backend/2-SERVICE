@@ -28,4 +28,8 @@ class UserRepositoryImpl(
     override fun delete(user: User) {
         userJpaRepository.delete(user)
     }
+    
+    override fun deleteAll() {
+        userJpaRepository.deleteAll()
+    }
 }

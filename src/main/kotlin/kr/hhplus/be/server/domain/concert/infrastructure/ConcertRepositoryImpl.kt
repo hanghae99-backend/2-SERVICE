@@ -28,4 +28,8 @@ class ConcertRepositoryImpl(
     override fun delete(concert: Concert) {
         concertRepository.delete(concert)
     }
+    
+    override fun deleteAll() {
+        concertRepository.deleteAll()
+    }
 }

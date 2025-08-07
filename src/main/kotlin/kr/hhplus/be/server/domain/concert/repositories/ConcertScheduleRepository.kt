@@ -24,4 +24,5 @@ interface ConcertScheduleRepository {
     fun findAllByOrderByConcertDateAsc(): List<ConcertSchedule>
     fun findByConcertDateGreaterThanEqualOrderByConcertDateAsc(concertDate: LocalDate): List<ConcertSchedule>
     fun delete(concertSchedule: ConcertSchedule)
+    fun deleteAll() // 테스트용 - 모든 콘서트 스케줄 데이터 삭제
 }

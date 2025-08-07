@@ -8,4 +8,5 @@ interface PaymentRepository {
     fun existsByUserId(userId: Long): Boolean
     fun findAll(): List<Payment>
     fun delete(payment: Payment)
+    fun deleteAll() // 테스트용 - 모든 결제 데이터 삭제
 }

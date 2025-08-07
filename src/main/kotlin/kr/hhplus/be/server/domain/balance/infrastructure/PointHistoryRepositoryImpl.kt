@@ -24,4 +24,8 @@ class PointHistoryRepositoryImpl(
     override fun findAll(): List<PointHistory> {
         return pointHistoryJpaRepository.findAll()
     }
+    
+    override fun deleteAll() {
+        pointHistoryJpaRepository.deleteAll()
+    }
 }

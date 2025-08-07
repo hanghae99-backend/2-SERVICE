@@ -36,7 +36,11 @@ data class Seat(
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "status_code", referencedColumnName = "code")
-    var status: SeatStatusType
+    var status: SeatStatusType,
+    
+    @Version
+    @Column(name = "version")
+    var version: Long = 0
 ) : BaseEntity() {
     
     // Seat -> ConcertSchedule 연관관계 (N:1)

@@ -7,7 +7,9 @@ import io.mockk.mockk
 import io.mockk.verify
 import kr.hhplus.be.server.api.balance.controller.BalanceController
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
-import kr.hhplus.be.server.api.balance.usecase.BalanceUseCase
+import kr.hhplus.be.server.api.balance.usecase.ChargeBalanceUseCase
+import kr.hhplus.be.server.api.balance.usecase.DeductBalanceUseCase
+import kr.hhplus.be.server.domain.balance.service.BalanceService
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistory
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
@@ -26,8 +28,10 @@ import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 @WebMvcTest(BalanceController::class)
 class BalanceControllerTest : DescribeSpec({
     
-    val balanceUseCase = mockk<BalanceUseCase>()
-    val balanceController = BalanceController(balanceUseCase)
+    val balanceService = mockk<BalanceService>()
+    val chargeBalanceUseCase = mockk<ChargeBalanceUseCase>()
+    val deductBalanceUseCase = mockk<DeductBalanceUseCase>()
+    val balanceController = BalanceController(balanceService, chargeBalanceUseCase, deductBalanceUseCase)
     val mockMvc = MockMvcBuilders.standaloneSetup(balanceController)
         .setControllerAdvice(GlobalExceptionHandler())
         .build()
@@ -42,7 +46,7 @@ class BalanceControllerTest : DescribeSpec({
                 val request = ChargeBalanceRequest(userId, amount)
                 val point = Point.create(userId, BigDecimal("15000"))
                 
-                every { balanceUseCase.chargeBalance(userId, amount) } returns point
+                every { chargeBalanceUseCase.execute(userId, amount) } returns point
                 
                 // when & then
                 mockMvc.perform(
@@ -55,7 +59,7 @@ class BalanceControllerTest : DescribeSpec({
                     .andExpect(jsonPath("$.data.chargedAmount").value(amount))
                     .andExpect(jsonPath("$.message").value("잔액 충전이 완료되었습니다"))
                 
-                verify { balanceUseCase.chargeBalance(userId, amount) }
+                verify { chargeBalanceUseCase.execute(userId, amount) }
             }
         }
         
@@ -66,7 +70,7 @@ class BalanceControllerTest : DescribeSpec({
                 val amount = BigDecimal("10000")
                 val request = ChargeBalanceRequest(userId, amount)
                 
-                every { balanceUseCase.chargeBalance(userId, amount) } throws 
+                every { chargeBalanceUseCase.execute(userId, amount) } throws 
                     UserNotFoundException("존재하지 않는 사용자입니다: $userId")
                 
                 // when & then
@@ -77,7 +81,7 @@ class BalanceControllerTest : DescribeSpec({
                 )
                     .andExpect(status().isNotFound)
                 
-                verify { balanceUseCase.chargeBalance(userId, amount) }
+                verify { chargeBalanceUseCase.execute(userId, amount) }
             }
         }
         
@@ -88,7 +92,7 @@ class BalanceControllerTest : DescribeSpec({
                 val amount = BigDecimal("500") // 최소 금액 미만
                 val request = ChargeBalanceRequest(userId, amount)
                 
-                every { balanceUseCase.chargeBalance(userId, amount) } throws 
+                every { chargeBalanceUseCase.execute(userId, amount) } throws 
                     InvalidPointAmountException("최소 충전 금액은 1000원입니다: $amount")
                 
                 // when & then
@@ -99,7 +103,7 @@ class BalanceControllerTest : DescribeSpec({
                 )
                     .andExpect(status().isBadRequest)
                 
-                verify { balanceUseCase.chargeBalance(userId, amount) }
+                verify { chargeBalanceUseCase.execute(userId, amount) }
             }
         }
     }
@@ -111,7 +115,7 @@ class BalanceControllerTest : DescribeSpec({
                 val userId = 1L
                 val point = Point.create(userId, BigDecimal("50000"))
                 
-                every { balanceUseCase.getBalance(userId) } returns point
+                every { balanceService.getBalance(userId) } returns point
                 
                 // when & then
                 mockMvc.perform(get("/api/v1/balance/$userId"))
@@ -122,7 +126,7 @@ class BalanceControllerTest : DescribeSpec({
                     .andExpect(jsonPath("$.data.balance").value(50000))
                     .andExpect(jsonPath("$.message").value("잔액 조회가 완료되었습니다"))
                 
-                verify { balanceUseCase.getBalance(userId) }
+                verify { balanceService.getBalance(userId) }
             }
         }
         
@@ -131,14 +135,14 @@ class BalanceControllerTest : DescribeSpec({
                 // given
                 val userId = 999L
                 
-                every { balanceUseCase.getBalance(userId) } throws 
+                every { balanceService.getBalance(userId) } throws 
                     UserNotFoundException("존재하지 않는 사용자입니다: $userId")
                 
                 // when & then
                 mockMvc.perform(get("/api/v1/balance/$userId"))
                     .andExpect(status().isNotFound)
                 
-                verify { balanceUseCase.getBalance(userId) }
+                verify { balanceService.getBalance(userId) }
             }
         }
     }
@@ -155,7 +159,7 @@ class BalanceControllerTest : DescribeSpec({
                     PointHistory.use(userId, BigDecimal("5000"), useType, "포인트 사용")
                 )
                 
-                every { balanceUseCase.getPointHistory(userId) } returns histories
+                every { balanceService.getPointHistory(userId) } returns histories
                 
                 // when & then
                 mockMvc.perform(get("/api/v1/balance/history/$userId"))
@@ -165,7 +169,7 @@ class BalanceControllerTest : DescribeSpec({
                     .andExpect(jsonPath("$.data.length()").value(2))
                     .andExpect(jsonPath("$.message").value("포인트 이력 조회가 완료되었습니다"))
                 
-                verify { balanceUseCase.getPointHistory(userId) }
+                verify { balanceService.getPointHistory(userId) }
             }
         }
         
@@ -174,14 +178,14 @@ class BalanceControllerTest : DescribeSpec({
                 // given
                 val userId = 999L
                 
-                every { balanceUseCase.getPointHistory(userId) } throws 
+                every { balanceService.getPointHistory(userId) } throws 
                     UserNotFoundException("존재하지 않는 사용자입니다: $userId")
                 
                 // when & then
                 mockMvc.perform(get("/api/v1/balance/history/$userId"))
                     .andExpect(status().isNotFound)
                 
-                verify { balanceUseCase.getPointHistory(userId) }
+                verify { balanceService.getPointHistory(userId) }
             }
         }
         
@@ -190,14 +194,14 @@ class BalanceControllerTest : DescribeSpec({
                 // given
                 val invalidUserId = -1L
 
-                every { balanceUseCase.getPointHistory(invalidUserId) } throws
+                every { balanceService.getPointHistory(invalidUserId) } throws
                         IllegalArgumentException("유효하지 않은 사용자 ID입니다")
 
                 // when & then
                 mockMvc.perform(get("/api/v1/balance/history/$invalidUserId"))
                     .andExpect(status().isBadRequest)
                 
-                verify { balanceUseCase.getPointHistory(invalidUserId) }
+                verify { balanceService.getPointHistory(invalidUserId) }
             }
         }
     }

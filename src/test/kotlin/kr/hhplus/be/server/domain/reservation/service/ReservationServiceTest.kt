@@ -30,7 +30,6 @@ class ReservationServiceTest : DescribeSpec({
     val reservationService = ReservationService(
         reservationRepository, 
         reservationStatusTypePojoRepository,
-        distributedLock,
         eventPublisher
     )
     

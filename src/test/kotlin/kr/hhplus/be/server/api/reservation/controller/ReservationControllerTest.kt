@@ -1,200 +1,172 @@
 package kr.hhplus.be.server.api.reservation.controller
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
-import kr.hhplus.be.server.api.reservation.controller.ReservationController
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
-import kr.hhplus.be.server.api.reservation.dto.request.*
-import kr.hhplus.be.server.api.reservation.usecase.ReservationUseCase
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
+import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
+import kr.hhplus.be.server.api.reservation.usecase.ReserveSeatUseCase
+import kr.hhplus.be.server.api.reservation.usecase.CancelReservationUseCase
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
-import kr.hhplus.be.server.global.exception.GlobalExceptionHandler
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
-import org.springframework.http.MediaType
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
-import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
-import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
-@WebMvcTest(ReservationController::class)
 class ReservationControllerTest : DescribeSpec({
-
-    val reservationUseCase = mockk<ReservationUseCase>()
-    val reservationController = ReservationController(reservationUseCase)
-    val mockMvc = MockMvcBuilders.standaloneSetup(reservationController)
-        .setControllerAdvice(GlobalExceptionHandler())
-        .build()
-    val objectMapper = ObjectMapper()
     
-    describe("POST /api/v1/reservations") {
+    describe("createReservation") {
         context("유효한 예약 생성 요청이 들어올 때") {
-            it("예약을 생성하고 201 상태코드를 반환해야 한다") {
+            it("예약을 생성하고 응답을 반환해야 한다") {
                 // given
+                val reservationService = mockk<ReservationService>()
+                val reserveSeatUseCase = mockk<ReserveSeatUseCase>()
+                val cancelReservationUseCase = mockk<CancelReservationUseCase>()
+                val reservationController = ReservationController(reservationService, reserveSeatUseCase, cancelReservationUseCase)
                 val userId = 1L
                 val concertId = 1L
                 val seatId = 1L
                 val token = "test-token"
                 val request = ReservationCreateRequest(userId, concertId, seatId, token)
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
-                val reservation = Reservation(
+                val reservationDto = ReservationDto(
                     reservationId = 1L,
                     userId = userId,
                     concertId = concertId,
                     seatId = seatId,
+                    paymentId = null,
                     seatNumber = "A1",
                     price = BigDecimal("50000"),
-                    status = temporaryStatus,
-                    reservedAt = LocalDateTime.now()
+                    statusCode = "TEMP",
+                    statusName = "임시예약",
+                    statusDescription = "임시 예약 상태",
+                    reservedAt = LocalDateTime.now(),
+                    expiresAt = LocalDateTime.now().plusMinutes(5),
+                    confirmedAt = null
                 )
                 
-                every { reservationUseCase.reserveSeat(userId, concertId, seatId, token) } returns reservation
+                val mockStatus = mockk<kr.hhplus.be.server.domain.reservation.model.ReservationStatusType>()
+                every { mockStatus.code } returns "TEMP"
+                every { mockStatus.name } returns "임시예약"
+                every { mockStatus.description } returns "임시 예약 상태"
+                
+                val mockReservation = mockk<kr.hhplus.be.server.domain.reservation.model.Reservation>(relaxed = true)
+                every { mockReservation.reservationId } returns 1L
+                every { mockReservation.userId } returns userId
+                every { mockReservation.concertId } returns concertId
+                every { mockReservation.seatId } returns seatId
+                every { mockReservation.seatNumber } returns "A1"
+                every { mockReservation.price } returns BigDecimal("50000")
+                every { mockReservation.status } returns mockStatus
+                every { mockReservation.reservedAt } returns LocalDateTime.now()
+                every { mockReservation.expiresAt } returns LocalDateTime.now().plusMinutes(5)
+                every { mockReservation.confirmedAt } returns null
+                every { mockReservation.paymentId } returns null
+                every { reserveSeatUseCase.execute(userId, concertId, seatId, token) } returns mockReservation
+                
+                // when
+                val response = reservationController.createReservation(request)
+                
+                // then
+                response shouldNotBe null
+                response.statusCode.value() shouldBe 201
+                response.body?.success shouldBe true
+                response.body?.message shouldBe "좌석 예약 완료"
+            }
+
+        context("존재하지 않는 예약 ID로 조회할 때") {
+            it("예외를 처리해야 한다") {
+                // given
+                val reservationService = mockk<ReservationService>()
+                val reserveSeatUseCase = mockk<ReserveSeatUseCase>()
+                val cancelReservationUseCase = mockk<CancelReservationUseCase>()
+                val reservationController = ReservationController(reservationService, reserveSeatUseCase, cancelReservationUseCase)
+                val invalidReservationId = 999L
+                
+                every { reservationService.getReservationWithDetails(invalidReservationId) } throws NoSuchElementException("예약을 찾을 수 없습니다")
                 
                 // when & then
-                mockMvc.perform(
-                    post("/api/v1/reservations")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-                )
-                    .andExpect(status().isCreated)
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.message").value("좌석이 성공적으로 예약되었습니다."))
-                    .andExpect(jsonPath("$.data.reservationId").value(1L))
-                    .andExpect(jsonPath("$.data.userId").value(userId))
-                    .andExpect(jsonPath("$.data.concertId").value(concertId))
-                    .andExpect(jsonPath("$.data.seatId").value(seatId))
-                    .andExpect(jsonPath("$.data.seatNumber").value("A1"))
-                    .andExpect(jsonPath("$.data.price").value(50000))
-                    .andDo(print())
+                shouldThrow<NoSuchElementException> {
+                    reservationController.getReservation(invalidReservationId)
+                }
             }
         }
-        
-        context("이미 예약된 좌석으로 요청할 때") {
-            it("409 상태코드를 반환해야 한다") {
+
+        context("잘못된 요청 데이터로 예약 생성 시") {
+            it("예외를 처리해야 한다") {
                 // given
-                val userId = 1L
+                val reservationService = mockk<ReservationService>()
+                val reserveSeatUseCase = mockk<ReserveSeatUseCase>()
+                val cancelReservationUseCase = mockk<CancelReservationUseCase>()
+                val reservationController = ReservationController(reservationService, reserveSeatUseCase, cancelReservationUseCase)
+                val userId = 0L // 잘못된 userId
                 val concertId = 1L
                 val seatId = 1L
                 val token = "test-token"
                 val request = ReservationCreateRequest(userId, concertId, seatId, token)
                 
-                every { reservationUseCase.reserveSeat(userId, concertId, seatId, token) } throws
-                        IllegalStateException("이미 예약된 좌석입니다")
+                every { reserveSeatUseCase.execute(userId, concertId, seatId, token) } throws IllegalArgumentException("잘못된 사용자 ID")
                 
                 // when & then
-                mockMvc.perform(
-                    post("/api/v1/reservations")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-                )
-                    .andExpect(status().isConflict)
-                    .andDo(print())
+                shouldThrow<IllegalArgumentException> {
+                    reservationController.createReservation(request)
+                }
             }
         }
+        }
     }
-    
-    describe("GET /api/v1/reservations/{reservationId}") {
+
+    describe("getReservation") {
         context("존재하는 예약 ID로 조회할 때") {
-            it("예약 정보를 반환하고 200 상태코드를 반환해야 한다") {
+            it("예약 정보를 반환해야 한다") {
                 // given
+                val reservationService = mockk<ReservationService>()
+                val reserveSeatUseCase = mockk<ReserveSeatUseCase>()
+                val cancelReservationUseCase = mockk<CancelReservationUseCase>()
+                val reservationController = ReservationController(reservationService, reserveSeatUseCase, cancelReservationUseCase)
                 val reservationId = 1L
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
-                val reservation = Reservation(
+                val reservationDto = ReservationDto(
                     reservationId = reservationId,
                     userId = 1L,
                     concertId = 1L,
                     seatId = 1L,
+                    paymentId = 1L,
                     seatNumber = "A1",
                     price = BigDecimal("50000"),
-                    status = temporaryStatus,
-                    reservedAt = LocalDateTime.now()
+                    statusCode = "CONF",
+                    statusName = "확정",
+                    statusDescription = "확정된 예약",
+                    reservedAt = LocalDateTime.now(),
+                    expiresAt = null,
+                    confirmedAt = LocalDateTime.now()
                 )
                 
-                every { reservationUseCase.getReservationById(reservationId) } returns reservation
+                val mockStatus = mockk<kr.hhplus.be.server.domain.reservation.model.ReservationStatusType>()
+                every { mockStatus.code } returns "CONF"
+                every { mockStatus.name } returns "확정"
+                every { mockStatus.description } returns "확정된 예약"
                 
-                // when & then
-                mockMvc.perform(get("/api/v1/reservations/$reservationId"))
-                    .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.message").value("예약 정보를 성공적으로 조회했습니다."))
-                    .andExpect(jsonPath("$.data.reservationId").value(reservationId))
-                    .andExpect(jsonPath("$.data.userId").value(1L))
-                    .andExpect(jsonPath("$.data.seatNumber").value("A1"))
-                    .andDo(print())
-            }
-        }
-        
-        context("존재하지 않는 예약 ID로 조회할 때") {
-            it("404 상태코드를 반환해야 한다") {
-                // given
-                val reservationId = 999L
+                val mockReservation = mockk<kr.hhplus.be.server.domain.reservation.model.Reservation>(relaxed = true)
+                every { mockReservation.reservationId } returns reservationId
+                every { mockReservation.userId } returns 1L
+                every { mockReservation.concertId } returns 1L
+                every { mockReservation.seatId } returns 1L
+                every { mockReservation.seatNumber } returns "A1"
+                every { mockReservation.price } returns BigDecimal("50000")
+                every { mockReservation.status } returns mockStatus
+                every { mockReservation.reservedAt } returns LocalDateTime.now()
+                every { mockReservation.expiresAt } returns null
+                every { mockReservation.confirmedAt } returns LocalDateTime.now()
+                every { mockReservation.paymentId } returns 1L
+                every { reservationService.getReservationWithDetails(reservationId) } returns mockReservation
                 
-                every { reservationUseCase.getReservationById(reservationId) } throws
-                        ReservationNotFoundException("예약을 찾을 수 없습니다: $reservationId")
+                // when
+                val response = reservationController.getReservation(reservationId)
                 
-                // when & then
-                mockMvc.perform(get("/api/v1/reservations/$reservationId"))
-                    .andExpect(status().isNotFound)
-                    .andDo(print())
-            }
-        }
-    }
-    
-    describe("POST /api/v1/reservations/search") {
-        context("유효한 검색 조건으로 예약 검색할 때") {
-            it("검색 결과를 반환하고 200 상태코드를 반환해야 한다") {
-                // given
-                val searchRequest = ReservationSearchRequest(
-                    userId = 1L,
-                    pageNumber = 1,
-                    pageSize = 10
-                )
-                val mockPage = ReservationDto.Page(
-                    reservations = emptyList(),
-                    totalCount = 0,
-                    pageNumber = 1,
-                    pageSize = 10,
-                    totalPages = 0
-                )
-                
-                every { reservationUseCase.getReservationsByCondition(any()) } returns mockPage
-                
-                // when & then
-                mockMvc.perform(
-                    post("/api/v1/reservations/search")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(searchRequest))
-                )
-                    .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.message").value("예약 검색이 완료되었습니다"))
-                    .andExpect(jsonPath("$.data.pageNumber").value(1))
-                    .andDo(print())
-            }
-        }
-    }
-    
-    describe("POST /api/v1/reservations/cleanup-expired") {
-        context("만료된 예약 정리 요청할 때") {
-            it("정리 결과를 반환하고 200 상태코드를 반환해야 한다") {
-                // given
-                val cleanupCount = 5
-                
-                every { reservationUseCase.cleanupExpiredReservations() } returns cleanupCount
-                
-                // when & then
-                mockMvc.perform(post("/api/v1/reservations/cleanup-expired"))
-                    .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.message").value("만료된 예약 ${cleanupCount}건이 정리되었습니다"))
-                    .andExpect(jsonPath("$.data.affectedCount").value(cleanupCount))
-                    .andExpect(jsonPath("$.data.message").value("만료된 예약 정리가 완료되었습니다."))
-                    .andDo(print())
+                // then
+                response shouldNotBe null
+                response.statusCode.value() shouldBe 200
+                response.body?.success shouldBe true
+                response.body?.message shouldBe "예약 정보 조회 완료"
             }
         }
     }

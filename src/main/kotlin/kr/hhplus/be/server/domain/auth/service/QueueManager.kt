@@ -73,6 +73,7 @@ class QueueManager(
             token = token,
             status = status,
             message = message,
+            queuePosition = if (isActive) null else queuePosition,
             estimatedWaitingTime = estimatedWaitingTime
         )
     }

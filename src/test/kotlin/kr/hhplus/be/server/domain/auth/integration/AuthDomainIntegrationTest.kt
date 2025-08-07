@@ -4,6 +4,8 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.assertions.throwables.shouldThrow
+import kr.hhplus.be.server.api.auth.usecase.TokenIssueUseCase
+import kr.hhplus.be.server.api.auth.usecase.TokenQueueStatusUseCase
 import kr.hhplus.be.server.domain.auth.infrastructure.RedisTokenStore
 import kr.hhplus.be.server.domain.auth.service.*
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
@@ -34,7 +36,8 @@ import java.util.concurrent.atomic.AtomicInteger
 @Transactional
 @ActiveProfiles("test")
 class AuthDomainIntegrationTest(
-    private val tokenService: TokenService,
+    private val tokenIssueUseCase: TokenIssueUseCase,
+    private val tokenQueueStatusUseCase: TokenQueueStatusUseCase,
     private val queueManager: QueueManager,
     private val tokenLifecycleManager: TokenLifecycleManager,
     private val redisTokenStore: RedisTokenStore,
@@ -78,7 +81,7 @@ class AuthDomainIntegrationTest(
             val user = User.create(userId)
             userJpaRepository.save(user)
             
-            val tokenDetail = tokenService.issueWaitingToken(userId)
+            val tokenDetail = tokenIssueUseCase.execute(userId)
 
             Then("토큰이 정상적으로 발급되어야 한다") {
                 tokenDetail shouldNotBe null
@@ -86,7 +89,7 @@ class AuthDomainIntegrationTest(
                 // null 검사 후에 나머지 검증 진행
                 if (tokenDetail != null) {
                     tokenDetail.userId shouldBe userId
-                    tokenDetail.status shouldBe TokenStatus.WAITING.name
+                    tokenDetail.status shouldBe "WAITING"
                     
                     // Redis에 저장 확인
                     val storedToken = redisTokenStore.findByToken(tokenDetail.token)
@@ -103,11 +106,11 @@ class AuthDomainIntegrationTest(
             val user = User.create(userId)
             userJpaRepository.save(user)
             
-            val firstTokenDetail = tokenService.issueWaitingToken(userId)
+            val firstTokenDetail = tokenIssueUseCase.execute(userId)
             
-            // 잘은 시간 대기 후 두 번째 토큰 발급
+            // 짧은 시간 대기 후 두 번째 토큰 발급
             Thread.sleep(100)
-            val secondTokenDetail = tokenService.issueWaitingToken(userId)
+            val secondTokenDetail = tokenIssueUseCase.execute(userId)
 
             Then("기존 토큰이 무효화되고 새 토큰이 발급되어야 한다") {
                 firstTokenDetail shouldNotBe null
@@ -151,7 +154,7 @@ class AuthDomainIntegrationTest(
             val futures = userIds.map { userId ->
                 CompletableFuture.supplyAsync({
                     try {
-                        val tokenDetail = tokenService.issueWaitingToken(userId)
+                        val tokenDetail = tokenIssueUseCase.execute(userId)
                         val position = tokenDetail.queuePosition!!
                         synchronized(queuePositions) {
                             queuePositions.add(position)
@@ -192,7 +195,7 @@ class AuthDomainIntegrationTest(
             val waitingTokens = (3000L until 3000L + waitingUsers).map { userId ->
                 val user = User.create(userId)
                 userJpaRepository.save(user)
-                tokenService.issueWaitingToken(userId)
+                tokenIssueUseCase.execute(userId)
             }
 
             // 일부 사용자 활성화
@@ -222,7 +225,7 @@ class AuthDomainIntegrationTest(
             val userId = 4001L
             val user = User.create(userId)
             userJpaRepository.save(user)
-            val tokenDetail = tokenService.issueWaitingToken(userId)
+            val tokenDetail = tokenIssueUseCase.execute(userId)
             
             // 토큰 만료 처리
             tokenLifecycleManager.expireToken(tokenDetail.token)
@@ -238,18 +241,19 @@ class AuthDomainIntegrationTest(
             val user = User.create(userId)
             userJpaRepository.save(user)
             
-            val tokenDetail = tokenService.issueWaitingToken(userId)
+            val tokenDetail = tokenIssueUseCase.execute(userId)
             
             // 토큰을 활성화
             queueManager.activateToken(tokenDetail.token)
             
-            val validatedToken = tokenService.validateActiveToken(tokenDetail.token)
+            // 토큰 상태 확인 (validateActiveToken 대신 직접 상태 검증)
+            val storedToken = redisTokenStore.findByToken(tokenDetail.token)
+            val status = redisTokenStore.getTokenStatus(tokenDetail.token)
 
             Then("토큰 검증이 성공해야 한다") {
-                validatedToken shouldNotBe null
-                validatedToken.userId shouldBe userId
+                storedToken shouldNotBe null
+                storedToken?.userId shouldBe userId
                 
-                val status = redisTokenStore.getTokenStatus(tokenDetail.token)
                 // 토큰 활성화 후 상태가 EXPIRED로 나오는 경우 대응
                 if (status == TokenStatus.EXPIRED) {
                     println("토큰이 활성화 후 EXPIRED 상태로 나왔습니다. 비즈니스 로직을 확인해주세요.")
@@ -265,15 +269,15 @@ class AuthDomainIntegrationTest(
             val user = User.create(userId)
             userJpaRepository.save(user)
             
-            val tokenDetail = tokenService.issueWaitingToken(userId)
+            val tokenDetail = tokenIssueUseCase.execute(userId)
             
             // 토큰 만료
             tokenLifecycleManager.expireToken(tokenDetail.token)
 
             Then("토큰 검증이 실패해야 한다") {
-                shouldThrow<Exception> {
-                    tokenService.validateActiveToken(tokenDetail.token)
-                }
+                // validateActiveToken 대신 상태 검증으로 변경
+                val status = redisTokenStore.getTokenStatus(tokenDetail.token)
+                status shouldBe TokenStatus.EXPIRED
             }
         }
     }
@@ -283,8 +287,8 @@ class AuthDomainIntegrationTest(
             val userId = 5001L
             val user = User.create(userId)
             userJpaRepository.save(user)
-            val tokenDetail = tokenService.issueWaitingToken(userId)
-            val queueDetail = tokenService.getTokenQueueStatus(tokenDetail.token)
+            val tokenDetail = tokenIssueUseCase.execute(userId)
+            val queueDetail = tokenQueueStatusUseCase.execute(tokenDetail.token)
 
             Then("대기열 정보가 정확히 반환되어야 한다") {
                 queueDetail shouldNotBe null
@@ -300,10 +304,10 @@ class AuthDomainIntegrationTest(
             val user = User.create(userId)
             userJpaRepository.save(user)
             
-            val tokenDetail = tokenService.issueWaitingToken(userId)
+            val tokenDetail = tokenIssueUseCase.execute(userId)
             queueManager.activateToken(tokenDetail.token)
             
-            val queueDetail = tokenService.getTokenQueueStatus(tokenDetail.token)
+            val queueDetail = tokenQueueStatusUseCase.execute(tokenDetail.token)
 
             Then("활성 상태 정보가 반환되어야 한다") {
                 queueDetail shouldNotBe null
@@ -317,7 +321,7 @@ class AuthDomainIntegrationTest(
         When("존재하지 않는 토큰을 조회할 때") {
             Then("예외가 발생해야 한다") {
                 shouldThrow<TokenNotFoundException> {
-                    tokenService.getTokenQueueStatus("invalid-token")
+                    tokenQueueStatusUseCase.execute("invalid-token")
                 }
             }
         }
@@ -340,8 +344,8 @@ class AuthDomainIntegrationTest(
             val futures = userIds.map { userId ->
                 CompletableFuture.supplyAsync({
                     try {
-                        val tokenDetail = tokenService.issueWaitingToken(userId)
-                        val queueDetail = tokenService.getTokenQueueStatus(tokenDetail.token)
+                        val tokenDetail = tokenIssueUseCase.execute(userId)
+                        val queueDetail = tokenQueueStatusUseCase.execute(tokenDetail.token)
                         successCount.incrementAndGet()
                         Pair(tokenDetail, queueDetail)
                     } catch (e: Exception) {
@@ -376,7 +380,7 @@ class AuthDomainIntegrationTest(
                 val user = User.create(userId)
                 userJpaRepository.save(user)
                 
-                val tokenDetail = tokenService.issueWaitingToken(userId)
+                val tokenDetail = tokenIssueUseCase.execute(userId)
                 
                 // 50%의 토큰을 만료시킴
                 if (index % 2 == 0) {

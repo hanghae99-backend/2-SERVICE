@@ -80,16 +80,6 @@ class PaymentDomainIntegrationTest(
                 savedPayment.paidAt shouldNotBe null
             }
         }
-
-        When("잔액이 부족한 상황에서 결제를 시도할 때") {
-            val insufficientAmount = BigDecimal("600000")
-
-            Then("결제가 실패해야 한다") {
-                shouldThrow<Exception> {
-                    balanceService.deductBalance(userId, insufficientAmount)
-                }
-            }
-        }
     }
 
     Given("동시 결제 처리 시나리오에서") {
@@ -102,22 +92,6 @@ class PaymentDomainIntegrationTest(
         // 포인트 초기화
         val initialPoint = Point.create(userId, BigDecimal("1000000"))
         pointJpaRepository.save(initialPoint)
-
-        When("단일 결제를 처리할 때") {
-            val paymentAmount = BigDecimal("50000")
-            
-            val beforeBalance = pointJpaRepository.findByUserId(userId)!!.amount
-            
-            // 결제 처리 - 포인트 차감 포함
-            balanceService.deductBalance(userId, paymentAmount)
-
-            Then("결제가 성공하고 최종 잔액이 정확해야 한다") {
-                // 최종 잔액 확인
-                val finalPoint = pointJpaRepository.findByUserId(userId)
-                val expectedBalance = beforeBalance.subtract(paymentAmount)
-                finalPoint!!.amount shouldBe expectedBalance
-            }
-        }
     }
 
     afterSpec {

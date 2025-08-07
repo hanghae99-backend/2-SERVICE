@@ -5,12 +5,11 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kr.hhplus.be.server.api.auth.controller.TokenController
-import kr.hhplus.be.server.api.auth.dto.TokenDto
 import kr.hhplus.be.server.api.auth.dto.TokenIssueDetail
 import kr.hhplus.be.server.api.auth.dto.TokenQueueDetail
 import kr.hhplus.be.server.api.auth.dto.request.TokenIssueRequest
-import kr.hhplus.be.server.api.auth.usecase.TokenUseCase
+import kr.hhplus.be.server.api.auth.usecase.TokenIssueUseCase
+import kr.hhplus.be.server.api.auth.usecase.TokenQueueStatusUseCase
 import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
 import kr.hhplus.be.server.global.exception.GlobalExceptionHandler
 import kr.hhplus.be.server.domain.user.exception.UserNotFoundException
@@ -27,8 +26,9 @@ import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 @WebMvcTest(TokenController::class)
 class TokenControllerTest : DescribeSpec({
     
-    val tokenUseCase = mockk<TokenUseCase>()
-    val tokenController = TokenController(tokenUseCase)
+    val tokenIssueUseCase = mockk<TokenIssueUseCase>()
+    val tokenQueueStatusUseCase = mockk<TokenQueueStatusUseCase>()
+    val tokenController = TokenController(tokenIssueUseCase, tokenQueueStatusUseCase)
     val validator = LocalValidatorFactoryBean().apply { afterPropertiesSet() }
     
     val mockMvc = MockMvcBuilders.standaloneSetup(tokenController)
@@ -54,7 +54,7 @@ class TokenControllerTest : DescribeSpec({
                     issuedAt = LocalDateTime.now()
                 )
                 
-                every { tokenUseCase.issueWaitingToken(userId) } returns tokenIssueDetail
+                every { tokenIssueUseCase.execute(userId) } returns tokenIssueDetail
                 
                 // when & then
                 mockMvc.perform(
@@ -72,7 +72,7 @@ class TokenControllerTest : DescribeSpec({
                     .andExpect(jsonPath("$.data.queuePosition").value(5))
                     .andExpect(jsonPath("$.data.estimatedWaitingTime").value(10))
                 
-                verify { tokenUseCase.issueWaitingToken(userId) }
+                verify { tokenIssueUseCase.execute(userId) }
             }
         }
         
@@ -82,7 +82,7 @@ class TokenControllerTest : DescribeSpec({
                 val userId = 999L
                 val request = TokenIssueRequest(userId)
                 
-                every { tokenUseCase.issueWaitingToken(userId) } throws 
+                every { tokenIssueUseCase.execute(userId) } throws 
                     UserNotFoundException("사용자를 찾을 수 없습니다: $userId")
                 
                 // when & then
@@ -93,7 +93,7 @@ class TokenControllerTest : DescribeSpec({
                 )
                     .andExpect(status().isNotFound)
                 
-                verify { tokenUseCase.issueWaitingToken(userId) }
+                verify { tokenIssueUseCase.execute(userId) }
             }
         }
 
@@ -103,7 +103,7 @@ class TokenControllerTest : DescribeSpec({
                 val invalidRequest = """{"userId": -1}"""
 
                 // 음수 userId에 대해 예외 발생하도록 설정
-                every { tokenUseCase.issueWaitingToken(-1) } throws
+                every { tokenIssueUseCase.execute(-1) } throws
                         IllegalArgumentException("유효하지 않은 사용자 ID입니다")
 
                 // when & then
@@ -115,7 +115,7 @@ class TokenControllerTest : DescribeSpec({
                     .andExpect(status().isBadRequest)
                     .andDo(print())
 
-                verify { tokenUseCase.issueWaitingToken(-1) }
+                verify { tokenIssueUseCase.execute(-1) }
             }
         }
     }
@@ -133,7 +133,7 @@ class TokenControllerTest : DescribeSpec({
                     estimatedWaitingTime = 6
                 )
                 
-                every { tokenUseCase.getTokenQueueStatus(token) } returns tokenQueueDetail
+                every { tokenQueueStatusUseCase.execute(token) } returns tokenQueueDetail
                 
                 // when & then
                 mockMvc.perform(get("/api/v1/tokens/$token"))
@@ -146,7 +146,7 @@ class TokenControllerTest : DescribeSpec({
                     .andExpect(jsonPath("$.data.queuePosition").value(3))
                     .andExpect(jsonPath("$.data.estimatedWaitingTime").value(6))
                 
-                verify { tokenUseCase.getTokenQueueStatus(token) }
+                verify { tokenQueueStatusUseCase.execute(token) }
             }
         }
         
@@ -162,7 +162,7 @@ class TokenControllerTest : DescribeSpec({
                     estimatedWaitingTime = null
                 )
                 
-                every { tokenUseCase.getTokenQueueStatus(token) } returns tokenQueueDetail
+                every { tokenQueueStatusUseCase.execute(token) } returns tokenQueueDetail
                 
                 // when & then
                 mockMvc.perform(get("/api/v1/tokens/$token"))
@@ -175,7 +175,7 @@ class TokenControllerTest : DescribeSpec({
                     .andExpect(jsonPath("$.data.queuePosition").doesNotExist())
                     .andExpect(jsonPath("$.data.estimatedWaitingTime").doesNotExist())
                 
-                verify { tokenUseCase.getTokenQueueStatus(token) }
+                verify { tokenQueueStatusUseCase.execute(token) }
             }
         }
         
@@ -184,108 +184,17 @@ class TokenControllerTest : DescribeSpec({
                 // given
                 val token = "non-existent-token"
                 
-                every { tokenUseCase.getTokenQueueStatus(token) } throws 
+                every { tokenQueueStatusUseCase.execute(token) } throws 
                     TokenNotFoundException("토큰을 찾을 수 없습니다.")
                 
                 // when & then
                 mockMvc.perform(get("/api/v1/tokens/$token"))
                     .andExpect(status().isNotFound)
                 
-                verify { tokenUseCase.getTokenQueueStatus(token) }
+                verify { tokenQueueStatusUseCase.execute(token) }
             }
         }
     }
     
-    describe("GET /api/v1/tokens/{token}/status") {
-        context("존재하는 토큰의 간단한 상태를 조회할 때") {
-            it("간단한 토큰 상태를 반환하고 200 상태코드를 반환해야 한다") {
-                // given
-                val token = "test-token"
-                val tokenDto = TokenDto.create(
-                    token = token,
-                    status = "ACTIVE",
-                    message = "서비스 이용 가능합니다"
-                )
-                
-                every { tokenUseCase.getSimpleTokenStatus(token) } returns tokenDto
-                
-                // when & then
-                mockMvc.perform(get("/api/v1/tokens/$token/status"))
-                    .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.message").value("토큰 상태 조회가 완료되었습니다"))
-                    .andExpect(jsonPath("$.data.token").value(token))
-                    .andExpect(jsonPath("$.data.status").value("ACTIVE"))
-                    .andExpect(jsonPath("$.data.message").value("서비스 이용 가능합니다"))
-                
-                verify { tokenUseCase.getSimpleTokenStatus(token) }
-            }
-        }
-        
-        context("대기 중인 토큰의 간단한 상태를 조회할 때") {
-            it("대기 상태를 반환해야 한다") {
-                // given
-                val token = "waiting-token"
-                val tokenDto = TokenDto.create(
-                    token = token,
-                    status = "WAITING",
-                    message = "대기 중입니다"
-                )
-                
-                every { tokenUseCase.getSimpleTokenStatus(token) } returns tokenDto
-                
-                // when & then
-                mockMvc.perform(get("/api/v1/tokens/$token/status"))
-                    .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.message").value("토큰 상태 조회가 완료되었습니다"))
-                    .andExpect(jsonPath("$.data.token").value(token))
-                    .andExpect(jsonPath("$.data.status").value("WAITING"))
-                    .andExpect(jsonPath("$.data.message").value("대기 중입니다"))
-                
-                verify { tokenUseCase.getSimpleTokenStatus(token) }
-            }
-        }
-        
-        context("만료된 토큰의 간단한 상태를 조회할 때") {
-            it("만료 상태를 반환해야 한다") {
-                // given
-                val token = "expired-token"
-                val tokenDto = TokenDto.create(
-                    token = token,
-                    status = "EXPIRED",
-                    message = "토큰이 만료되었습니다"
-                )
-                
-                every { tokenUseCase.getSimpleTokenStatus(token) } returns tokenDto
-                
-                // when & then
-                mockMvc.perform(get("/api/v1/tokens/$token/status"))
-                    .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.message").value("토큰 상태 조회가 완료되었습니다"))
-                    .andExpect(jsonPath("$.data.token").value(token))
-                    .andExpect(jsonPath("$.data.status").value("EXPIRED"))
-                    .andExpect(jsonPath("$.data.message").value("토큰이 만료되었습니다"))
-                
-                verify { tokenUseCase.getSimpleTokenStatus(token) }
-            }
-        }
-        
-        context("존재하지 않는 토큰의 간단한 상태를 조회할 때") {
-            it("404 상태코드를 반환해야 한다") {
-                // given
-                val token = "non-existent-token"
-                
-                every { tokenUseCase.getSimpleTokenStatus(token) } throws 
-                    TokenNotFoundException("토큰을 찾을 수 없습니다.")
-                
-                // when & then
-                mockMvc.perform(get("/api/v1/tokens/$token/status"))
-                    .andExpect(status().isNotFound)
-                
-                verify { tokenUseCase.getSimpleTokenStatus(token) }
-            }
-        }
-    }
+
 })

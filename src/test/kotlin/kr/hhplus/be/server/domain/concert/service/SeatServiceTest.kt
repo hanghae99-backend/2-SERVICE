@@ -211,33 +211,7 @@ class SeatServiceTest : DescribeSpec({
             }
         }
     }
-    
-    describe("getSeatsByNumberPattern") {
-        context("좌석 번호 패턴으로 검색할 때") {
-            it("패턴에 맞는 좌석 목록을 반환해야 한다") {
-                // given
-                val scheduleId = 1L
-                val pattern = "A"
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, LocalDateTime.now())
-                val seats = listOf(
-                    Seat(1L, scheduleId, "A1", "NORMAL", BigDecimal("100000"), availableStatus),
-                    Seat(2L, scheduleId, "A2", "NORMAL", BigDecimal("100000"), availableStatus)
-                )
-                
-                every { 
-                    seatRepository.findByScheduleIdAndSeatNumberContainingOrderBySeatNumberAsc(scheduleId, pattern) 
-                } returns seats
-                
-                // when
-                val result = seatService.getSeatsByNumberPattern(scheduleId, pattern)
-                
-                // then
-                result shouldNotBe null
-                result.size shouldBe 2
-            }
-        }
-    }
-    
+
     describe("confirmSeat") {
         context("예약 가능한 좌석을 확정할 때") {
             it("좌석을 확정 상태로 변경해야 한다") {

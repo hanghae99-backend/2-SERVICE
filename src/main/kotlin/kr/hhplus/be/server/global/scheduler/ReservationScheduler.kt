@@ -1,6 +1,5 @@
 package kr.hhplus.be.server.global.scheduler
 
-import kr.hhplus.be.server.domain.auth.service.TokenService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.auth.service.QueueManager
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
@@ -10,7 +9,6 @@ import org.springframework.stereotype.Component
 @Component
 class ReservationScheduler(
     private val reservationService: ReservationService,
-    private val tokenService: TokenService,
     private val tokenLifecycleManager: TokenLifecycleManager,
     private val queueManager: QueueManager
 ) {

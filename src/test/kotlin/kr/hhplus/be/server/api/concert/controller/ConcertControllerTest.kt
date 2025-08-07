@@ -5,13 +5,11 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.mockk.every
 import io.mockk.mockk
 import kr.hhplus.be.server.api.concert.dto.*
-import kr.hhplus.be.server.api.concert.dto.request.SearchConcertRequest
-import kr.hhplus.be.server.api.concert.usecase.ConcertUseCase
+import kr.hhplus.be.server.domain.concert.service.ConcertService
 import kr.hhplus.be.server.domain.concert.exception.ConcertNotFoundException
 import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.global.exception.GlobalExceptionHandler
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
-import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
@@ -22,9 +20,9 @@ import java.time.LocalDate
 @WebMvcTest(ConcertController::class)
 class ConcertControllerTest : DescribeSpec({
     
-    val concertUseCase = mockk<ConcertUseCase>()
+    val concertService = mockk<ConcertService>()
     val seatService = mockk<SeatService>()
-    val concertController = ConcertController(concertUseCase, seatService)
+    val concertController = ConcertController(concertService, seatService)
     val mockMvc = MockMvcBuilders.standaloneSetup(concertController)
         .setControllerAdvice(GlobalExceptionHandler())
         .build()
@@ -51,7 +49,7 @@ class ConcertControllerTest : DescribeSpec({
                     )
                 )
                 
-                every { concertUseCase.getAvailableConcerts(startDate, endDate) } returns concerts
+                every { concertService.getAvailableConcerts(startDate, endDate) } returns concerts
                 
                 // when & then
                 mockMvc.perform(
@@ -63,7 +61,7 @@ class ConcertControllerTest : DescribeSpec({
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.data").isArray)
                     .andExpect(jsonPath("$.data.length()").value(1))
-                    .andExpect(jsonPath("$.message").value("예약 가능한 콘서트 목록 조회가 완료되었습니다"))
+                    .andExpect(jsonPath("$.message").value("예약 가능한 콘서트 목록 조회 완료"))
                     .andDo(print())
             }
         }
@@ -84,52 +82,13 @@ class ConcertControllerTest : DescribeSpec({
                     )
                 )
                 
-                every { concertUseCase.getAvailableConcerts(any(), any()) } returns concerts
+                every { concertService.getAvailableConcerts(any(), any()) } returns concerts
                 
                 // when & then
                 mockMvc.perform(get("/api/v1/concerts"))
                     .andExpect(status().isOk)
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.data").isArray)
-                    .andDo(print())
-            }
-        }
-    }
-    
-    describe("POST /api/v1/concerts/search") {
-        context("콘서트 검색 요청을 보낼 때") {
-            it("검색 결과를 반환하고 200 상태코드를 반환해야 한다") {
-                // given
-                val request = SearchConcertRequest(
-                    startDate = LocalDate.now(),
-                    endDate = LocalDate.now().plusMonths(1)
-                )
-                val concerts = listOf(
-                    ConcertScheduleWithInfoDto(
-                        scheduleId = 1L,
-                        concertId = 1L,
-                        title = "검색된 콘서트",
-                        artist = "아티스트",
-                        venue = "장소",
-                        concertDate = LocalDate.now(),
-                        totalSeats = 100,
-                        availableSeats = 50
-                    )
-                )
-                
-                every { concertUseCase.getAvailableConcerts(request.startDate!!, request.endDate!!) } returns concerts
-                
-                // when & then
-                mockMvc.perform(
-                    post("/api/v1/concerts/search")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-                )
-                    .andExpect(status().isOk)
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.data").isArray)
-                    .andExpect(jsonPath("$.data.length()").value(1))
-                    .andExpect(jsonPath("$.message").value("콘서트 검색이 완료되었습니다"))
                     .andDo(print())
             }
         }
@@ -146,7 +105,7 @@ class ConcertControllerTest : DescribeSpec({
                     artist = "아티스트 1"
                 )
                 
-                every { concertUseCase.getConcertById(concertId) } returns concert
+                every { concertService.getConcertById(concertId) } returns concert
                 
                 // when & then
                 mockMvc.perform(get("/api/v1/concerts/$concertId"))
@@ -154,7 +113,7 @@ class ConcertControllerTest : DescribeSpec({
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.data.concertId").value(concertId))
                     .andExpect(jsonPath("$.data.title").value("콘서트 1"))
-                    .andExpect(jsonPath("$.message").value("콘서트 정보 조회가 완료되었습니다"))
+                    .andExpect(jsonPath("$.message").value("콘서트 정보 조회 완료"))
                     .andDo(print())
             }
         }
@@ -164,7 +123,7 @@ class ConcertControllerTest : DescribeSpec({
                 // given
                 val concertId = 999L
                 
-                every { concertUseCase.getConcertById(concertId) } throws 
+                every { concertService.getConcertById(concertId) } throws 
                     ConcertNotFoundException("콘서트를 찾을 수 없습니다: $concertId")
                 
                 // when & then
@@ -175,10 +134,64 @@ class ConcertControllerTest : DescribeSpec({
         }
     }
     
-    describe("GET /api/v1/concerts/schedules/{scheduleId}/seats") {
+    describe("GET /api/v1/concerts/{concertId}/schedules") {
+        context("콘서트 ID로 스케줄 목록을 조회할 때") {
+            it("스케줄 목록을 반환해야 한다") {
+                // given
+                val concertId = 1L
+                val schedules = listOf(
+                    mockk<ConcertWithScheduleDto>(relaxed = true)
+                )
+                
+                every { concertService.getSchedulesByConcertId(concertId) } returns schedules
+                
+                // when & then
+                mockMvc.perform(get("/api/v1/concerts/$concertId/schedules"))
+                    .andExpect(status().isOk)
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data").isArray)
+                    .andExpect(jsonPath("$.message").value("콘서트 스케줄 조회 완료"))
+                    .andDo(print())
+            }
+        }
+    }
+    
+    describe("GET /api/v1/concerts/{concertId}/schedules/{scheduleId}") {
+        context("콘서트와 스케줄 ID로 상세 정보를 조회할 때") {
+            it("콘서트 상세 정보를 반환해야 한다") {
+                // given
+                val concertId = 1L
+                val scheduleId = 1L
+                val detail = ConcertDetailDto(
+                    concert = ConcertDto(concertId, "테스트 콘서트", "테스트 아티스트"),
+                    schedule = ConcertScheduleDto(
+                        scheduleId = scheduleId,
+                        concertId = concertId,
+                        venue = "테스트 장소",
+                        concertDate = LocalDate.now(),
+                        totalSeats = 100,
+                        availableSeats = 50
+                    ),
+                    seats = emptyList()
+                )
+                
+                every { concertService.getConcertDetailByScheduleId(scheduleId) } returns detail
+                
+                // when & then
+                mockMvc.perform(get("/api/v1/concerts/$concertId/schedules/$scheduleId"))
+                    .andExpect(status().isOk)
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.message").value("콘서트 스케줄 상세 조회 완료"))
+                    .andDo(print())
+            }
+        }
+    }
+    
+    describe("GET /api/v1/concerts/{concertId}/schedules/{scheduleId}/seats") {
         context("예약 가능한 좌석만 조회할 때 (기본값)") {
             it("예약 가능한 좌석 목록을 반환해야 한다") {
                 // given
+                val concertId = 1L
                 val scheduleId = 1L
                 val seats = listOf(
                     SeatDto(
@@ -193,13 +206,13 @@ class ConcertControllerTest : DescribeSpec({
                 every { seatService.getAvailableSeats(scheduleId) } returns seats
                 
                 // when & then
-                mockMvc.perform(get("/api/v1/concerts/schedules/$scheduleId/seats"))
+                mockMvc.perform(get("/api/v1/concerts/$concertId/schedules/$scheduleId/seats"))
                     .andExpect(status().isOk)
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.data").isArray)
                     .andExpect(jsonPath("$.data.length()").value(1))
                     .andExpect(jsonPath("$.data[0].statusCode").value("AVAILABLE"))
-                    .andExpect(jsonPath("$.message").value("좌석 조회가 완료되었습니다"))
+                    .andExpect(jsonPath("$.message").value("좌석 조회 완료"))
                     .andDo(print())
             }
         }
@@ -207,6 +220,7 @@ class ConcertControllerTest : DescribeSpec({
         context("모든 좌석 조회를 요청할 때") {
             it("모든 좌석 목록을 반환해야 한다") {
                 // given
+                val concertId = 1L
                 val scheduleId = 1L
                 val seats = listOf(
                     SeatDto(
@@ -229,14 +243,14 @@ class ConcertControllerTest : DescribeSpec({
                 
                 // when & then
                 mockMvc.perform(
-                    get("/api/v1/concerts/schedules/$scheduleId/seats")
+                    get("/api/v1/concerts/$concertId/schedules/$scheduleId/seats")
                         .param("availableOnly", "false")
                 )
                     .andExpect(status().isOk)
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.data").isArray)
                     .andExpect(jsonPath("$.data.length()").value(2))
-                    .andExpect(jsonPath("$.message").value("좌석 조회가 완료되었습니다"))
+                    .andExpect(jsonPath("$.message").value("좌석 조회 완료"))
                     .andDo(print())
             }
         }

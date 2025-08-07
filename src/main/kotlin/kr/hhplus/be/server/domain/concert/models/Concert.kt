@@ -33,7 +33,6 @@ class Concert(
     
     companion object {
         fun create(title: String, artist: String): Concert {
-            // 파라미터 검증
             if (title.isBlank()) {
                 throw ParameterValidationException("콘서트 제목은 필수입니다")
             }

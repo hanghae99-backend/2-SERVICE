@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component
 class QueueManager(
     private val tokenStore: TokenStore
 ) {
-
+    
     companion object {
         private const val MAX_ACTIVE_TOKENS = 100L
     }

@@ -20,7 +20,7 @@ class DistributedLock(
         // 락 소유권 식별을 위한 고유 값 생성
         val lockValue = UUID.randomUUID().toString()
         val startTime = System.currentTimeMillis()
-
+        
         while (System.currentTimeMillis() - startTime < waitTimeoutMs) {
             if (tryAcquireLock(lockKey, lockValue, lockTimeoutMs)) {
                 return try {
@@ -30,13 +30,13 @@ class DistributedLock(
                     releaseLock(lockKey, lockValue)
                 }
             }
-
+            
             Thread.sleep(50)
         }
-
+        
         throw ConcurrentAccessException("락 획득에 실패했습니다: $lockKey")
     }
-
+    
 
     private fun tryAcquireLock(key: String, value: String, timeoutMs: Long): Boolean {
         // Redis SET NX EX: 키가 없을 때만 설정 (원자적 락 획득)
@@ -44,7 +44,7 @@ class DistributedLock(
             .setIfAbsent(key, value, Duration.ofMillis(timeoutMs))
         return result ?: false
     }
-
+    
 
     private fun releaseLock(key: String, value: String) {
         // Lua 스크립트로 소유권 확인 후 락 해제 (원자적 처리)
@@ -55,7 +55,7 @@ class DistributedLock(
                 return 0
             end
         """.trimIndent()
-
+        
         try {
             redisTemplate.execute(
                 RedisScript.of(script, Long::class.java),

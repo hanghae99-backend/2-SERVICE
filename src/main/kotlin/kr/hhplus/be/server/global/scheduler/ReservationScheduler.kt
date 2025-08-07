@@ -12,7 +12,7 @@ class ReservationScheduler(
     private val tokenLifecycleManager: TokenLifecycleManager,
     private val queueManager: QueueManager
 ) {
-
+    
     // 매 1분마다 만료된 예약 정리
     @Scheduled(fixedRate = 60000)
     fun cleanupExpiredReservations() {
@@ -25,7 +25,7 @@ class ReservationScheduler(
             println("만료된 예약 정리 중 오류 발생: ${e.message}")
         }
     }
-
+    
     // 매 30초마다 대기열 처리 (단순한 로직 - service 직접 호출)
     @Scheduled(fixedRate = 30000)
     fun processQueue() {
@@ -36,7 +36,7 @@ class ReservationScheduler(
             println("대기열 자동 처리 중 오류 발생: ${e.message}")
         }
     }
-
+    
     // 매 5분마다 만료된 토큰 정리 (단순한 로직 - service 직접 호출)
     @Scheduled(fixedRate = 300000)
     fun cleanupExpiredTokens() {

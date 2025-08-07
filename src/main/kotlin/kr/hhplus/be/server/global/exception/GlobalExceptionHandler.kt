@@ -61,7 +61,7 @@ class GlobalExceptionHandler {
             is ConcertScheduleNotFoundException -> ex.errorCode to ex.status
             else -> "RESOURCE_NOT_FOUND" to HttpStatus.NOT_FOUND
         }
-
+        
         return createErrorResponse(ex.message ?: "리소스를 찾을 수 없습니다", errorCode, status)
     }
 
@@ -75,7 +75,7 @@ class GlobalExceptionHandler {
             is SeatAlreadyReservedException -> ex.errorCode to ex.status
             else -> CommonErrorCode.BadRequest.code to CommonErrorCode.BadRequest.httpStatus
         }
-
+        
         return createErrorResponse(ex.message ?: "비즈니스 규칙을 위반했습니다", errorCode, status)
     }
 
@@ -90,7 +90,7 @@ class GlobalExceptionHandler {
             is InvalidPointAmountException -> ex.errorCode to ex.status
             else -> CommonErrorCode.BadRequest.code to CommonErrorCode.BadRequest.httpStatus
         }
-
+        
         return createErrorResponse(ex.message ?: "잔액 관련 오류가 발생했습니다", errorCode, status)
     }
 
@@ -115,7 +115,7 @@ class GlobalExceptionHandler {
             is PaymentProcessException -> ex.errorCode to ex.status
             else -> CommonErrorCode.BadRequest.code to CommonErrorCode.BadRequest.httpStatus
         }
-
+        
         return createErrorResponse(ex.message ?: "결제 관련 오류가 발생했습니다", errorCode, status)
     }
 
@@ -140,7 +140,7 @@ class GlobalExceptionHandler {
             is ReservationAlreadyCancelledException -> ex.errorCode to ex.status
             else -> CommonErrorCode.BadRequest.code to CommonErrorCode.BadRequest.httpStatus
         }
-
+        
         return createErrorResponse(ex.message ?: "예약 관련 오류가 발생했습니다", errorCode, status)
     }
 
@@ -178,7 +178,7 @@ class GlobalExceptionHandler {
             is InvalidTokenException -> ex.errorCode to ex.status
             else -> "AUTH_ERROR" to HttpStatus.UNAUTHORIZED
         }
-
+        
         return createErrorResponse(ex.message ?: "인증 관련 오류가 발생했습니다", errorCode, status)
     }
 
@@ -221,7 +221,7 @@ class GlobalExceptionHandler {
         } else {
             HttpStatus.BAD_REQUEST
         }
-
+        
         return createErrorResponse(
             ex.message ?: "잘못된 상태입니다",
             if (status == HttpStatus.CONFLICT) "ALREADY_RESERVED" else CommonErrorCode.BadRequest.code,
@@ -233,14 +233,14 @@ class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgumentException(ex: IllegalArgumentException): ResponseEntity<ErrorResponse> {
         // 권한 관련 에러의 경우 403 Forbidden 반환
-        val status = if (ex.message?.contains("소유자가 아닙니다") == true ||
-            ex.message?.contains("권한이 없습니다") == true ||
-            ex.message?.contains("예약 소유자가 아닙니다") == true) {
+        val status = if (ex.message?.contains("소유자가 아닙니다") == true || 
+                        ex.message?.contains("권한이 없습니다") == true ||
+                        ex.message?.contains("예약 소유자가 아닙니다") == true) {
             HttpStatus.FORBIDDEN
         } else {
             HttpStatus.BAD_REQUEST
         }
-
+        
         return createErrorResponse(
             ex.message ?: "잘못된 요청입니다",
             if (status == HttpStatus.FORBIDDEN) "ACCESS_DENIED" else CommonErrorCode.BadRequest.code,

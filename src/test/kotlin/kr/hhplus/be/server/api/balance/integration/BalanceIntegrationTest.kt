@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
+import kr.hhplus.be.server.config.TestDataCleanupService
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
@@ -32,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class BalanceIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
+    private val testDataCleanupService: TestDataCleanupService,
     private val userRepository: UserRepository,
     private val pointRepository: PointRepository,
     private val pointHistoryTypeRepository: PointHistoryTypePojoRepository

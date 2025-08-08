@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.concert.dto.request.SearchConcertRequest
+import kr.hhplus.be.server.config.TestDataCleanupService
 import kr.hhplus.be.server.domain.concert.infrastructure.ConcertJpaRepository
 import kr.hhplus.be.server.domain.concert.infrastructure.ConcertScheduleJpaRepository
 import kr.hhplus.be.server.domain.concert.infrastructure.SeatJpaRepository
@@ -30,6 +31,7 @@ import java.time.LocalDate
 @Transactional
 class ConcertIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
+    private val testDataCleanupService: TestDataCleanupService,
     private val concertJpaRepository: ConcertJpaRepository,
     private val concertScheduleJpaRepository: ConcertScheduleJpaRepository,
     private val seatJpaRepository: SeatJpaRepository,
@@ -47,10 +49,8 @@ class ConcertIntegrationTest(
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 데이터 정리
-        seatJpaRepository.deleteAll()
-        concertScheduleJpaRepository.deleteAll()
-        concertJpaRepository.deleteAll()
+        // 안전한 데이터 정리
+        testDataCleanupService.cleanupAllTestData()
 
         // 테스트 데이터 생성
         testConcert = concertJpaRepository.save(

@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.auth.dto.request.TokenIssueRequest
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
+import kr.hhplus.be.server.config.TestDataCleanupService
 import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
 import kr.hhplus.be.server.domain.user.model.User
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
@@ -24,6 +25,7 @@ import org.springframework.web.context.WebApplicationContext
 @Transactional
 class AuthIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
+    private val testDataCleanupService: TestDataCleanupService,
     private val userJpaRepository: UserJpaRepository,
     private val tokenStore: TokenStore,
     private val objectMapper: ObjectMapper
@@ -37,8 +39,8 @@ class AuthIntegrationTest(
             .webAppContextSetup(webApplicationContext)
             .build()
         
-        // 테스트 데이터 초기화
-        userJpaRepository.deleteAll()
+        // 안전한 데이터 정리
+        testDataCleanupService.cleanupAllTestData()
     }
 
     describe("토큰 발급 API") {

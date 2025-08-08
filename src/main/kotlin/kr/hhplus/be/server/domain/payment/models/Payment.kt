@@ -5,8 +5,7 @@ import kr.hhplus.be.server.global.common.BaseEntity
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import kr.hhplus.be.server.domain.payment.exception.PaymentAlreadyProcessedException
 import jakarta.persistence.*
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.user.model.User
+
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -41,25 +40,12 @@ data class Payment(
     val paidAt: LocalDateTime? = null,
     
     @Version
-    @Column(name = "version") 
-    var version: Long = 0
+    @Column(name = "version")
+    var version: Long? = null
 ) : BaseEntity() {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    val user: User? = null
-
-    @OneToMany(mappedBy = "payment", fetch = FetchType.LAZY)
-    private var _reservationList: MutableList<Reservation> = mutableListOf()
-
-    val reservationList: List<Reservation>
-        get() = _reservationList.toList()
-
-    fun addReservation(reservation: Reservation) {
-        if (!_reservationList.contains(reservation)) {
-            _reservationList.add(reservation)
-        }
-    }
+    // 연관관계 제거 - JPA 연관관계로 인한 트랜잭션 문제를 방지
+    // 필요한 경우 userId로 직접 조회하도록 변경
 
     companion object {
         // 상태 코드 상수

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.payment.dto.request.PaymentRequest
+import kr.hhplus.be.server.config.TestDataCleanupService
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
@@ -68,19 +69,14 @@ class PaymentIntegrationTest(
     lateinit var testSeat: Seat
     lateinit var testReservation: Reservation
     lateinit var validToken: WaitingToken
+    lateinit var testDataCleanupService: TestDataCleanupService
     beforeEach {
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
 
         // 데이터 정리
-        paymentRepository.deleteAll()
-        reservationRepository.deleteAll()
-        seatRepository.deleteAll()
-        concertScheduleRepository.deleteAll()
-        concertRepository.deleteAll()
-        pointRepository.deleteAll()
-        userRepository.deleteAll()
+        testDataCleanupService.cleanupAllTestData()
 
         // 테스트 데이터 설정
         // 테스트용 사용자 생성

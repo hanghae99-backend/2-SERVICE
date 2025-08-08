@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.user.dto.request.UserCreateRequest
+import kr.hhplus.be.server.config.TestDataCleanupService
 import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
@@ -24,6 +25,7 @@ import org.springframework.web.context.WebApplicationContext
 class UserIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val userJpaRepository: UserJpaRepository,
+    private val testDataCleanupService: TestDataCleanupService,
     private val objectMapper: ObjectMapper
 ) : DescribeSpec({
     extension(SpringExtension)
@@ -35,7 +37,8 @@ class UserIntegrationTest(
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        userJpaRepository.deleteAll()
+        // 안전한 데이터 정리
+        testDataCleanupService.cleanupAllTestData()
     }
 
     describe("사용자 생성 API") {
@@ -65,7 +68,7 @@ class UserIntegrationTest(
         }
 
         context("중복된 사용자 ID로 생성 요청을 할 때") {
-            it("400 오류가 발생해야 한다") {
+            it("409 오류가 발생해야 한다") {
                 // given
                 val userId = 99999L
                 val createRequest = UserCreateRequest(userId = userId)
@@ -85,7 +88,7 @@ class UserIntegrationTest(
                         .content(objectMapper.writeValueAsString(createRequest))
                 )
                 .andDo(print())
-                .andExpect(status().isBadRequest)
+                .andExpect(status().isConflict)
                 .andExpect(jsonPath("$.success").value(false))
             }
         }

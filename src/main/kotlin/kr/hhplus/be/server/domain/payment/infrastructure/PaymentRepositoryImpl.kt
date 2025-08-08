@@ -17,6 +17,10 @@ class PaymentRepositoryImpl(
         return paymentJpaRepository.findById(id).orElse(null)
     }
     
+    override fun findByReservationId(reservationId: Long): List<Payment> {
+        return paymentJpaRepository.findByReservationId(reservationId)
+    }
+    
     override fun existsByUserId(userId: Long): Boolean {
         return paymentJpaRepository.existsByUserId(userId)
     }

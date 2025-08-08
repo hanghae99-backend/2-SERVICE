@@ -9,4 +9,5 @@ interface PointRepository {
     fun findByUserIdWithPessimisticLock(userId: Long): Point?
     fun delete(point: Point)
     fun deleteAll() // 테스트용 - 모든 포인트 데이터 삭제
+    fun flush() // 변경사항을 즉시 DB에 반영
 }

@@ -32,4 +32,8 @@ class PointRepositoryImpl(
     override fun deleteAll() {
         pointJpaRepository.deleteAll()
     }
+    
+    override fun flush() {
+        pointJpaRepository.flush()
+    }
 }

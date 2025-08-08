@@ -88,6 +88,15 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
+tasks.test {
+	useJUnitPlatform()
+
+	testLogging {
+		events("passed", "skipped", "failed")
+		showStandardStreams = true
+	}
+}
+
 tasks.withType<Test> {
 	useJUnitPlatform()
 	systemProperty("user.timezone", "UTC")

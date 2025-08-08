@@ -27,8 +27,13 @@ interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
     fun findByConcertIdOrderByReservedAtDesc(concertId: Long): List<Reservation>
     fun findByConcertIdOrderByReservedAtDesc(concertId: Long, pageable: Pageable): Page<Reservation>
     
-    // 좌석 예약 확인
-    fun findBySeatIdAndStatusCodeIn(seatId: Long, statusCodes: List<String>): Reservation?
+    // 좌석 예약 확인 (비관적 락 사용)
+    @Query("SELECT r FROM Reservation r WHERE r.seatId = :seatId AND r.status.code IN :statusCodes")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    fun findBySeatIdAndStatusCodeIn(@Param("seatId") seatId: Long, @Param("statusCodes") statusCodes: List<String>): Reservation?
+    
+    // 비관적 락 없는 버전 (읽기 전용)
+    fun findBySeatIdAndStatusCodeInReadOnly(seatId: Long, statusCodes: List<String>): Reservation?
     
     // 만료된 예약 조회
     fun findByExpiresAtBeforeAndStatusCode(currentTime: LocalDateTime, statusCode: String): List<Reservation>

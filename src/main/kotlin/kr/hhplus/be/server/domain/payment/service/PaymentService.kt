@@ -81,6 +81,10 @@ class PaymentService(
         return PaymentDto.fromEntity(finalPayment)
     }
 
+    fun findByReservationId(reservationId: Long): List<Payment> {
+        return paymentRepository.findByReservationId(reservationId)
+    }
+    
     fun getPaymentById(paymentId: Long): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
             .orElseThrow { PaymentNotFoundException("결제를 찾을 수 없습니다: $paymentId") }

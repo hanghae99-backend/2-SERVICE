@@ -41,6 +41,20 @@ class RedisTokenStore(
         val value = redisTemplate.opsForValue().get(TOKEN_PREFIX + token) ?: return null
         return objectMapper.readValue(value, WaitingToken::class.java)
     }
+    
+    override fun findActiveTokenByUserId(userId: Long): WaitingToken? {
+        // 사용자의 토큰들을 조회
+        val userTokens = redisTemplate.opsForSet().members(USER_PREFIX + userId) ?: return null
+        
+        // 활성 상태인 토큰을 찾아서 반환
+        for (tokenStr in userTokens) {
+            val token = findByToken(tokenStr)
+            if (token != null && (getTokenStatus(tokenStr) == TokenStatus.WAITING || getTokenStatus(tokenStr) == TokenStatus.ACTIVE)) {
+                return token
+            }
+        }
+        return null
+    }
 
     override fun delete(token: String) {
         val waitingToken = findByToken(token)

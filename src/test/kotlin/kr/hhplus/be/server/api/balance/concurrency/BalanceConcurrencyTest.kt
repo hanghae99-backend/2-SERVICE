@@ -19,7 +19,6 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.context.WebApplicationContext
 import java.math.BigDecimal
 import java.util.concurrent.CompletableFuture
@@ -48,13 +47,20 @@ class BalanceConcurrencyTest(
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 데이터 정리
+        // 데이터 정리 (순서 중요 - 외래키 제약 고려)
         pointRepository.deleteAll()
         userRepository.deleteAll()
         pointHistoryTypeRepository.deleteAll()
+        
+        // 즉시 DB에 반영
+        pointRepository.flush()
+        userRepository.flush()
+        pointHistoryTypeRepository.flush()
 
         // 테스트 데이터 설정
-        testUser = userRepository.save(User.create(1L))
+        val uniqueUserId = System.currentTimeMillis() + (0..1000).random()
+        testUser = userRepository.save(User.create(uniqueUserId))
+        userRepository.flush()
 
         chargeType = pointHistoryTypeRepository.save(
             PointHistoryType(
@@ -63,9 +69,11 @@ class BalanceConcurrencyTest(
                 description = "포인트 충전"
             )
         )
+        pointHistoryTypeRepository.flush()
 
         // 초기 포인트 생성
         pointRepository.save(Point.create(testUser.userId, BigDecimal("10000")))
+        pointRepository.flush()
     }
 
     describe("잔액 충전 동시성 테스트") {
@@ -73,11 +81,15 @@ class BalanceConcurrencyTest(
             it("모든 충전이 안전하게 처리되어야 한다") {
                 // given
                 val userCount = 5
-                val users = (2L..2L + userCount).map { userId ->
+                val baseUserId = System.currentTimeMillis() + 10000
+                val users = (0 until userCount).map { index ->
+                    val userId = baseUserId + index
                     val user = userRepository.save(User.create(userId))
                     pointRepository.save(Point.create(userId, BigDecimal("10000")))
                     user
                 }
+                userRepository.flush()
+                pointRepository.flush()
 
                 val executor = Executors.newFixedThreadPool(userCount)
                 val results = mutableListOf<CompletableFuture<BalanceTestResult>>()

@@ -34,14 +34,18 @@ class ReservationService(
     
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
+        logger.info("예약 요청 시작 - userId: $userId, seatId: $seatId")
+        
         val activeStatuses = listOf(
             statusRepository.getTemporaryStatus().code,
             statusRepository.getConfirmedStatus().code
         )
         
+        // 비관적 락으로 기존 예약 확인 및 좌석 상태 변경
         val existingReservation = reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses)
         
         if (existingReservation != null) {
+            logger.warn("기존 예약 존재 - reservationId: ${existingReservation.reservationId}, status: ${existingReservation.status.code}")
             if (existingReservation.isConfirmed()) {
                 throw IllegalStateException("이미 확정된 좌석입니다")
             }
@@ -51,6 +55,15 @@ class ReservationService(
         }
 
         val seat = seatService.getSeatById(seatId)
+        
+        // 좌석 상태를 예약됨으로 변경
+        try {
+            seatService.reserveSeat(seatId)
+        } catch (e: Exception) {
+            logger.error("좌석 상태 변경 실패 - seatId: $seatId", e)
+            throw IllegalStateException("좌석 예약에 실패했습니다")
+        }
+        
         val reservation = Reservation.createTemporary(
             userId = userId,
             concertId = concertId,
@@ -61,6 +74,7 @@ class ReservationService(
         )
         
         val savedReservation = reservationRepository.save(reservation)
+        logger.info("예약 생성 성공 - reservationId: ${savedReservation.reservationId}")
         
         val event = ReservationCreatedEvent(
             reservationId = savedReservation.reservationId,
@@ -152,6 +166,11 @@ class ReservationService(
         eventPublisher.publish(cancelledEvent)
         
         return savedReservation
+    }
+    
+    fun getReservationWithLock(reservationId: Long): Reservation {
+        return reservationRepository.findByIdWithPessimisticLock(reservationId)
+            ?: throw IllegalArgumentException("예약을 찾을 수 없습니다: $reservationId")
     }
     
     fun getReservationById(reservationId: Long): Reservation {

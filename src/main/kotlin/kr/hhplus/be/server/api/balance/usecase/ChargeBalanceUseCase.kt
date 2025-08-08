@@ -48,8 +48,20 @@ class ChargeBalanceUseCase(
     }
     
     private fun executeChargeInternal(userId: Long, amount: BigDecimal): Point {
-        val currentPoint = pointRepository.findByUserId(userId)
-            ?: Point.create(userId, BigDecimal.ZERO)
+        // 비관적 락을 사용하여 동시성 문제 방지
+        val currentPoint = pointRepository.findByUserIdWithPessimisticLock(userId)
+            ?: run {
+                // 포인트가 없는 경우 새로 생성 (동시성 안전하게)
+                try {
+                    val newPoint = Point.create(userId, BigDecimal.ZERO)
+                    pointRepository.save(newPoint)
+                } catch (e: Exception) {
+                    // 다른 스레드에서 이미 생성한 경우, 다시 조회
+                    logger.info("Point already created by another thread for user: $userId")
+                    pointRepository.findByUserIdWithPessimisticLock(userId)
+                        ?: throw IllegalStateException("포인트 생성 실패: $userId")
+                }
+            }
 
         val chargedPoint = currentPoint.charge(amount)
         val savedPoint = pointRepository.save(chargedPoint)

@@ -36,13 +36,15 @@ class ProcessPaymentUserCase (
         val status = tokenLifecycleManager.getTokenStatus(token)
         tokenDomainService.validateActiveToken(waitingToken, status)
 
-        val reservation = reservationService.getReservationById(reservationId)
+        // 예약 상태로 중복 결제 확인 (예약이 이미 확정되었는지 확인)
+        val reservation = reservationService.getReservationWithLock(reservationId)
+        logger.info("결제 처리 시작 - userId: $userId, reservationId: $reservationId, status: ${reservation.status.code}")
 
         if (reservation.userId != userId) {
             throw PaymentProcessException("예약의 사용자가 일치하지 않습니다")
         }
         if (!reservation.isTemporary()) {
-            throw PaymentProcessException("임시 예약 상태가 아닙니다: $reservationId")
+            throw PaymentProcessException("임시 예약 상태가 아닙니다: $reservationId, 현재 상태: ${reservation.status.code}")
         }
         if (reservation.isExpired()) {
             throw PaymentProcessException("예약이 만료되었습니다: $reservationId")

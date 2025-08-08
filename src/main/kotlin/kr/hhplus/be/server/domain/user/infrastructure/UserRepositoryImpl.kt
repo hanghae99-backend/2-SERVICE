@@ -32,4 +32,8 @@ class UserRepositoryImpl(
     override fun deleteAll() {
         userJpaRepository.deleteAll()
     }
+    
+    override fun flush() {
+        userJpaRepository.flush()
+    }
 }

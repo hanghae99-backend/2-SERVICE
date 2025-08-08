@@ -1,6 +1,8 @@
 package kr.hhplus.be.server.api.balance.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
@@ -8,18 +10,12 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepos
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.user.model.User
 import kr.hhplus.be.server.domain.user.repository.UserRepository
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Nested
-import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
-import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.transaction.annotation.Transactional
@@ -33,30 +29,21 @@ import java.util.concurrent.atomic.AtomicInteger
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 @Transactional
-class BalanceIntegrationTest {
+class BalanceIntegrationTest(
+    private val webApplicationContext: WebApplicationContext,
+    private val objectMapper: ObjectMapper,
+    private val userRepository: UserRepository,
+    private val pointRepository: PointRepository,
+    private val pointHistoryTypeRepository: PointHistoryTypePojoRepository
+) : DescribeSpec({
+    extension(SpringExtension)
 
-    @Autowired
-    private lateinit var webApplicationContext: WebApplicationContext
+    lateinit var mockMvc: MockMvc
+    lateinit var testUser: User
+    lateinit var chargeType: PointHistoryType
+    lateinit var deductType: PointHistoryType
 
-    @Autowired
-    private lateinit var objectMapper: ObjectMapper
-
-    @Autowired
-    private lateinit var userRepository: UserRepository
-
-    @Autowired
-    private lateinit var pointRepository: PointRepository
-
-    @Autowired
-    private lateinit var pointHistoryTypeRepository: PointHistoryTypePojoRepository
-
-    private lateinit var mockMvc: MockMvc
-    private lateinit var testUser: User
-    private lateinit var chargeType: PointHistoryType
-    private lateinit var deductType: PointHistoryType
-
-    @BeforeEach
-    fun setUp() {
+    beforeEach {
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
@@ -67,10 +54,6 @@ class BalanceIntegrationTest {
         pointHistoryTypeRepository.deleteAll()
 
         // 테스트 데이터 설정
-        setupTestData()
-    }
-
-    private fun setupTestData() {
         testUser = userRepository.save(User.create(1L))
 
         chargeType = pointHistoryTypeRepository.save(
@@ -93,317 +76,289 @@ class BalanceIntegrationTest {
         pointRepository.save(Point.create(testUser.userId, BigDecimal("50000")))
     }
 
-    @Nested
-    @DisplayName("잔액 충전 API 테스트")
-    inner class ChargeBalanceTest {
+    describe("잔액 충전 API") {
+        context("유효한 충전 요청을 할 때") {
+            it("잔액이 정상적으로 충전되어야 한다") {
+                // given
+                val request = ChargeBalanceRequest(
+                    userId = testUser.userId,
+                    amount = BigDecimal("100000")
+                )
 
-        @Test
-        @DisplayName("유효한 충전 요청 시 잔액이 정상적으로 충전되어야 한다")
-        fun chargeBalance_Success() {
-            // given
-            val request = ChargeBalanceRequest(
-                userId = testUser.userId,
-                amount = BigDecimal("100000")
-            )
-
-            // when & then
-            mockMvc.perform(
-                post("/api/v1/balance")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    post("/api/v1/balance")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                )
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("잔액 충전이 완료되었습니다"))
                 .andExpect(jsonPath("$.data.userId").value(testUser.userId))
                 .andExpect(jsonPath("$.data.chargedAmount").value(100000))
                 .andExpect(jsonPath("$.data.currentBalance").value(150000))
+            }
         }
 
-        @Test
-        @DisplayName("음수 금액으로 충전 요청 시 400 오류가 발생해야 한다")
-        fun chargeBalance_Fail_NegativeAmount() {
-            // given
-            val request = ChargeBalanceRequest(
-                userId = testUser.userId,
-                amount = BigDecimal("-10000")
-            )
+        context("음수 금액으로 충전 요청을 할 때") {
+            it("400 Bad Request 응답을 반환해야 한다") {
+                // given
+                val request = ChargeBalanceRequest(
+                    userId = testUser.userId,
+                    amount = BigDecimal("-10000")
+                )
 
-            // when & then
-            mockMvc.perform(
-                post("/api/v1/balance")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    post("/api/v1/balance")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                )
                 .andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.success").value(false))
+            }
         }
 
-        @Test
-        @DisplayName("최소 충전 금액 미만으로 요청 시 400 오류가 발생해야 한다")
-        fun chargeBalance_Fail_BelowMinimumAmount() {
-            // given
-            val request = ChargeBalanceRequest(
-                userId = testUser.userId,
-                amount = BigDecimal("500")
-            )
+        context("최소 충전 금액 미만으로 요청할 때") {
+            it("400 Bad Request 응답을 반환해야 한다") {
+                // given
+                val request = ChargeBalanceRequest(
+                    userId = testUser.userId,
+                    amount = BigDecimal("500")
+                )
 
-            // when & then
-            mockMvc.perform(
-                post("/api/v1/balance")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    post("/api/v1/balance")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                )
                 .andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.success").value(false))
+            }
         }
 
-        @Test
-        @DisplayName("존재하지 않는 사용자로 충전 요청 시 404 오류가 발생해야 한다")
-        fun chargeBalance_Fail_UserNotFound() {
-            // given
-            val request = ChargeBalanceRequest(
-                userId = 999L,
-                amount = BigDecimal("100000")
-            )
+        context("존재하지 않는 사용자로 충전 요청할 때") {
+            it("404 Not Found 응답을 반환해야 한다") {
+                // given
+                val request = ChargeBalanceRequest(
+                    userId = 999L,
+                    amount = BigDecimal("100000")
+                )
 
-            // when & then
-            mockMvc.perform(
-                post("/api/v1/balance")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    post("/api/v1/balance")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                )
                 .andExpect(status().isNotFound)
                 .andExpect(jsonPath("$.success").value(false))
+            }
         }
 
-        @Test
-        @DisplayName("최대 잔액 한도를 초과하는 금액 충전 시 400 오류가 발생해야 한다")
-        fun chargeBalance_Fail_ExceedsMaximumBalance() {
-            // given
-            val request = ChargeBalanceRequest(
-                userId = testUser.userId,
-                amount = BigDecimal("50000000") // 5천만원 충전 시도
-            )
+        context("최대 잔액 한도를 초과하는 금액으로 충전 요청할 때") {
+            it("400 Bad Request 응답을 반환해야 한다") {
+                // given
+                val request = ChargeBalanceRequest(
+                    userId = testUser.userId,
+                    amount = BigDecimal("50000000") // 5천만원 충전 시도
+                )
 
-            // when & then
-            mockMvc.perform(
-                post("/api/v1/balance")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    post("/api/v1/balance")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                )
                 .andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.success").value(false))
+            }
         }
     }
 
-    @Nested
-    @DisplayName("잔액 조회 API 테스트")
-    inner class GetBalanceTest {
-
-        @Test
-        @DisplayName("존재하는 사용자의 잔액 조회 시 잔액 정보가 정상적으로 반환되어야 한다")
-        fun getBalance_Success() {
-            // when & then
-            mockMvc.perform(
-                get("/api/v1/balance/{userId}", testUser.userId)
-                    .contentType(MediaType.APPLICATION_JSON)
-            )
-                .andDo(print())
+    describe("잔액 조회 API") {
+        context("존재하는 사용자의 잔액을 조회할 때") {
+            it("잔액 정보가 정상적으로 반환되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/balance/{userId}", testUser.userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("잔액 조회가 완료되었습니다"))
                 .andExpect(jsonPath("$.data.userId").value(testUser.userId))
                 .andExpect(jsonPath("$.data.balance").value(50000))
+            }
         }
 
-        @Test
-        @DisplayName("존재하지 않는 사용자의 잔액 조회 시 404 오류가 발생해야 한다")
-        fun getBalance_Fail_UserNotFound() {
-            // given
-            val nonExistentUserId = 999L
+        context("존재하지 않는 사용자의 잔액을 조회할 때") {
+            it("404 Not Found 응답을 반환해야 한다") {
+                // given
+                val nonExistentUserId = 999L
 
-            // when & then
-            mockMvc.perform(
-                get("/api/v1/balance/{userId}", nonExistentUserId)
-                    .contentType(MediaType.APPLICATION_JSON)
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/balance/{userId}", nonExistentUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
                 .andExpect(status().isNotFound)
                 .andExpect(jsonPath("$.success").value(false))
+            }
         }
 
-        @Test
-        @DisplayName("유효하지 않은 사용자 ID로 조회 시 400 오류가 발생해야 한다")
-        fun getBalance_Fail_InvalidUserId() {
-            // given
-            val invalidUserId = -1L
+        context("유효하지 않은 사용자 ID로 조회할 때") {
+            it("400 Bad Request 응답을 반환해야 한다") {
+                // given
+                val invalidUserId = -1L
 
-            // when & then
-            mockMvc.perform(
-                get("/api/v1/balance/{userId}", invalidUserId)
-                    .contentType(MediaType.APPLICATION_JSON)
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/balance/{userId}", invalidUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
                 .andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.success").value(false))
+            }
         }
     }
 
-    @Nested
-    @DisplayName("포인트 이력 조회 API 테스트")
-    inner class GetPointHistoryTest {
-
-        @Test
-        @DisplayName("사용자의 포인트 이력 조회 시 이력 정보가 배열로 반환되어야 한다")
-        fun getPointHistory_Success() {
-            // when & then
-            mockMvc.perform(
-                get("/api/v1/balance/history/{userId}", testUser.userId)
-                    .contentType(MediaType.APPLICATION_JSON)
-            )
-                .andDo(print())
+    describe("포인트 이력 조회 API") {
+        context("사용자의 포인트 이력을 조회할 때") {
+            it("이력 정보가 배열로 반환되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/balance/history/{userId}", testUser.userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("포인트 이력 조회가 완료되었습니다"))
                 .andExpect(jsonPath("$.data").isArray())
+            }
         }
 
-        @Test
-        @DisplayName("존재하지 않는 사용자의 이력 조회 시 빈 배열이 반환되어야 한다")
-        fun getPointHistory_Success_EmptyList() {
-            // given
-            val nonExistentUserId = 999L
+        context("존재하지 않는 사용자의 이력을 조회할 때") {
+            it("빈 배열이 반환되어야 한다") {
+                // given
+                val nonExistentUserId = 999L
 
-            // when & then
-            mockMvc.perform(
-                get("/api/v1/balance/history/{userId}", nonExistentUserId)
-                    .contentType(MediaType.APPLICATION_JSON)
-            )
-                .andDo(print())
-                .andExpect(status().isOk) // 빈 리스트 반환으로 200 OK
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/balance/history/{userId}", nonExistentUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                .andExpect(status().isOk)
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data").isEmpty())
+            }
         }
 
-        @Test
-        @DisplayName("유효하지 않은 사용자 ID로 이력 조회 시 400 오류가 발생해야 한다")
-        fun getPointHistory_Fail_InvalidUserId() {
-            // given
-            val invalidUserId = -1L
+        context("유효하지 않은 사용자 ID로 이력 조회할 때") {
+            it("400 Bad Request 응답을 반환해야 한다") {
+                // given
+                val invalidUserId = -1L
 
-            // when & then
-            mockMvc.perform(
-                get("/api/v1/balance/history/{userId}", invalidUserId)
-                    .contentType(MediaType.APPLICATION_JSON)
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/balance/history/{userId}", invalidUserId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
                 .andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.success").value(false))
+            }
         }
     }
 
-    @Nested
-    @DisplayName("동시성 테스트")
-    inner class ConcurrencyTest {
+    describe("동시성 테스트") {
+        context("동시에 여러 번 충전 요청을 할 때") {
+            it("모든 충전이 정상적으로 처리되어야 한다") {
+                // given
+                val requests = listOf(
+                    ChargeBalanceRequest(testUser.userId, BigDecimal("10000")),
+                    ChargeBalanceRequest(testUser.userId, BigDecimal("20000")),
+                    ChargeBalanceRequest(testUser.userId, BigDecimal("30000"))
+                )
 
-        @Test
-        @DisplayName("동시에 여러 번 충전 요청 시 모든 충전이 정상적으로 처리되어야 한다")
-        fun chargeBalance_Concurrency_AllSucceeds() {
-            // given
-            val requests = listOf(
-                ChargeBalanceRequest(testUser.userId, BigDecimal("10000")),
-                ChargeBalanceRequest(testUser.userId, BigDecimal("20000")),
-                ChargeBalanceRequest(testUser.userId, BigDecimal("30000"))
-            )
+                val executor = Executors.newFixedThreadPool(requests.size)
+                val successCount = AtomicInteger(0)
 
-            val executor = Executors.newFixedThreadPool(requests.size)
-            val successCount = AtomicInteger(0)
+                // when - 동시 충전 요청
+                val futures = requests.map { request ->
+                    CompletableFuture.supplyAsync({
+                        try {
+                            val result = mockMvc.perform(
+                                post("/api/v1/balance")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(request))
+                            ).andReturn()
 
-            // when - 동시 충전 요청
-            val futures = requests.map { request ->
-                CompletableFuture.supplyAsync({
-                    try {
-                        val result = mockMvc.perform(
-                            post("/api/v1/balance")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request))
-                        ).andReturn()
-
-                        if (result.response.status == 200) {
-                            successCount.incrementAndGet()
+                            if (result.response.status == 200) {
+                                successCount.incrementAndGet()
+                            }
+                            result.response.status
+                        } catch (e: Exception) {
+                            500
                         }
-                        result.response.status
-                    } catch (e: Exception) {
-                        500
-                    }
-                }, executor)
-            }
+                    }, executor)
+                }
 
-            futures.forEach { it.get() }
+                futures.forEach { it.get() }
 
-            // then - 모든 요청이 성공해야 함
-            assert(successCount.get() == requests.size) {
-                "동시 충전 시 모든 요청이 성공해야 하지만 ${successCount.get()}개만 성공했습니다"
-            }
+                // then - 모든 요청이 성공해야 함
+                assert(successCount.get() == requests.size) {
+                    "동시 충전 시 모든 요청이 성공해야 하지만 ${successCount.get()}개만 성공했습니다"
+                }
 
-            // 최종 잔액 확인
-            mockMvc.perform(
-                get("/api/v1/balance/{userId}", testUser.userId)
-                    .contentType(MediaType.APPLICATION_JSON)
-            )
+                // 최종 잔액 확인
+                mockMvc.perform(
+                    get("/api/v1/balance/{userId}", testUser.userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.data.balance").value(110000)) // 50000 + 10000 + 20000 + 30000
 
-            executor.shutdown()
+                executor.shutdown()
+            }
         }
     }
 
-    @Nested
-    @DisplayName("검증 테스트")
-    inner class ValidationTest {
+    describe("검증 테스트") {
+        context("필수 파라미터가 누락된 요청을 할 때") {
+            it("400 Bad Request 응답을 반환해야 한다") {
+                // given - amount가 누락된 잘못된 요청
+                val invalidRequestJson = """
+                {
+                    "userId": ${testUser.userId}
+                }
+                """.trimIndent()
 
-        @Test
-        @DisplayName("필수 파라미터 누락 시 400 오류가 발생해야 한다")
-        fun chargeBalance_Fail_ValidationError() {
-            // given - amount가 누락된 잘못된 요청
-            val invalidRequestJson = """
-            {
-                "userId": ${testUser.userId}
-            }
-            """.trimIndent()
-
-            // when & then
-            mockMvc.perform(
-                post("/api/v1/balance")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(invalidRequestJson)
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    post("/api/v1/balance")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidRequestJson)
+                )
                 .andExpect(status().isBadRequest)
                 .andExpect(jsonPath("$.success").value(false))
+            }
         }
 
-        @Test
-        @DisplayName("잘못된 JSON 형식으로 요청 시 400 오류가 발생해야 한다")
-        fun chargeBalance_Fail_InvalidJson() {
-            // given
-            val invalidJson = "{ invalid json }"
+        context("잘못된 JSON 형식으로 요청할 때") {
+            it("400 Bad Request 응답을 반환해야 한다") {
+                // given
+                val invalidJson = "{ invalid json }"
 
-            // when & then
-            mockMvc.perform(
-                post("/api/v1/balance")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(invalidJson)
-            )
-                .andDo(print())
+                // when & then
+                mockMvc.perform(
+                    post("/api/v1/balance")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidJson)
+                )
                 .andExpect(status().isBadRequest)
+            }
         }
     }
-}
+})

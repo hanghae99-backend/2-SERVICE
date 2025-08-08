@@ -347,7 +347,8 @@ class PaymentConcurrencyTest(
                 
                 // 사용자 포인트를 특정 금액으로 설정
                 val userPoint = pointRepository.findByUserId(user.userId)!!
-                pointRepository.save(userPoint.copy(balance = initialBalance))
+                userPoint.amount = initialBalance
+                pointRepository.save(userPoint)
 
                 val reservedStatus = seatStatusTypeRepository.findByCode("RESERVED")!!
                 val temporaryStatus = reservationStatusTypeRepository.findByCode("TEMPORARY")!!
@@ -384,7 +385,7 @@ class PaymentConcurrencyTest(
 
                 // when - 동일 사용자의 동시 결제 요청
                 multipleReservations.forEach { reservation ->
-                    val future = CompletableFuture.supplyAsync<PaymentTestResult>({
+                    val future = CompletableFuture.supplyAsync({
                         try {
                             val request = PaymentRequest(
                                 userId = user.userId,
@@ -412,7 +413,7 @@ class PaymentConcurrencyTest(
                 val finalResults = results.map { it.get(20, TimeUnit.SECONDS) }
 
                 // then - 성공한 결제 수만큼 포인트가 차감되어야 함
-                val finalBalance = pointRepository.findByUserId(user.userId)!!.balance
+                val finalBalance = pointRepository.findByUserId(user.userId)!!.amount
                 val expectedDeduction = BigDecimal("50000").multiply(BigDecimal(successCount.get()))
                 val expectedFinalBalance = initialBalance.subtract(expectedDeduction)
 

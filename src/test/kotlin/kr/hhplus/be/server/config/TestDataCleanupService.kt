@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import jakarta.persistence.EntityManager
+import org.springframework.test.annotation.DirtiesContext
 
 @Service
 @Profile("test")
@@ -32,24 +33,58 @@ class TestDataCleanupService(
         try {
             // 외래 키 제약 조건 비활성화
             entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE").executeUpdate()
+            entityManager.flush()
             
             // 의존성 순서에 따라 삭제 (자식 테이블부터)
-            try { paymentJpaRepository?.deleteAll() } catch (e: Exception) { /* 무시 */ }
-            try { reservationJpaRepository?.deleteAll() } catch (e: Exception) { /* 무시 */ }
-            try { seatJpaRepository?.deleteAll() } catch (e: Exception) { /* 무시 */ }
-            try { concertScheduleJpaRepository?.deleteAll() } catch (e: Exception) { /* 무시 */ }
-            try { concertJpaRepository?.deleteAll() } catch (e: Exception) { /* 무시 */ }
-            try { pointHistoryJpaRepository?.deleteAll() } catch (e: Exception) { /* 무시 */ }
-            try { pointJpaRepository.deleteAll() } catch (e: Exception) { /* 무시 */ }
-            try { userJpaRepository.deleteAll() } catch (e: Exception) { /* 무시 */ }
+            try { 
+                paymentJpaRepository?.deleteAll()
+                entityManager.flush()
+            } catch (e: Exception) { /* 무시 */ }
+            
+            try { 
+                reservationJpaRepository?.deleteAll()
+                entityManager.flush()
+            } catch (e: Exception) { /* 무시 */ }
+            
+            try { 
+                seatJpaRepository?.deleteAll()
+                entityManager.flush()
+            } catch (e: Exception) { /* 무시 */ }
+            
+            try { 
+                concertScheduleJpaRepository?.deleteAll()
+                entityManager.flush()
+            } catch (e: Exception) { /* 무시 */ }
+            
+            try { 
+                concertJpaRepository?.deleteAll()
+                entityManager.flush()
+            } catch (e: Exception) { /* 무시 */ }
+            
+            try { 
+                pointHistoryJpaRepository?.deleteAll()
+                entityManager.flush()
+            } catch (e: Exception) { /* 무시 */ }
+            
+            try { 
+                pointJpaRepository.deleteAll()
+                entityManager.flush()
+            } catch (e: Exception) { /* 무시 */ }
+            
+            try { 
+                userJpaRepository.deleteAll()
+                entityManager.flush()
+            } catch (e: Exception) { /* 무시 */ }
             
             // 외래 키 제약 조건 재활성화
             entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE").executeUpdate()
+            entityManager.flush()
             
         } catch (e: Exception) {
             // 실패 시에도 제약 조건 복원 시도
             try {
                 entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE").executeUpdate()
+                entityManager.flush()
             } catch (ex: Exception) {
                 // 무시
             }

@@ -18,10 +18,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.context.WebApplicationContext
 
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
-@Transactional
 class UserIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val userJpaRepository: UserJpaRepository,
@@ -32,13 +31,24 @@ class UserIntegrationTest(
 
     lateinit var mockMvc: MockMvc
 
-    beforeEach {
+    beforeSpec {
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
-
+    }
+    
+    beforeEach {
         // 안전한 데이터 정리
         testDataCleanupService.cleanupAllTestData()
+    }
+    
+    afterEach {
+        // 각 테스트 후 데이터 정리
+        try {
+            testDataCleanupService.cleanupAllTestData()
+        } catch (e: Exception) {
+            println("Cleanup failed: ${e.message}")
+        }
     }
 
     describe("사용자 생성 API") {

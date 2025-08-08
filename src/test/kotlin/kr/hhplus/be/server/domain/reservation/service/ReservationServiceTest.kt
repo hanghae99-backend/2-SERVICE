@@ -11,6 +11,7 @@ import io.mockk.verify
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchCondition
+import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
 import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
@@ -26,11 +27,13 @@ class ReservationServiceTest : DescribeSpec({
     val reservationStatusTypePojoRepository = mockk<ReservationStatusTypePojoRepository>()
     val distributedLock = mockk<DistributedLock>()
     val eventPublisher = mockk<DomainEventPublisher>()
+    val seatService = mockk<SeatService>()
 
     val reservationService = ReservationService(
         reservationRepository, 
         reservationStatusTypePojoRepository,
-        eventPublisher
+        eventPublisher,
+        seatService
     )
     
     // DistributedLock executeWithLock 메서드의 기본 동작 설정

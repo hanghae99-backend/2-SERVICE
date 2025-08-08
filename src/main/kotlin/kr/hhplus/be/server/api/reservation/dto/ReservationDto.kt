@@ -83,30 +83,6 @@ data class ReservationDto(
     }
 
     /**
-     * 연관 엔티티를 포함한 상세 정보
-     */
-    data class Detail(
-        val reservation: ReservationDto,
-        val user: User?,
-        val concert: Concert?,
-        val seat: Seat?,
-        val payment: Payment?
-    ) {
-        
-        companion object {
-            fun fromEntity(reservation: Reservation): Detail {
-                return Detail(
-                    reservation = ReservationDto.fromEntity(reservation),
-                    user = reservation.user,
-                    concert = reservation.concert,
-                    seat = reservation.seat,
-                    payment = reservation.payment
-                )
-            }
-        }
-    }
-
-    /**
      * 페이징된 목록
      */
     data class Page(

@@ -3,11 +3,7 @@ package kr.hhplus.be.server.domain.reservation.model
 import kr.hhplus.be.server.global.common.BaseEntity
 
 import kr.hhplus.be.server.global.exception.ParameterValidationException
-import kr.hhplus.be.server.domain.user.model.User
-import kr.hhplus.be.server.domain.concert.models.Concert
-import kr.hhplus.be.server.domain.payment.models.Payment
 import jakarta.persistence.*
-import kr.hhplus.be.server.domain.concert.models.Seat
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -56,7 +52,11 @@ class Reservation(
     val expiresAt: LocalDateTime? = null,
 
     @Column(name = "confirmed_at", nullable = true)
-    var confirmedAt: LocalDateTime? = null
+    var confirmedAt: LocalDateTime? = null,
+    
+    @Version
+    @Column(name = "version")
+    var version: Long? = null
 ) : BaseEntity() {
     
     // 상태 명칭 계산 프로퍼티
@@ -67,22 +67,8 @@ class Reservation(
     val statusDescription: String
         get() = status.description ?: ""
 
-    // 필요할 때만 사용하는 연관관계 (조회 전용)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    val user: User? = null
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "concert_id", insertable = false, updatable = false)
-    val concert: Concert? = null
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "seat_id", insertable = false, updatable = false)
-    val seat: Seat? = null
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "payment_id", insertable = false, updatable = false)
-    val payment: Payment? = null
+    // 연관관계 제거 - JPA 연관관계로 인한 트랜잭션 문제를 방지
+    // 필요한 경우 각 ID로 직접 조회하도록 변경
 
     companion object {
     // 상태 코드 상수

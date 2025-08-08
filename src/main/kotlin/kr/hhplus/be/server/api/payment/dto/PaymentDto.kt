@@ -12,7 +12,6 @@ data class PaymentDto(
     val paymentMethod: String?,
     val statusCode: String,
     val paidAt: LocalDateTime?,
-    val reservationList: List<Reservation>
 ) {
     companion object {
         fun fromEntity(payment: Payment): PaymentDto {
@@ -23,7 +22,6 @@ data class PaymentDto(
                 paymentMethod = payment.paymentMethod,
                 statusCode = payment.status.code,
                 paidAt = payment.paidAt,
-                reservationList = payment.reservationList
             )
         }
     }

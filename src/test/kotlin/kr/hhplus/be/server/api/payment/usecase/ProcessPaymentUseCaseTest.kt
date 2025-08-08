@@ -83,8 +83,8 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { balanceService.getBalance(userId) } returns mockBalance
                 justRun { paymentService.validatePaymentAmount(mockBalance.amount, mockPayment.amount) }
                 every { deductBalanceUseCase.execute(userId, paymentAmount) } returns mockk()
-                justRun { reservationService.confirmReservationInternal(reservationId, mockPayment.paymentId) }
-                justRun { seatService.confirmSeatInternal(seatId) }
+                justRun { reservationService.confirmReservation(reservationId, mockPayment.paymentId) }
+                justRun { seatService.confirmSeat(seatId) }
                 every { paymentService.completePayment(mockPayment.paymentId, reservationId, seatId, token) } returns mockCompletedPayment
 
                 // when
@@ -94,8 +94,8 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 result shouldBe mockCompletedPayment
                 verify { paymentService.createPayment(userId, paymentAmount) }
                 verify { deductBalanceUseCase.execute(userId, paymentAmount) }
-                verify { reservationService.confirmReservationInternal(reservationId, mockPayment.paymentId) }
-                verify { seatService.confirmSeatInternal(seatId) }
+                verify { reservationService.confirmReservation(reservationId, mockPayment.paymentId) }
+                verify { seatService.confirmSeat(seatId) }
                 verify { paymentService.completePayment(mockPayment.paymentId, reservationId, seatId, token) }
             }
         }

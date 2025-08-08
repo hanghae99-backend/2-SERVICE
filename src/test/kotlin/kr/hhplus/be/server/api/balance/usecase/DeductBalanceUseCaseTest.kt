@@ -30,12 +30,10 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val pointRepository = mockk<PointRepository>()
                 val pointHistoryRepository = mockk<PointHistoryRepository>()
                 val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
-                val eventPublisher = mockk<DomainEventPublisher>()
                 val deductBalanceUseCase = DeductBalanceUseCase(
                     pointRepository,
                     pointHistoryRepository,
                     pointHistoryTypeRepository,
-                    eventPublisher
                 )
                 val userId = 1L
                 val deductAmount = BigDecimal("5000")
@@ -50,8 +48,7 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 every { pointRepository.save(any()) } returns expectedResultPoint
                 every { pointHistoryTypeRepository.getUseType() } returns useType
                 every { pointHistoryRepository.save(any()) } returns history
-                justRun { eventPublisher.publish(any()) }
-                
+
                 // when
                 val result = deductBalanceUseCase.execute(userId, deductAmount)
                 
@@ -66,12 +63,10 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val pointRepository = mockk<PointRepository>()
                 val pointHistoryRepository = mockk<PointHistoryRepository>()
                 val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
-                val eventPublisher = mockk<DomainEventPublisher>()
                 val deductBalanceUseCase = DeductBalanceUseCase(
                     pointRepository,
                     pointHistoryRepository,
                     pointHistoryTypeRepository,
-                    eventPublisher
                 )
                 val userId = 1L
                 val negativeAmount = BigDecimal("-1000")
@@ -93,12 +88,10 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val pointRepository = mockk<PointRepository>()
                 val pointHistoryRepository = mockk<PointHistoryRepository>()
                 val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
-                val eventPublisher = mockk<DomainEventPublisher>()
                 val deductBalanceUseCase = DeductBalanceUseCase(
                     pointRepository,
                     pointHistoryRepository,
                     pointHistoryTypeRepository,
-                    eventPublisher
                 )
                 val userId = 1L
                 val deductAmount = BigDecimal("5000")
@@ -118,12 +111,10 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val pointRepository = mockk<PointRepository>()
                 val pointHistoryRepository = mockk<PointHistoryRepository>()
                 val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
-                val eventPublisher = mockk<DomainEventPublisher>()
                 val deductBalanceUseCase = DeductBalanceUseCase(
                     pointRepository,
                     pointHistoryRepository,
                     pointHistoryTypeRepository,
-                    eventPublisher
                 )
                 val userId = 1L
                 val deductAmount = BigDecimal("15000")
@@ -144,12 +135,10 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val pointRepository = mockk<PointRepository>()
                 val pointHistoryRepository = mockk<PointHistoryRepository>()
                 val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
-                val eventPublisher = mockk<DomainEventPublisher>()
                 val deductBalanceUseCase = DeductBalanceUseCase(
                     pointRepository,
                     pointHistoryRepository,
                     pointHistoryTypeRepository,
-                    eventPublisher
                 )
                 val userId = 1L
                 val invalidAmount = BigDecimal.ZERO

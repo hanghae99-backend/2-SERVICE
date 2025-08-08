@@ -2,9 +2,18 @@ package kr.hhplus.be.server.domain.concert.infrastructure
 
 import kr.hhplus.be.server.domain.concert.models.Seat
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import jakarta.persistence.LockModeType
 import java.math.BigDecimal
+import java.util.Optional
 
 interface SeatJpaRepository : JpaRepository<Seat, Long> {
+    
+    @Query("SELECT s FROM Seat s WHERE s.seatId = :id")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    fun findByIdWithPessimisticLock(@Param("id") id: Long): Optional<Seat>
     
     // 스케줄 ID로 좌석 조회
     fun findByScheduleId(scheduleId: Long): List<Seat>

@@ -62,11 +62,11 @@ class ReservationController(
     @GetMapping("/{reservationId}")
     fun getReservation(
         @PathVariable @Positive reservationId: Long
-    ): ResponseEntity<CommonApiResponse<ReservationDto.Detail>> {
+    ): ResponseEntity<CommonApiResponse<ReservationDto>> {
         val reservation = reservationService.getReservationWithDetails(reservationId)
         return ResponseEntity.ok(
             CommonApiResponse.success(
-                data = ReservationDto.Detail.fromEntity(reservation),
+                data = ReservationDto.fromEntity(reservation),
                 message = "예약 정보 조회 완료"
             )
         )

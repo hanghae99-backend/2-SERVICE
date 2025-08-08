@@ -8,6 +8,7 @@ import java.time.LocalDateTime
 interface ReservationRepository {
     fun save(reservation: Reservation): Reservation
     fun findById(id: Long): Reservation?
+    fun findByIdWithPessimisticLock(id: Long): Reservation?
     fun findByUserIdOrderByReservedAtDesc(userId: Long): List<Reservation>
     fun findByUserIdOrderByReservedAtDesc(userId: Long, pageable: Pageable): Page<Reservation>
     fun findByConcertIdOrderByReservedAtDesc(concertId: Long): List<Reservation>

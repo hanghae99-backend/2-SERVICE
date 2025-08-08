@@ -267,7 +267,7 @@ class SeatServiceTest : DescribeSpec({
                 every { seatRepository.save(any()) } returns confirmedSeat
                 
                 // when
-                val result = seatService.confirmSeatInternal(seatId)
+                val result = seatService.confirmSeat(seatId)
                 
                 // then
                 result shouldNotBe null

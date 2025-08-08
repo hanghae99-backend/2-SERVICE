@@ -4,11 +4,20 @@ import kr.hhplus.be.server.domain.reservation.model.Reservation
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import jakarta.persistence.LockModeType
 import java.time.LocalDateTime
+import java.util.Optional
 
 @Repository
 interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
+    
+    @Query("SELECT r FROM Reservation r WHERE r.reservationId = :id")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    fun findByIdWithPessimisticLock(@Param("id") id: Long): Optional<Reservation>
     
     // 사용자별 조회
     fun findByUserIdOrderByReservedAtDesc(userId: Long): List<Reservation>

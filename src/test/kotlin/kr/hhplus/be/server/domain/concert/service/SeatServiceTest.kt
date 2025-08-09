@@ -223,7 +223,7 @@ class SeatServiceTest : DescribeSpec({
                 val seat = Seat(seatId, 1L, "A1", "NORMAL", BigDecimal("100000"), reservedStatus)
                 val confirmedSeat = seat.confirm(occupiedStatus)
                 
-                every { seatRepository.findById(seatId) } returns seat
+                every { seatRepository.findByIdWithPessimisticLock(seatId) } returns seat
                 every { seatStatusTypePojoRepository.getOccupiedStatus() } returns occupiedStatus
                 every { seatRepository.save(any()) } returns confirmedSeat
                 
@@ -241,37 +241,12 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val seatId = 999L
                 
-                every { seatRepository.findById(seatId) } returns null
+                every { seatRepository.findByIdWithPessimisticLock(seatId) } returns null
                 
                 // when & then
                 shouldThrow<SeatNotFoundException> {
                     seatService.confirmSeat(seatId)
                 }
-            }
-        }
-    }
-    
-    describe("confirmSeatInternal") {
-        context("내부 호출로 좌석을 확정할 때") {
-            it("좌석을 확정 상태로 변경해야 한다") {
-                // given
-                val seatId = 1L
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, LocalDateTime.now())
-                val reservedStatus = SeatStatusType("RESERVED", "임시예약", "임시 예약된 좌석", true, LocalDateTime.now())
-                val occupiedStatus = SeatStatusType("OCCUPIED", "점유", "점유된 좌석", true, LocalDateTime.now())
-                val seat = Seat(seatId, 1L, "A1", "NORMAL", BigDecimal("100000"), reservedStatus)
-                val confirmedSeat = seat.confirm(occupiedStatus)
-                
-                every { seatRepository.findById(seatId) } returns seat
-                every { seatStatusTypePojoRepository.getOccupiedStatus() } returns occupiedStatus
-                every { seatRepository.save(any()) } returns confirmedSeat
-                
-                // when
-                val result = seatService.confirmSeat(seatId)
-                
-                // then
-                result shouldNotBe null
-                verify { seatRepository.save(any()) }
             }
         }
     }

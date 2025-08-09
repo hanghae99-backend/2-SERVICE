@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
@@ -49,15 +50,22 @@ class AuthConcurrencyTest(
             .webAppContextSetup(webApplicationContext)
             .build()
         
-        // 테스트 데이터 초기화 (순서 중요)
+        // 데이터 정리 (외래키 제약조건 고려)
         try {
-            // Redis 완전 초기화
-            redisTokenStore.flushAll()
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            jdbcTemplate.execute("DELETE FROM point_history")
+            jdbcTemplate.execute("DELETE FROM point")
+            jdbcTemplate.execute("DELETE FROM users")
+            
+            // Redis 데이터도 정리
+            try {
+                redisTokenStore.flushAll() // Redis의 모든 데이터 정리
+            } catch (e: Exception) {
+                // Redis 연결 오류 또는 메서드 없음 무시
+            }
         } catch (e: Exception) {
-            // Redis 초기화 실패시 무시
+            // 테이블이 없거나 이미 비어있는 경우 무시
         }
-        userJpaRepository.deleteAll()
-        userJpaRepository.flush() // 즉시 DB에 반영
     }
 
     describe("토큰 발급 동시성 테스트") {

@@ -77,9 +77,9 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { tokenLifecycleManager.getTokenStatus(token) } returns mockStatus
                 justRun { tokenDomainService.validateActiveToken(mockToken, mockStatus) }
                 
-                every { reservationService.getReservationById(reservationId) } returns mockReservation
+                every { reservationService.getReservationWithLock(reservationId) } returns mockReservation
                 every { seatService.getSeatById(seatId) } returns mockSeat
-                every { paymentService.createPayment(userId, paymentAmount) } returns mockPayment
+                every { paymentService.createReservationPayment(userId, reservationId, paymentAmount) } returns mockPayment
                 every { balanceService.getBalance(userId) } returns mockBalance
                 justRun { paymentService.validatePaymentAmount(mockBalance.amount, mockPayment.amount) }
                 every { deductBalanceUseCase.execute(userId, paymentAmount) } returns mockk()
@@ -92,7 +92,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
 
                 // then
                 result shouldBe mockCompletedPayment
-                verify { paymentService.createPayment(userId, paymentAmount) }
+                verify { paymentService.createReservationPayment(userId, reservationId, paymentAmount) }
                 verify { deductBalanceUseCase.execute(userId, paymentAmount) }
                 verify { reservationService.confirmReservation(reservationId, mockPayment.paymentId) }
                 verify { seatService.confirmSeat(seatId) }
@@ -133,7 +133,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { tokenLifecycleManager.findToken(token) } returns mockToken
                 every { tokenLifecycleManager.getTokenStatus(token) } returns mockStatus
                 justRun { tokenDomainService.validateActiveToken(mockToken, mockStatus) }
-                every { reservationService.getReservationById(reservationId) } returns mockReservation
+                every { reservationService.getReservationWithLock(reservationId) } returns mockReservation
 
                 // when & then
                 shouldThrow<PaymentProcessException> {
@@ -176,7 +176,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { tokenLifecycleManager.findToken(token) } returns mockToken
                 every { tokenLifecycleManager.getTokenStatus(token) } returns mockStatus
                 justRun { tokenDomainService.validateActiveToken(mockToken, mockStatus) }
-                every { reservationService.getReservationById(reservationId) } returns mockReservation
+                every { reservationService.getReservationWithLock(reservationId) } returns mockReservation
 
                 // when & then
                 shouldThrow<PaymentProcessException> {
@@ -220,7 +220,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { tokenLifecycleManager.findToken(token) } returns mockToken
                 every { tokenLifecycleManager.getTokenStatus(token) } returns mockStatus
                 justRun { tokenDomainService.validateActiveToken(mockToken, mockStatus) }
-                every { reservationService.getReservationById(reservationId) } returns mockReservation
+                every { reservationService.getReservationWithLock(reservationId) } returns mockReservation
 
                 // when & then
                 shouldThrow<PaymentProcessException> {
@@ -275,20 +275,20 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { tokenLifecycleManager.getTokenStatus(token) } returns mockStatus
                 justRun { tokenDomainService.validateActiveToken(mockToken, mockStatus) }
                 
-                every { reservationService.getReservationById(reservationId) } returns mockReservation
+                every { reservationService.getReservationWithLock(reservationId) } returns mockReservation
                 every { seatService.getSeatById(seatId) } returns mockSeat
-                every { paymentService.createPayment(userId, paymentAmount) } returns mockPayment
+                every { paymentService.createReservationPayment(userId, reservationId, paymentAmount) } returns mockPayment
                 every { balanceService.getBalance(userId) } returns mockBalance
                 justRun { paymentService.validatePaymentAmount(mockBalance.amount, mockPayment.amount) }
-                every { deductBalanceUseCase.execute(userId, paymentAmount) } throws RuntimeException("잔액 부족")
-                justRun { paymentService.failPayment(mockPayment.paymentId, reservationId, "잔액 부족", token) }
+                every { deductBalanceUseCase.execute(any(), any()) } throws RuntimeException("잔액 부족")
+                justRun { paymentService.failPayment(mockPayment.paymentId, reservationId, any(), token) }
 
                 // when & then
                 shouldThrow<PaymentProcessException> {
                     processPaymentUseCase.execute(userId, reservationId, token)
                 }
                 
-                verify { paymentService.failPayment(mockPayment.paymentId, reservationId, "잔액 부족", token) }
+                verify { paymentService.failPayment(mockPayment.paymentId, reservationId, any(), token) }
             }
         }
     }

@@ -53,7 +53,7 @@ class ProcessPaymentUserCase (
         val seatId = reservation.seatId
         val seat = seatService.getSeatById(seatId)
         val paymentAmount = seat.price
-        val payment = paymentService.createPayment(userId, paymentAmount)
+        val payment = paymentService.createReservationPayment(userId, reservationId, paymentAmount)
 
         try {
             val currentBalance = balanceService.getBalance(userId)

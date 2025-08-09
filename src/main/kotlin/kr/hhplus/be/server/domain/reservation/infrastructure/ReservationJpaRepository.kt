@@ -32,9 +32,6 @@ interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     fun findBySeatIdAndStatusCodeIn(@Param("seatId") seatId: Long, @Param("statusCodes") statusCodes: List<String>): Reservation?
     
-    // 비관적 락 없는 버전 (읽기 전용)
-    fun findBySeatIdAndStatusCodeInReadOnly(seatId: Long, statusCodes: List<String>): Reservation?
-    
     // 만료된 예약 조회
     fun findByExpiresAtBeforeAndStatusCode(currentTime: LocalDateTime, statusCode: String): List<Reservation>
     

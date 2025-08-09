@@ -23,6 +23,7 @@ import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
 import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
 import kr.hhplus.be.server.domain.user.model.User
 import kr.hhplus.be.server.domain.user.repository.UserRepository
+import kr.hhplus.be.server.config.TestDataCleanupService
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
@@ -57,7 +58,8 @@ class PaymentConcurrencyTest(
     private val paymentRepository: PaymentRepository,
     private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
     private val tokenStore: TokenStore,
-    private val tokenFactory: TokenFactory
+    private val tokenFactory: TokenFactory,
+    private val testDataCleanupService: TestDataCleanupService // 추가
 ) : DescribeSpec({
     extension(SpringExtension)
 
@@ -74,14 +76,8 @@ class PaymentConcurrencyTest(
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 데이터 정리
-        paymentRepository.deleteAll()
-        reservationRepository.deleteAll()
-        seatRepository.deleteAll()
-        concertScheduleRepository.deleteAll()
-        concertRepository.deleteAll()
-        pointRepository.deleteAll()
-        userRepository.deleteAll()
+        // TestDataCleanupService를 사용하여 데이터 정리
+        testDataCleanupService.cleanupAllTestData()
 
         // 테스트 데이터 설정
         // 테스트용 사용자들 생성

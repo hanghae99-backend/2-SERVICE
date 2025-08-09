@@ -32,9 +32,9 @@ class ReservationService(
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
     
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
-        logger.info("예약 요청 시작 - userId: $userId, seatId: $seatId")
+        logger.info("예약 요청 시작 - userId: $userId, seatId: $seatId, thread: ${Thread.currentThread().name}")
         
         val activeStatuses = listOf(
             statusRepository.getTemporaryStatus().code,
@@ -45,7 +45,7 @@ class ReservationService(
         val existingReservation = reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses)
         
         if (existingReservation != null) {
-            logger.warn("기존 예약 존재 - reservationId: ${existingReservation.reservationId}, status: ${existingReservation.status.code}")
+            logger.warn("기존 예약 존재 - reservationId: ${existingReservation.reservationId}, status: ${existingReservation.status.code}, userId: $userId")
             if (existingReservation.isConfirmed()) {
                 throw IllegalStateException("이미 확정된 좌석입니다")
             }
@@ -56,12 +56,13 @@ class ReservationService(
 
         val seat = seatService.getSeatById(seatId)
         
-        // 좌석 상태를 예약됨으로 변경
+        // 좌석 상태를 예약됨으로 변경 (비관적 락 사용)
         try {
             seatService.reserveSeat(seatId)
+            logger.info("좌석 상태 변경 성공 - seatId: $seatId, userId: $userId")
         } catch (e: Exception) {
-            logger.error("좌석 상태 변경 실패 - seatId: $seatId", e)
-            throw IllegalStateException("좌석 예약에 실패했습니다")
+            logger.error("좌석 상태 변경 실패 - seatId: $seatId, userId: $userId", e)
+            throw IllegalStateException("좌석 예약에 실패했습니다: ${e.message}")
         }
         
         val reservation = Reservation.createTemporary(
@@ -74,7 +75,7 @@ class ReservationService(
         )
         
         val savedReservation = reservationRepository.save(reservation)
-        logger.info("예약 생성 성공 - reservationId: ${savedReservation.reservationId}")
+        logger.info("예약 생성 성공 - reservationId: ${savedReservation.reservationId}, userId: $userId")
         
         val event = ReservationCreatedEvent(
             reservationId = savedReservation.reservationId,

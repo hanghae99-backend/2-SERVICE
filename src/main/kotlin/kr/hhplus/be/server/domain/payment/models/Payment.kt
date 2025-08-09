@@ -14,7 +14,8 @@ import java.time.LocalDateTime
     name = "payment",
     indexes = [
         Index(name = "idx_payment_user_status", columnList = "user_id, status_code"),
-        Index(name = "idx_payment_paid_at", columnList = "paid_at")
+        Index(name = "idx_payment_paid_at", columnList = "paid_at"),
+        Index(name = "idx_payment_reservation", columnList = "reservation_id")
     ]
 )
 data class Payment(
@@ -25,6 +26,9 @@ data class Payment(
 
     @Column(name = "user_id", nullable = false)
     val userId: Long,
+
+    @Column(name = "reservation_id", nullable = true)
+    val reservationId: Long? = null,
 
     @Column(name = "amount", nullable = false, precision = 10, scale = 2)
     val amount: BigDecimal,
@@ -55,6 +59,34 @@ data class Payment(
         const val STATUS_CANCELLED = "CANC"
         const val STATUS_REFUNDED = "REFD"
 
+        // 예약 관련 결제
+        fun createForReservation(
+            userId: Long,
+            reservationId: Long,
+            amount: BigDecimal,
+            paymentMethod: String = "POINT",
+            pendingStatus: PaymentStatusType
+        ): Payment {
+            if (userId <= 0) {
+                throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
+            }
+            if (reservationId <= 0) {
+                throw ParameterValidationException("예약 ID는 0보다 커야 합니다: $reservationId")
+            }
+            if (amount <= BigDecimal.ZERO) {
+                throw ParameterValidationException("결제 금액은 0보다 커야 합니다: $amount")
+            }
+
+            return Payment(
+                userId = userId,
+                reservationId = reservationId,
+                amount = amount,
+                status = pendingStatus,
+                paymentMethod = paymentMethod
+            )
+        }
+        
+        // 일반 결제 (기존 방식 유지)
         fun create(
             userId: Long,
             amount: BigDecimal,
@@ -70,6 +102,7 @@ data class Payment(
 
             return Payment(
                 userId = userId,
+                reservationId = null, // 예약과 무관한 결제
                 amount = amount,
                 status = pendingStatus,
                 paymentMethod = paymentMethod

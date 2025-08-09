@@ -18,6 +18,7 @@ import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
 import kr.hhplus.be.server.domain.concert.models.Seat
 import kr.hhplus.be.server.domain.concert.models.SeatStatusType
 import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
+import kr.hhplus.be.server.config.TestDataCleanupService
 import kr.hhplus.be.server.domain.user.model.User
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
@@ -47,7 +48,8 @@ class ConcertConcurrencyTest(
     private val userJpaRepository: UserJpaRepository,
     private val tokenStore: TokenStore,
     private val tokenFactory: TokenFactory,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val testDataCleanupService: TestDataCleanupService // 추가
 ) : DescribeSpec({
     extension(SpringExtension)
 
@@ -62,11 +64,8 @@ class ConcertConcurrencyTest(
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 데이터 정리
-        seatJpaRepository.deleteAll()
-        concertScheduleJpaRepository.deleteAll()
-        concertJpaRepository.deleteAll()
-        userJpaRepository.deleteAll()
+        // TestDataCleanupService를 사용하여 데이터 정리
+        testDataCleanupService.cleanupAllTestData()
 
         // 테스트 데이터 생성
         testConcert = concertJpaRepository.save(
@@ -164,19 +163,22 @@ class ConcertConcurrencyTest(
                 // 모든 요청 완료 대기
                 CompletableFuture.allOf(*futures.toTypedArray()).join()
 
-                // then
-                println("Success count: ${successCount.get()}, Failure count: ${failureCount.get()}")
-                println("Results: ${futures.map { it.get() }}")
-                
-                // 실제로는 여러 성공이 가능할 수 있으므로 최소 1개 성공을 확인
-                successCount.get() shouldBe 1  // 정확히 하나만 성공 (동일 좌석)
-                failureCount.get() shouldBe (testUsers.size - 1)  // 나머지는 실패
-                
-                // 실제 DB에서 예약 확인
-                val actualReservations = seatJpaRepository.findById(testSeat.seatId).orElse(null)
-                actualReservations?.let {
-                    println("Seat status: ${it.status.code}")
-                }
+        // then
+        println("Concert test - Success: ${successCount.get()}, Failure: ${failureCount.get()}")
+        println("Future results: ${futures.map { it.get() }}")
+        
+        // 데이터베이스에서 실제로 생성된 예약 수 확인
+        Thread.sleep(1000) // DB 반영 대기
+        val actualReservationsInDb = seatJpaRepository.findAll().filter { it.status.code == "RESERVED" }
+        println("실제 DB에서 예약된 좌석 수: ${actualReservationsInDb.size}")
+        
+        // 하나의 좌석에 대해 하나의 예약만 성공해야 함
+        val actualSuccessCount = successCount.get()
+        println("Expected: 1, Actual: $actualSuccessCount")
+        
+        // 동시성 제어가 완벽하지 않을 수 있으므로 최소 1개는 성공, 최대 1개만 성공하도록 수정
+        actualSuccessCount shouldBe 1
+        failureCount.get() shouldBe (testUsers.size - actualSuccessCount)
 
                 executor.shutdown()
                 executor.awaitTermination(5, TimeUnit.SECONDS)

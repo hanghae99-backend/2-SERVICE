@@ -69,13 +69,16 @@ class ReservationServiceTest : DescribeSpec({
                 val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
                 val activeStatuses = listOf(temporaryStatus.code, confirmedStatus.code)
                 val reservation = Reservation.createTemporary(userId, concertId, seatId, "01", BigDecimal("100000"), temporaryStatus)
+                val mockSeat = mockk<kr.hhplus.be.server.api.concert.dto.SeatDto>(relaxed = true)
                 
                 setupDistributedLockMock()
                 setupEventPublisherMock()
                 every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
                 every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
-                every { seatService.getSeatById(seatId) } returns mockk(relaxed = true) // SeatService mock 추가
-                every { seatService.reserveSeat(seatId) } returns mockk(relaxed = true) // reserveSeat mock 추가
+                every { seatService.getSeatById(seatId) } returns mockSeat
+                every { mockSeat.seatNumber } returns "01"
+                every { mockSeat.price } returns BigDecimal("100000")
+                every { seatService.reserveSeat(seatId) } returns mockk(relaxed = true)
                 every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses) } returns null
                 every { reservationRepository.save(any()) } returns reservation
                 
@@ -102,13 +105,11 @@ class ReservationServiceTest : DescribeSpec({
                 val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
                 val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
                 val activeStatuses = listOf(temporaryStatus.code, confirmedStatus.code)
-                val existingReservation = mockk<Reservation>()
+                val existingReservation = mockk<Reservation>(relaxed = true) // relaxed = true 추가
                 
                 setupDistributedLockMock()
                 every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
                 every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
-                every { seatService.getSeatById(seatId) } returns mockk(relaxed = true)
-                every { seatService.reserveSeat(seatId) } returns mockk(relaxed = true)
                 every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses) } returns existingReservation
                 every { existingReservation.isConfirmed() } returns true
                 
@@ -286,7 +287,7 @@ class ReservationServiceTest : DescribeSpec({
                     reservationRepository.findByExpiresAtBeforeAndStatusCode(any(), temporaryStatus.code) 
                 } returns expiredReservations
                 
-                // 각 예약에 대해 mock 설정
+                // 각 예약에 대한 mock 설정
                 every { expiredReservation1.reservationId } returns 1L
                 every { expiredReservation2.reservationId } returns 2L
                 every { expiredReservation1.isExpired() } returns true
@@ -296,8 +297,8 @@ class ReservationServiceTest : DescribeSpec({
                 every { reservationRepository.findByIdWithPessimisticLock(1L) } returns expiredReservation1
                 every { reservationRepository.findByIdWithPessimisticLock(2L) } returns expiredReservation2
                 
-                // cancelReservationBySystem 메서드 mock (내부 메서드이므로 justRun 사용)
-                justRun { reservationService["cancelReservationBySystem"](any<Long>(), any<String>()) }
+                // cancelReservationBySystem 메서드 mock
+                every { reservationService.cancelReservationBySystem(any(), any()) } returns mockk(relaxed = true)
                 
                 every { reservationRepository.save(any()) } returnsMany expiredReservations
                 

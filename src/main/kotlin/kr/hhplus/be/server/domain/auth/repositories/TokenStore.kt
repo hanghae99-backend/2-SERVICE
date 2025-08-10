@@ -7,6 +7,7 @@ interface TokenStore {
     // 기본 CRUD
     fun save(token: WaitingToken)
     fun findByToken(token: String): WaitingToken?
+    fun findActiveTokenByUserId(userId: Long): WaitingToken?
     fun delete(token: String)
     fun validate(token: String): Boolean
 

@@ -69,4 +69,8 @@ class PointHistoryTypeRepositoryImpl(
     override fun deleteAll() {
         jpaRepository.deleteAll()
     }
+    
+    override fun flush() {
+        jpaRepository.flush()
+    }
 }

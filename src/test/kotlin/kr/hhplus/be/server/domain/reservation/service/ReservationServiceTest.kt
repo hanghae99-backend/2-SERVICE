@@ -8,9 +8,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.justRun
 import io.mockk.verify
+import io.mockk.spyk
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchCondition
+import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
 import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
@@ -26,12 +28,14 @@ class ReservationServiceTest : DescribeSpec({
     val reservationStatusTypePojoRepository = mockk<ReservationStatusTypePojoRepository>()
     val distributedLock = mockk<DistributedLock>()
     val eventPublisher = mockk<DomainEventPublisher>()
+    val seatService = mockk<SeatService>()
 
-    val reservationService = ReservationService(
+    val reservationService = spyk(ReservationService(
         reservationRepository, 
         reservationStatusTypePojoRepository,
-        eventPublisher
-    )
+        eventPublisher,
+        seatService
+    ))
     
     // DistributedLock executeWithLock 메서드의 기본 동작 설정
     fun setupDistributedLockMock() {
@@ -65,11 +69,16 @@ class ReservationServiceTest : DescribeSpec({
                 val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
                 val activeStatuses = listOf(temporaryStatus.code, confirmedStatus.code)
                 val reservation = Reservation.createTemporary(userId, concertId, seatId, "01", BigDecimal("100000"), temporaryStatus)
+                val mockSeat = mockk<kr.hhplus.be.server.api.concert.dto.SeatDto>(relaxed = true)
                 
                 setupDistributedLockMock()
                 setupEventPublisherMock()
                 every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
                 every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
+                every { seatService.getSeatById(seatId) } returns mockSeat
+                every { mockSeat.seatNumber } returns "01"
+                every { mockSeat.price } returns BigDecimal("100000")
+                every { seatService.reserveSeat(seatId) } returns mockk(relaxed = true)
                 every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses) } returns null
                 every { reservationRepository.save(any()) } returns reservation
                 
@@ -96,7 +105,7 @@ class ReservationServiceTest : DescribeSpec({
                 val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
                 val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
                 val activeStatuses = listOf(temporaryStatus.code, confirmedStatus.code)
-                val existingReservation = mockk<Reservation>()
+                val existingReservation = mockk<Reservation>(relaxed = true) // relaxed = true 추가
                 
                 setupDistributedLockMock()
                 every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
@@ -123,7 +132,7 @@ class ReservationServiceTest : DescribeSpec({
                 
                 setupDistributedLockMock()
                 setupEventPublisherMock()
-                every { reservationRepository.findById(reservationId) } returns reservation
+                every { reservationRepository.findByIdWithPessimisticLock(reservationId) } returns reservation
                 every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
                 every { reservationRepository.save(any()) } returns reservation
                 
@@ -144,7 +153,7 @@ class ReservationServiceTest : DescribeSpec({
                 val paymentId = 1L
                 
                 setupDistributedLockMock()
-                every { reservationRepository.findById(reservationId) } returns null
+                every { reservationRepository.findByIdWithPessimisticLock(reservationId) } returns null
                 
                 // when & then
                 shouldThrow<IllegalArgumentException> {
@@ -166,7 +175,7 @@ class ReservationServiceTest : DescribeSpec({
                 
                 setupDistributedLockMock()
                 setupEventPublisherMock()
-                every { reservationRepository.findById(reservationId) } returns reservation
+                every { reservationRepository.findByIdWithPessimisticLock(reservationId) } returns reservation
                 every { reservation.userId } returns userId
                 every { reservationStatusTypePojoRepository.getCancelledStatus() } returns cancelledStatus
                 every { reservationRepository.save(any()) } returns reservation
@@ -191,7 +200,7 @@ class ReservationServiceTest : DescribeSpec({
                 val reservation = mockk<Reservation>()
                 
                 setupDistributedLockMock()
-                every { reservationRepository.findById(reservationId) } returns reservation
+                every { reservationRepository.findByIdWithPessimisticLock(reservationId) } returns reservation
                 every { reservation.userId } returns otherUserId
                 
                 // when & then
@@ -277,6 +286,20 @@ class ReservationServiceTest : DescribeSpec({
                 every { 
                     reservationRepository.findByExpiresAtBeforeAndStatusCode(any(), temporaryStatus.code) 
                 } returns expiredReservations
+                
+                // 각 예약에 대한 mock 설정
+                every { expiredReservation1.reservationId } returns 1L
+                every { expiredReservation2.reservationId } returns 2L
+                every { expiredReservation1.isExpired() } returns true
+                every { expiredReservation2.isExpired() } returns true
+                
+                // findByIdWithPessimisticLock에 대한 mock
+                every { reservationRepository.findByIdWithPessimisticLock(1L) } returns expiredReservation1
+                every { reservationRepository.findByIdWithPessimisticLock(2L) } returns expiredReservation2
+                
+                // cancelReservationBySystem 메서드 mock
+                every { reservationService.cancelReservationBySystem(any(), any()) } returns mockk(relaxed = true)
+                
                 every { reservationRepository.save(any()) } returnsMany expiredReservations
                 
                 // when

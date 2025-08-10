@@ -22,6 +22,10 @@ class SeatRepositoryImpl(
         return seatJpaRepository.findById(id).orElse(null)
     }
     
+    override fun findByIdWithPessimisticLock(id: Long): Seat? {
+        return seatJpaRepository.findByIdWithPessimisticLock(id).orElse(null)
+    }
+    
     override fun findByScheduleId(scheduleId: Long): List<Seat> {
         return seatJpaRepository.findByScheduleId(scheduleId)
     }

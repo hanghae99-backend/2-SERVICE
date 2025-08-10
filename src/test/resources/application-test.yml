@@ -1,28 +1,54 @@
+# 테스트 환경 설정
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
     username: sa
     password: 
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 20000
+      validation-timeout: 5000
+      leak-detection-threshold: 60000
+
   jpa:
     hibernate:
       ddl-auto: create-drop
-    show-sql: true
     properties:
       hibernate:
-        format_sql: true
         dialect: org.hibernate.dialect.H2Dialect
-        use_sql_comments: true
-    defer-datasource-initialization: true
+        connection:
+          isolation: 2 # READ_COMMITTED
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+        # 락 타임아웃 설정
+        javax:
+          persistence:
+            lock:
+              timeout: 10000 # 10초
+    show-sql: true
+    format-sql: true
+
+  # H2 콘솔 설정 (테스트 시 디버깅용)
   h2:
     console:
       enabled: true
       path: /h2-console
-  data:
-    redis:
-      port: 16379
-      host: localhost
+
+# 로깅 설정
 logging:
   level:
+    kr.hhplus.be.server: DEBUG
+    org.springframework.transaction: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    root: INFO
+
+# 테스트 전용 설정
+test:
+  concurrency:
+    thread-pool-size: 10
+    timeout-seconds: 30

@@ -5,8 +5,7 @@ import kr.hhplus.be.server.global.common.BaseEntity
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import kr.hhplus.be.server.domain.payment.exception.PaymentAlreadyProcessedException
 import jakarta.persistence.*
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.user.model.User
+
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -15,7 +14,8 @@ import java.time.LocalDateTime
     name = "payment",
     indexes = [
         Index(name = "idx_payment_user_status", columnList = "user_id, status_code"),
-        Index(name = "idx_payment_paid_at", columnList = "paid_at")
+        Index(name = "idx_payment_paid_at", columnList = "paid_at"),
+        Index(name = "idx_payment_reservation", columnList = "reservation_id")
     ]
 )
 data class Payment(
@@ -26,6 +26,9 @@ data class Payment(
 
     @Column(name = "user_id", nullable = false)
     val userId: Long,
+
+    @Column(name = "reservation_id", nullable = true)
+    val reservationId: Long? = null,
 
     @Column(name = "amount", nullable = false, precision = 10, scale = 2)
     val amount: BigDecimal,
@@ -38,24 +41,15 @@ data class Payment(
     var status: PaymentStatusType,
 
     @Column(name = "paid_at")
-    val paidAt: LocalDateTime? = null
+    val paidAt: LocalDateTime? = null,
+    
+    @Version
+    @Column(name = "version")
+    var version: Long? = null
 ) : BaseEntity() {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    val user: User? = null
-
-    @OneToMany(mappedBy = "payment", fetch = FetchType.LAZY)
-    private var _reservationList: MutableList<Reservation> = mutableListOf()
-
-    val reservationList: List<Reservation>
-        get() = _reservationList.toList()
-
-    fun addReservation(reservation: Reservation) {
-        if (!_reservationList.contains(reservation)) {
-            _reservationList.add(reservation)
-        }
-    }
+    // 연관관계 제거 - JPA 연관관계로 인한 트랜잭션 문제를 방지
+    // 필요한 경우 userId로 직접 조회하도록 변경
 
     companion object {
         // 상태 코드 상수
@@ -65,6 +59,34 @@ data class Payment(
         const val STATUS_CANCELLED = "CANC"
         const val STATUS_REFUNDED = "REFD"
 
+        // 예약 관련 결제
+        fun createForReservation(
+            userId: Long,
+            reservationId: Long,
+            amount: BigDecimal,
+            paymentMethod: String = "POINT",
+            pendingStatus: PaymentStatusType
+        ): Payment {
+            if (userId <= 0) {
+                throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
+            }
+            if (reservationId <= 0) {
+                throw ParameterValidationException("예약 ID는 0보다 커야 합니다: $reservationId")
+            }
+            if (amount <= BigDecimal.ZERO) {
+                throw ParameterValidationException("결제 금액은 0보다 커야 합니다: $amount")
+            }
+
+            return Payment(
+                userId = userId,
+                reservationId = reservationId,
+                amount = amount,
+                status = pendingStatus,
+                paymentMethod = paymentMethod
+            )
+        }
+        
+        // 일반 결제 (기존 방식 유지)
         fun create(
             userId: Long,
             amount: BigDecimal,
@@ -80,6 +102,7 @@ data class Payment(
 
             return Payment(
                 userId = userId,
+                reservationId = null, // 예약과 무관한 결제
                 amount = amount,
                 status = pendingStatus,
                 paymentMethod = paymentMethod

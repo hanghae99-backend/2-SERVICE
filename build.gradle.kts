@@ -85,6 +85,16 @@ dependencies {
 
 	// Spring Boot Logging
 	implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
+    testImplementation(kotlin("test"))
+}
+
+tasks.test {
+	useJUnitPlatform()
+
+	testLogging {
+		events("passed", "skipped", "failed")
+		showStandardStreams = true
+	}
 }
 
 tasks.withType<Test> {

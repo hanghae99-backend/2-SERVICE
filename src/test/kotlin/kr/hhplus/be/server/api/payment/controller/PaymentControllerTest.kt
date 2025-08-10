@@ -33,7 +33,6 @@ class PaymentControllerTest : DescribeSpec({
                     paymentMethod = "POINT",
                     statusCode = "COMPLETED",
                     paidAt = LocalDateTime.now(),
-                    reservationList = emptyList()
                 )
                 
                 every { processPaymentUserCase.execute(userId, reservationId, token) } returns paymentDto
@@ -63,7 +62,6 @@ class PaymentControllerTest : DescribeSpec({
                     paymentMethod = "POINT",
                     statusCode = "COMPLETED",
                     paidAt = LocalDateTime.now(),
-                    reservationList = emptyList()
                 )
                 
                 every { paymentService.getPaymentById(paymentId) } returns paymentDto

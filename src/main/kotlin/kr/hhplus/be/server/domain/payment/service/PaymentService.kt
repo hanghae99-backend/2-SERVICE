@@ -24,13 +24,21 @@ class PaymentService(
     private val domainEventPublisher: DomainEventPublisher
 ) {
 
+    // 예약 관련 결제
+    @Transactional
+    fun createReservationPayment(userId: Long, reservationId: Long, amount: BigDecimal): PaymentDto {
+        val pendingStatus = paymentStatusTypeRepository.getPendingStatus()
+        val payment = Payment.createForReservation(userId, reservationId, amount, "POINT", pendingStatus)
+        val savedPayment = paymentRepository.save(payment)
+        return PaymentDto.fromEntity(savedPayment)
+    }
+    
+    // 일반 결제 (기존 방식 유지)
     @Transactional
     fun createPayment(userId: Long, amount: BigDecimal): PaymentDto {
-
         val pendingStatus = paymentStatusTypeRepository.getPendingStatus()
         val payment = Payment.create(userId, amount, "POINT", pendingStatus)
         val savedPayment = paymentRepository.save(payment)
-
         return PaymentDto.fromEntity(savedPayment)
     }
 
@@ -81,6 +89,10 @@ class PaymentService(
         return PaymentDto.fromEntity(finalPayment)
     }
 
+    fun findByReservationId(reservationId: Long): List<Payment> {
+        return paymentRepository.findByReservationId(reservationId)
+    }
+    
     fun getPaymentById(paymentId: Long): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
             .orElseThrow { PaymentNotFoundException("결제를 찾을 수 없습니다: $paymentId") }

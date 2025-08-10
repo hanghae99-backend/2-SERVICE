@@ -23,4 +23,5 @@ interface PointHistoryTypePojoRepository {
     fun isValidType(code: String): Boolean
 
     fun deleteAll()
+    fun flush() // 변경사항을 즉시 DB에 반영
 }

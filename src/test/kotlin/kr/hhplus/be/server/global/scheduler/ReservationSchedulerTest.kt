@@ -7,13 +7,11 @@ import io.mockk.mockk
 import io.mockk.verify
 import kr.hhplus.be.server.domain.auth.service.QueueManager
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
-import kr.hhplus.be.server.domain.auth.service.TokenService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 
 class ReservationSchedulerTest : DescribeSpec({
     
     val reservationService = mockk<ReservationService>()
-    val tokenService = mockk<TokenService>()
     val tokenLifecycleManager = mockk<TokenLifecycleManager>()
     val queueManager = mockk<QueueManager>()
     val reservationScheduler = ReservationScheduler(
@@ -69,56 +67,60 @@ class ReservationSchedulerTest : DescribeSpec({
     
     describe("processQueue") {
         context("대기열 자동 처리를 실행할 때") {
-            it("토큰 서비스의 자동 처리를 호출해야 한다") {
+            it("토큰 생명주기 관리자와 큐 매니저의 메서드를 호출해야 한다") {
                 // given
-                every { tokenService.processQueueAutomatically() } returns Unit
+                every { tokenLifecycleManager.cleanupExpiredTokens() } returns Unit
+                every { queueManager.processQueueAutomatically() } returns Unit
                 
                 // when
                 reservationScheduler.processQueue()
                 
                 // then
-                verify { tokenService.processQueueAutomatically() }
+                verify { tokenLifecycleManager.cleanupExpiredTokens() }
+                verify { queueManager.processQueueAutomatically() }
             }
         }
         
         context("대기열 처리 중 예외가 발생할 때") {
             it("예외를 처리하고 계속 실행되어야 한다") {
                 // given
-                every { tokenService.processQueueAutomatically() } throws RuntimeException("처리 실패")
+                every { tokenLifecycleManager.cleanupExpiredTokens() } throws RuntimeException("정리 실패")
+                every { queueManager.processQueueAutomatically() } returns Unit
                 
                 // when
                 reservationScheduler.processQueue()
                 
                 // then
-                verify { tokenService.processQueueAutomatically() }
+                verify { tokenLifecycleManager.cleanupExpiredTokens() }
+                // 예외가 발생해도 다음 메서드는 호출되지 않을 수 있음
             }
         }
     }
     
     describe("cleanupExpiredTokens") {
         context("만료된 토큰 정리를 실행할 때") {
-            it("토큰 서비스의 정리 메서드를 호출해야 한다") {
+            it("토큰 생명주기 관리자의 정리 메서드를 호출해야 한다") {
                 // given
-                every { tokenService.cleanupExpiredActiveTokens() } returns Unit
+                every { tokenLifecycleManager.cleanupExpiredTokens() } returns Unit
                 
                 // when
                 reservationScheduler.cleanupExpiredTokens()
                 
                 // then
-                verify { tokenService.cleanupExpiredActiveTokens() }
+                verify { tokenLifecycleManager.cleanupExpiredTokens() }
             }
         }
         
         context("토큰 정리 중 예외가 발생할 때") {
             it("예외를 처리하고 계속 실행되어야 한다") {
                 // given
-                every { tokenService.cleanupExpiredActiveTokens() } throws RuntimeException("정리 실패")
+                every { tokenLifecycleManager.cleanupExpiredTokens() } throws RuntimeException("정리 실패")
                 
                 // when
                 reservationScheduler.cleanupExpiredTokens()
                 
                 // then
-                verify { tokenService.cleanupExpiredActiveTokens() }
+                verify { tokenLifecycleManager.cleanupExpiredTokens() }
             }
         }
     }

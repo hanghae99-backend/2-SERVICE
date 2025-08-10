@@ -27,6 +27,10 @@ class TokenLifecycleManager(
         return tokenStore.findByToken(token)
     }
     
+    fun findActiveTokenByUserId(userId: Long): WaitingToken? {
+        return tokenStore.findActiveTokenByUserId(userId)
+    }
+    
 
     fun expireToken(token: String) {
         tokenStore.expireToken(token)

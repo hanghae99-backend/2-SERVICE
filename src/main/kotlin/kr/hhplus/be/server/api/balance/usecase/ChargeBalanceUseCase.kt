@@ -1,33 +1,43 @@
 package kr.hhplus.be.server.api.balance.usecase
 
-import kr.hhplus.be.server.api.balance.dto.BalanceDto
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistory
-import kr.hhplus.be.server.domain.balance.event.BalanceChargedEvent
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
-import kr.hhplus.be.server.global.event.DomainEventPublisher
-import kr.hhplus.be.server.global.lock.LockGuard
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import org.slf4j.LoggerFactory
 
 @Service
 class ChargeBalanceUseCase(
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
     private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
-    private val eventPublisher: DomainEventPublisher
 ) {
+    
+    private val logger = LoggerFactory.getLogger(ChargeBalanceUseCase::class.java)
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
-    @LockGuard(key = "balance:#userId")
     fun execute(userId: Long, amount: BigDecimal): Point {
-        val currentPoint = pointRepository.findByUserId(userId)
-            ?: Point.create(userId, BigDecimal.ZERO)
+        // 비관적 락을 사용하여 동시성 문제 방지 (차감과 동일한 전략 사용)
+        val currentPoint = pointRepository.findByUserIdWithPessimisticLock(userId)
+            ?: run {
+                // 포인트가 없는 경우 새로 생성 (동시성 안전하게)
+                try {
+                    val newPoint = Point.create(userId, BigDecimal.ZERO)
+                    pointRepository.save(newPoint)
+                } catch (e: Exception) {
+                    // 다른 스레드에서 이미 생성한 경우, 다시 조회
+                    logger.info("Point already created by another thread for user: $userId")
+                    pointRepository.findByUserIdWithPessimisticLock(userId)
+                        ?: throw IllegalStateException("포인트 생성 실패: $userId")
+                }
+            }
 
         val chargedPoint = currentPoint.charge(amount)
         val savedPoint = pointRepository.save(chargedPoint)
@@ -35,14 +45,7 @@ class ChargeBalanceUseCase(
         val chargeType = pointHistoryTypeRepository.getChargeType()
         val history = PointHistory.charge(userId, amount, chargeType, "포인트 충전")
         pointHistoryRepository.save(history)
-
-        val event = BalanceChargedEvent(
-            userId = userId,
-            amount = amount,
-            newBalance = savedPoint.amount
-        )
-        eventPublisher.publish(event)
-
+        
         return savedPoint
     }
 }

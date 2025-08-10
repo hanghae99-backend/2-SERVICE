@@ -7,6 +7,7 @@ interface SeatRepository {
     fun save(seat: Seat): Seat
     fun saveAll(seats: List<Seat>): List<Seat>
     fun findById(id: Long): Seat?
+    fun findByIdWithPessimisticLock(id: Long): Seat?
     fun findByScheduleId(scheduleId: Long): List<Seat>
     fun findByScheduleIdAndStatusCode(scheduleId: Long, statusCode: String): List<Seat>
     fun findByScheduleIdAndSeatNumber(scheduleId: Long, seatNumber: String): Seat?

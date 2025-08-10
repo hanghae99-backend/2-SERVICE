@@ -36,6 +36,7 @@ class TokenIssueUseCaseTest : DescribeSpec({
                 val queuePositionFromZero = 4
                 val estimatedWaitingTime = 20
                 
+                every { tokenLifecycleManager.findActiveTokenByUserId(userId) } returns null
                 every { tokenFactory.createWaitingToken(userId) } returns waitingToken
                 every { tokenLifecycleManager.saveToken(waitingToken) } returns Unit
                 every { queueManager.addToQueue(tokenValue) } returns Unit

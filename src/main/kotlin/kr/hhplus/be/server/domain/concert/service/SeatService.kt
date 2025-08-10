@@ -8,6 +8,7 @@ import kr.hhplus.be.server.domain.concert.repositories.SeatRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatStatusTypePojoRepository
 import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.global.lock.LockGuard
+import kr.hhplus.be.server.global.lock.LockKeyManager
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -47,6 +48,7 @@ class SeatService(
         return seat.isAvailable()
     }
     
+    @LockGuard(key = "seat:#seatId")
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(seatId: Long): SeatDto {
         val seat = seatRepository.findByIdWithPessimisticLock(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
@@ -62,6 +64,7 @@ class SeatService(
         return SeatDto.from(savedSeat)
     }
     
+    @LockGuard(key = "seat:#seatId")
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun confirmSeat(seatId: Long): SeatDto {
         val seat = seatRepository.findByIdWithPessimisticLock(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }

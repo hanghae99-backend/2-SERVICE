@@ -10,6 +10,7 @@ import kr.hhplus.be.server.domain.payment.exception.PaymentNotFoundException
 import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.payment.repository.PaymentRepository
 import kr.hhplus.be.server.domain.payment.repository.PaymentStatusTypePojoRepository
+import kr.hhplus.be.server.global.lock.LockGuard
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -42,6 +43,7 @@ class PaymentService(
         return PaymentDto.fromEntity(savedPayment)
     }
 
+    @LockGuard(key = "payment:#paymentId")
     @Transactional
     fun completePayment(paymentId: Long, reservationId: Long, seatId: Long, token: String): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
@@ -66,6 +68,7 @@ class PaymentService(
         return PaymentDto.fromEntity(finalPayment)
     }
 
+    @LockGuard(key = "payment:#paymentId")
     @Transactional
     fun failPayment(paymentId: Long, reservationId: Long, reason: String, token: String): PaymentDto {
         val payment = paymentRepository.findById(paymentId)

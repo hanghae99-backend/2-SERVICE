@@ -12,6 +12,7 @@ import kr.hhplus.be.server.domain.reservation.event.ReservationConfirmedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
 import kr.hhplus.be.server.domain.concert.service.SeatService
+import kr.hhplus.be.server.global.lock.LockGuard
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -32,6 +33,7 @@ class ReservationService(
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
     
+    @LockGuard(key = "seat:#seatId")
     @Transactional(isolation = Isolation.SERIALIZABLE)
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
         logger.info("예약 요청 시작 - userId: $userId, seatId: $seatId, thread: ${Thread.currentThread().name}")
@@ -91,6 +93,7 @@ class ReservationService(
         return savedReservation
     }
     
+    @LockGuard(key = "reservation:#reservationId")
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun confirmReservation(reservationId: Long, paymentId: Long): Reservation {
         val reservation = reservationRepository.findByIdWithPessimisticLock(reservationId)
@@ -113,6 +116,7 @@ class ReservationService(
         return savedReservation
     }
 
+    @LockGuard(key = "reservation:#reservationId")
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun cancelReservation(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
         val reservation = reservationRepository.findByIdWithPessimisticLock(reservationId)
@@ -138,6 +142,7 @@ class ReservationService(
         return savedReservation
     }
 
+    @LockGuard(key = "reservation:#reservationId")
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun cancelReservationBySystem(reservationId: Long, cancelReason: String): Reservation {
         val reservation = reservationRepository.findByIdWithPessimisticLock(reservationId)

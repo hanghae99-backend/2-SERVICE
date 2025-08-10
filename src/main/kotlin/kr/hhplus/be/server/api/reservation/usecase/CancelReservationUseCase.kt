@@ -5,6 +5,7 @@ import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
+import kr.hhplus.be.server.global.lock.LockGuard
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -15,6 +16,7 @@ class CancelReservationUseCase(
     private val tokenLifecycleManager: TokenLifecycleManager
 ) {
     
+    @LockGuard(key = "reservation:#reservationId")
     @Transactional
     @ValidateUserId
     fun execute(reservationId: Long, userId: Long, cancelReason: String?, token: String): Reservation {

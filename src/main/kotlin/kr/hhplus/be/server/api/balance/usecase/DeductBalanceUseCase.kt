@@ -7,6 +7,7 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
+import kr.hhplus.be.server.global.lock.LockGuard
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -19,6 +20,7 @@ class DeductBalanceUseCase(
     private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
 ) {
 
+    @LockGuard(key = "user:#userId")
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, amount: BigDecimal): Point {

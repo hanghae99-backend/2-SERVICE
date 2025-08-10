@@ -6,6 +6,7 @@ import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
+import kr.hhplus.be.server.global.lock.LockGuard
 import org.slf4j.LoggerFactory
 import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.stereotype.Service
@@ -22,6 +23,7 @@ class ReserveSeatUseCase(
     
     private val logger = LoggerFactory.getLogger(ReserveSeatUseCase::class.java)
     
+    @LockGuard(key = "seat:#seatId")
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {

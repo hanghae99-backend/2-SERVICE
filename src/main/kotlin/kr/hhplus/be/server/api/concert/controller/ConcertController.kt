@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.api.concert.dto.*
 import kr.hhplus.be.server.domain.concert.service.ConcertService
 import kr.hhplus.be.server.domain.concert.service.SeatService
+import kr.hhplus.be.server.api.concert.dto.PopularConcertDto
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -91,6 +92,32 @@ class ConcertController(
             CommonApiResponse.success(
                 data = seats,
                 message = "좌석 조회 완료"
+            )
+        )
+    }
+
+    @GetMapping("/popular")
+    fun getPopularConcerts(
+        @RequestParam(defaultValue = "10") limit: Int
+    ): ResponseEntity<CommonApiResponse<List<PopularConcertDto>>> {
+        val popularConcerts = concertService.getPopularConcerts(limit)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = popularConcerts,
+                message = "인기 콘서트 조회 완료"
+            )
+        )
+    }
+
+    @GetMapping("/trending")
+    fun getTrendingConcerts(
+        @RequestParam(defaultValue = "5") limit: Int
+    ): ResponseEntity<CommonApiResponse<List<PopularConcertDto>>> {
+        val trendingConcerts = concertService.getTrendingConcerts(limit)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = trendingConcerts,
+                message = "실시간 트렌딩 콘서트 조회 완료"
             )
         )
     }

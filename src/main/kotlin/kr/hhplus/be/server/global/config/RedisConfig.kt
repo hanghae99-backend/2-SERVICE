@@ -70,6 +70,11 @@ class RedisConfig {
                 defaultConfig.entryTtl(Duration.ofHours(1)))
             .withCacheConfiguration("status:types", 
                 defaultConfig.entryTtl(Duration.ofHours(24)))
+            // 인기 콘서트 캐시 설정
+            .withCacheConfiguration("concerts:popular:main", 
+                defaultConfig.entryTtl(Duration.ofMinutes(3))) // 메인 페이지는 짧은 TTL
+            .withCacheConfiguration("concerts:trending", 
+                defaultConfig.entryTtl(Duration.ofMinutes(1))) // 트렌딩은 매우 짧은 TTL
             .build()
     }
 }

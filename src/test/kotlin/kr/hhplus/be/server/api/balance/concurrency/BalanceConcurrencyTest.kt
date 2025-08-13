@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
+import kr.hhplus.be.server.config.ConcurrencyTest
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
@@ -13,6 +14,7 @@ import kr.hhplus.be.server.domain.user.model.User
 import kr.hhplus.be.server.domain.user.repository.UserRepository
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
@@ -27,9 +29,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-@SpringBootTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles("test")
+@ConcurrencyTest
 class BalanceConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,

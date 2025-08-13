@@ -2,6 +2,8 @@ package kr.hhplus.be.server.domain.concert.infrastructure
 
 import kr.hhplus.be.server.domain.concert.models.SeatStatusType
 import kr.hhplus.be.server.domain.concert.repositories.SeatStatusTypePojoRepository
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Repository
 
 @Repository

@@ -5,11 +5,9 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.user.dto.request.UserCreateRequest
 import kr.hhplus.be.server.config.TestDataCleanupService
+import kr.hhplus.be.server.config.IntegrationTest
 import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
-import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
@@ -18,9 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.context.WebApplicationContext
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles("test")
+@IntegrationTest
 class UserIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val userJpaRepository: UserJpaRepository,

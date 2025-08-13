@@ -42,7 +42,6 @@ class SeatService(
             .map { seat -> 
                 SeatDto.from(seat).copy(
                     statusCode = "LAYOUT",
-                    statusName = "레이아웃"
                 )
             }
             .sortedBy { it.seatNumber }

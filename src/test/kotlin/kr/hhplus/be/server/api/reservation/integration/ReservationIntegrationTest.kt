@@ -6,6 +6,7 @@ import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCancelRequest
 import kr.hhplus.be.server.config.TestDataCleanupService
+import kr.hhplus.be.server.config.IntegrationTest
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
@@ -19,11 +20,7 @@ import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
 import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
 import kr.hhplus.be.server.domain.user.model.User
 import kr.hhplus.be.server.domain.user.repository.UserRepository
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
-import org.springframework.test.context.ActiveProfiles
-import org.springframework.test.annotation.Rollback
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
@@ -47,9 +44,7 @@ data class TestData(
     val reservedStatus: SeatStatusType
 )
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles("test")
+@IntegrationTest
 class ReservationIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,

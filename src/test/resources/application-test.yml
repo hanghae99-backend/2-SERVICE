@@ -1,5 +1,18 @@
 # 테스트 환경 설정
 spring:
+  # Redisson 비활성화
+  redisson:
+    config: null
+    
+  # Redis 설정 (기본 Spring Data Redis만 사용)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 5000ms
+      connect-timeout: 3000ms
+      database: 0
+      
   datasource:
     url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
@@ -24,15 +37,13 @@ spring:
         order_inserts: true
         order_updates: true
         batch_versioned_data: true
-        # 락 타임아웃 설정
         javax:
           persistence:
             lock:
-              timeout: 10000 # 10초
+              timeout: 10000
     show-sql: true
     format-sql: true
 
-  # H2 콘솔 설정 (테스트 시 디버깅용)
   h2:
     console:
       enabled: true
@@ -45,6 +56,7 @@ logging:
     org.springframework.transaction: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.redisson: OFF
     root: INFO
 
 # 테스트 전용 설정

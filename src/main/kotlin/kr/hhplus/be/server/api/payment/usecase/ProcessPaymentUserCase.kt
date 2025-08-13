@@ -39,7 +39,7 @@ class ProcessPaymentUserCase (
         tokenDomainService.validateActiveToken(waitingToken, status)
 
         // 예약 상태로 중복 결제 확인 (예약이 이미 확정되었는지 확인)
-        val reservation = reservationService.getReservationWithLock(reservationId)
+            val reservation = reservationService.getReservationWithLock(reservationId)
         logger.info("결제 처리 시작 - userId: $userId, reservationId: $reservationId, status: ${reservation.status.code}")
 
         if (reservation.userId != userId) {

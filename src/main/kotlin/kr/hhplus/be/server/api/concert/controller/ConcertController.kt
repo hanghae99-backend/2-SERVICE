@@ -3,8 +3,9 @@ package kr.hhplus.be.server.api.concert.controller
 import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.api.concert.dto.*
 import kr.hhplus.be.server.domain.concert.service.ConcertService
+import kr.hhplus.be.server.domain.concert.service.ConcertStatsService
 import kr.hhplus.be.server.domain.concert.service.SeatService
-import kr.hhplus.be.server.api.concert.dto.PopularConcertDto
+import kr.hhplus.be.server.global.cache.PopularConcertDto
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -16,7 +17,8 @@ import java.time.LocalDate
 @Validated
 class ConcertController(
     private val concertService: ConcertService,
-    private val seatService: SeatService
+    private val seatService: SeatService,
+    private val concertStatsService: ConcertStatsService
 ) {
 
     @GetMapping
@@ -100,7 +102,7 @@ class ConcertController(
     fun getPopularConcerts(
         @RequestParam(defaultValue = "10") limit: Int
     ): ResponseEntity<CommonApiResponse<List<PopularConcertDto>>> {
-        val popularConcerts = concertService.getPopularConcerts(limit)
+        val popularConcerts = concertStatsService.getPopularConcerts(limit)
         return ResponseEntity.ok(
             CommonApiResponse.success(
                 data = popularConcerts,
@@ -113,7 +115,7 @@ class ConcertController(
     fun getTrendingConcerts(
         @RequestParam(defaultValue = "5") limit: Int
     ): ResponseEntity<CommonApiResponse<List<PopularConcertDto>>> {
-        val trendingConcerts = concertService.getTrendingConcerts(limit)
+        val trendingConcerts = concertStatsService.getTrendingConcerts(limit)
         return ResponseEntity.ok(
             CommonApiResponse.success(
                 data = trendingConcerts,

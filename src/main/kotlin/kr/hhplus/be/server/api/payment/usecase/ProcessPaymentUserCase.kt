@@ -17,8 +17,9 @@ import kr.hhplus.be.server.domain.payment.service.PaymentService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import kr.hhplus.be.server.global.lock.LockGuard
+
 import org.slf4j.LoggerFactory
-import org.springframework.dao.OptimisticLockingFailureException
+
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -38,7 +39,7 @@ class ProcessPaymentUserCase (
 
     private val logger = LoggerFactory.getLogger(ProcessPaymentUserCase::class.java)
 
-    @LockGuard(keys = ["user:#userId", "reservation:#reservationId", "seat:#seatId"])
+    @LockGuard(keys = ["user:#userId", "reservation:#reservationId"])
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, reservationId: Long, token: String): PaymentDto{
@@ -47,7 +48,7 @@ class ProcessPaymentUserCase (
         tokenDomainService.validateActiveToken(waitingToken, status)
 
         // 예약 상태로 중복 결제 확인 (예약이 이미 확정되었는지 확인)
-        val reservation = reservationService.getReservationWithLock(reservationId)
+        val reservation = reservationService.getReservationById(reservationId)
         logger.info("결제 처리 시작 - userId: $userId, reservationId: $reservationId, status: ${reservation.status.code}")
 
         if (reservation.userId != userId) {
@@ -69,8 +70,7 @@ class ProcessPaymentUserCase (
             val currentBalance = balanceService.getBalance(userId)
             paymentService.validatePaymentAmount(currentBalance.amount, payment.amount)
             
-            // 멀티락 내에서 직접 잔액 차감 처리 (중첩 락 방지)
-            val currentPoint = pointRepository.findByUserIdWithPessimisticLock(userId)
+            val currentPoint = pointRepository.findByUserId(userId)
                 ?: throw PointNotFoundException("포인트 정보를 찾을 수 없습니다")
             val deductedPoint = currentPoint.deduct(payment.amount)
             pointRepository.save(deductedPoint)
@@ -90,15 +90,6 @@ class ProcessPaymentUserCase (
 
             return completedPayment
 
-        } catch (e: OptimisticLockingFailureException) {
-            logger.warn("Optimistic lock failure during payment processing. UserId: $userId, ReservationId: $reservationId")
-            paymentService.failPayment(
-                paymentId = payment.paymentId,
-                reservationId = reservationId,
-                reason = "동시 결제 요청으로 인한 처리 실패",
-                token = token
-            )
-            throw PaymentProcessException("동일한 예약에 대한 중복 결제 요청입니다. 결제가 취소되었습니다.")
         } catch (e: Exception) {
             paymentService.failPayment(
                 paymentId = payment.paymentId,

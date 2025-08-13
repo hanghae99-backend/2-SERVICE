@@ -5,7 +5,6 @@ import kr.hhplus.be.server.api.concert.dto.*
 import kr.hhplus.be.server.domain.concert.service.ConcertService
 import kr.hhplus.be.server.domain.concert.service.ConcertStatsService
 import kr.hhplus.be.server.domain.concert.service.SeatService
-import kr.hhplus.be.server.global.cache.PopularConcertDto
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated

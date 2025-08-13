@@ -7,8 +7,9 @@ import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import kr.hhplus.be.server.global.lock.LockGuard
+
 import org.slf4j.LoggerFactory
-import org.springframework.dao.OptimisticLockingFailureException
+
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -35,11 +36,6 @@ class ReserveSeatUseCase(
             throw IllegalStateException("예약할 수 없는 좌석입니다: $seatId")
         }
         
-        return try {
-            reservationService.reserveSeat(userId, concertId, seatId)
-        } catch (e: OptimisticLockingFailureException) {
-            logger.warn("Optimistic lock failure during seat reservation. SeatId: $seatId, UserId: $userId")
-            throw IllegalStateException("해당 좌석이 이미 다른 사용자에 의해 예약되었습니다. 다른 좌석을 선택해주세요.")
-        }
+        return reservationService.reserveSeat(userId, concertId, seatId)
     }
 }

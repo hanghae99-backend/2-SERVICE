@@ -7,6 +7,7 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepos
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import kr.hhplus.be.server.global.lock.LockGuard
+
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -26,8 +27,7 @@ class ChargeBalanceUseCase(
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, amount: BigDecimal): Point {
-        // 비관적 락을 사용하여 동시성 문제 방지 (차감과 동일한 전략 사용)
-        val currentPoint = pointRepository.findByUserIdWithPessimisticLock(userId)
+        val currentPoint = pointRepository.findByUserId(userId)
             ?: run {
                 // 포인트가 없는 경우 새로 생성 (동시성 안전하게)
                 try {
@@ -36,7 +36,7 @@ class ChargeBalanceUseCase(
                 } catch (e: Exception) {
                     // 다른 스레드에서 이미 생성한 경우, 다시 조회
                     logger.info("Point already created by another thread for user: $userId")
-                    pointRepository.findByUserIdWithPessimisticLock(userId)
+                    pointRepository.findByUserId(userId)
                         ?: throw IllegalStateException("포인트 생성 실패: $userId")
                 }
             }

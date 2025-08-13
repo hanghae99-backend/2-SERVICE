@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.domain.concert.service
 
-import kr.hhplus.be.server.global.cache.PopularConcertDto
+import kr.hhplus.be.server.api.concert.dto.PopularConcertDto
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.scheduling.annotation.Async
@@ -34,7 +34,6 @@ class ConcertStatsService(
                     concertId = concert.concertId,
                     title = concert.title,
                     artist = concert.artist,
-                    description = concert.description,
                     imageUrl = null,
                     popularityScore = 0.0,
                     viewCount = 0,
@@ -86,7 +85,6 @@ class ConcertStatsService(
                     concertId = concert.concertId,
                     title = concert.title,
                     artist = concert.artist,
-                    description = concert.description,
                     imageUrl = null,
                     popularityScore = viewCount.toDouble(),
                     viewCount = viewCount,

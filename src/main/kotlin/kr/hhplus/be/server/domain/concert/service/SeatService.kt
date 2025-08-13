@@ -62,7 +62,7 @@ class SeatService(
     }
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(seatId: Long): SeatDto {
-        val seat = seatRepository.findByIdWithPessimisticLock(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
+        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
         
         if (!seat.isAvailable()) {
             throw IllegalStateException("이미 예약된 좌석입니다. ID: $seatId")
@@ -77,7 +77,7 @@ class SeatService(
     
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun confirmSeat(seatId: Long): SeatDto {
-        val seat = seatRepository.findByIdWithPessimisticLock(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
+        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
         val occupiedStatus = seatStatusTypeRepository.getOccupiedStatus()
 
         val confirmedSeat = seat.confirm(occupiedStatus)
@@ -88,7 +88,7 @@ class SeatService(
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun releaseSeat(seatId: Long): SeatDto {
-        val seat = seatRepository.findByIdWithPessimisticLock(seatId)
+        val seat = seatRepository.findById(seatId)
             .orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
         
         if (!seat.isReserved()) {

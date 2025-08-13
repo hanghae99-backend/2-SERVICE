@@ -54,12 +54,7 @@ class RedisConfig {
 
         return RedisCacheManager.builder(redisConnectionFactory())
             .cacheDefaults(defaultConfig)
-            .withCacheConfiguration("seats:available", 
-                defaultConfig.entryTtl(Duration.ofMinutes(5)))
-            .withCacheConfiguration("seats:all", 
-                defaultConfig.entryTtl(Duration.ofMinutes(10)))
-            .withCacheConfiguration("seats:layout", 
-                defaultConfig.entryTtl(Duration.ofHours(2)))
+
             .withCacheConfiguration("schedules", 
                 defaultConfig.entryTtl(Duration.ofHours(1)))
             .withCacheConfiguration("concerts", 

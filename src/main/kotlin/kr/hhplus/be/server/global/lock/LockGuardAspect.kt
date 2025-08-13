@@ -22,18 +22,24 @@ class LockGuardAspect(
     
     @Around("@annotation(lockGuard)")
     fun executeWithLock(joinPoint: ProceedingJoinPoint, lockGuard: LockGuard): Any? {
-        val lockKey = generateLockKey(joinPoint, lockGuard.key)
+        val lockKeys = if (lockGuard.keys.isNotEmpty()) {
+            lockGuard.keys.map { generateLockKey(joinPoint, it) }.sorted() // 정렬로 데드락 방지
+        } else if (lockGuard.key.isNotEmpty()) {
+            listOf(generateLockKey(joinPoint, lockGuard.key))
+        } else {
+            throw IllegalArgumentException("LockGuard에 key 또는 keys를 지정해야 합니다")
+        }
         
-        logger.debug("Acquiring lock with key: $lockKey")
+        logger.debug("Acquiring locks with keys: $lockKeys")
         
-        return distributedLock.executeWithLock(
-            lockKey = lockKey,
+        return distributedLock.executeWithMultiLock(
+            lockKeys = lockKeys,
             lockTimeoutMs = lockGuard.lockTimeoutMs,
             waitTimeoutMs = lockGuard.waitTimeoutMs
         ) {
-            logger.debug("Lock acquired, executing method: ${joinPoint.signature.name}")
+            logger.debug("Locks acquired, executing method: ${joinPoint.signature.name}")
             val result = joinPoint.proceed()
-            logger.debug("Method execution completed, releasing lock: $lockKey")
+            logger.debug("Method execution completed, releasing locks: $lockKeys")
             result
         }
     }

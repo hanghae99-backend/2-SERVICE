@@ -5,6 +5,12 @@ import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.balance.service.BalanceService
+import kr.hhplus.be.server.domain.balance.models.Point
+import kr.hhplus.be.server.domain.balance.models.PointHistory
+import kr.hhplus.be.server.domain.balance.exception.PointNotFoundException
+import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
+import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
+import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.payment.service.PaymentService
@@ -23,14 +29,16 @@ class ProcessPaymentUserCase (
     private val reservationService: ReservationService,
     private val seatService: SeatService,
     private val balanceService: BalanceService,
-    private val deductBalanceUseCase: DeductBalanceUseCase,
+    private val pointRepository: PointRepository,
+    private val pointHistoryRepository: PointHistoryRepository,
+    private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
     private val tokenDomainService: TokenDomainService,
     private val tokenLifecycleManager: TokenLifecycleManager
 ){
 
     private val logger = LoggerFactory.getLogger(ProcessPaymentUserCase::class.java)
 
-    @LockGuard(key = "reservation:#reservationId")
+    @LockGuard(keys = ["user:#userId", "reservation:#reservationId", "seat:#seatId"])
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, reservationId: Long, token: String): PaymentDto{
@@ -39,7 +47,7 @@ class ProcessPaymentUserCase (
         tokenDomainService.validateActiveToken(waitingToken, status)
 
         // 예약 상태로 중복 결제 확인 (예약이 이미 확정되었는지 확인)
-            val reservation = reservationService.getReservationWithLock(reservationId)
+        val reservation = reservationService.getReservationWithLock(reservationId)
         logger.info("결제 처리 시작 - userId: $userId, reservationId: $reservationId, status: ${reservation.status.code}")
 
         if (reservation.userId != userId) {
@@ -60,7 +68,15 @@ class ProcessPaymentUserCase (
         try {
             val currentBalance = balanceService.getBalance(userId)
             paymentService.validatePaymentAmount(currentBalance.amount, payment.amount)
-            deductBalanceUseCase.execute(userId, payment.amount)
+            
+            // 멀티락 내에서 직접 잔액 차감 처리 (중첩 락 방지)
+            val currentPoint = pointRepository.findByUserIdWithPessimisticLock(userId)
+                ?: throw PointNotFoundException("포인트 정보를 찾을 수 없습니다")
+            val deductedPoint = currentPoint.deduct(payment.amount)
+            pointRepository.save(deductedPoint)
+            val useType = pointHistoryTypeRepository.getUseType()
+            val history = PointHistory.use(userId, payment.amount, useType, "포인트 사용")
+            pointHistoryRepository.save(history)
 
             reservationService.confirmReservation(reservationId, payment.paymentId)
             seatService.confirmSeat(seatId)

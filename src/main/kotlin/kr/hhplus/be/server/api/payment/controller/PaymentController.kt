@@ -27,7 +27,7 @@ class PaymentController(
 
     @PostMapping
     fun processPayment(@Valid @RequestBody request: PaymentRequest): ResponseEntity<CommonApiResponse<PaymentDto>> {
-        val payment = processPaymentUserCase.execute(request.userId, request.reservationId, request.token)
+        val payment = processPaymentUserCase.execute(request.userId, request.reservationId, request.seatId, request.token)
         return ResponseEntity.status(201).body(
             CommonApiResponse.Companion.success(
                 data = payment,

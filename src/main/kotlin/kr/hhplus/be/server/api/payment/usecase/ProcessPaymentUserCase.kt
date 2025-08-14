@@ -41,13 +41,13 @@ class ProcessPaymentUserCase (
     private val logger = LoggerFactory.getLogger(ProcessPaymentUserCase::class.java)
 
     @LockGuard(
-        keys = ["'balance:' + #userId", "'reservation:' + #reservationId"],
+        keys = ["'balance:' + #userId", "'reservation:' + #reservationId", "'seat:' + #seatId"],
         strategy = LockStrategy.PUB_SUB,
         waitTimeoutMs = 15000L
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
-    fun execute(userId: Long, reservationId: Long, token: String): PaymentDto{
+    fun execute(userId: Long, reservationId: Long, seatId: Long, token: String): PaymentDto{
         val waitingToken = tokenLifecycleManager.findToken(token)
         val status = tokenLifecycleManager.getTokenStatus(token)
         tokenDomainService.validateActiveToken(waitingToken, status)
@@ -67,6 +67,11 @@ class ProcessPaymentUserCase (
         }
 
         val seatId = reservation.seatId
+        
+        // 결제 요청의 seatId와 예약의 seatId가 일치하는지 검증
+        if (reservation.seatId != seatId) {
+            throw PaymentProcessException("예약의 좌석과 결제 요청의 좌석이 일치하지 않습니다")
+        }
         val seat = seatService.getSeatById(seatId)
         val paymentAmount = seat.price
         val payment = paymentService.createReservationPayment(userId, reservationId, paymentAmount)

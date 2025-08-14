@@ -42,10 +42,6 @@ data class Payment(
 
     @Column(name = "paid_at")
     val paidAt: LocalDateTime? = null,
-    
-    @Version
-    @Column(name = "version")
-    var version: Long? = null
 ) : BaseEntity() {
 
     // 연관관계 제거 - JPA 연관관계로 인한 트랜잭션 문제를 방지

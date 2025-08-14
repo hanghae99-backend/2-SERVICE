@@ -53,10 +53,7 @@ class Reservation(
 
     @Column(name = "confirmed_at", nullable = true)
     var confirmedAt: LocalDateTime? = null,
-    
-    @Version
-    @Column(name = "version")
-    var version: Long? = null
+
 ) : BaseEntity() {
     
     // 상태 명칭 계산 프로퍼티

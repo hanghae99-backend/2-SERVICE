@@ -32,9 +32,6 @@ class Point(
     @Column(name = "last_updated", nullable = false)
     var lastUpdated: LocalDateTime = LocalDateTime.now(),
 
-    @Version
-    @Column(name = "version")
-    var version: Long? = null  // nullable로 변경
 ) : BaseEntity() {
 
     // 연관관계 제거 - JPA 연관관계로 인한 트랜잭션 문제를 방지

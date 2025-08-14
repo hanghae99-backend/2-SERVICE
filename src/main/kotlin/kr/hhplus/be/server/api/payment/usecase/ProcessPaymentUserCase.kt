@@ -17,6 +17,7 @@ import kr.hhplus.be.server.domain.payment.service.PaymentService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import kr.hhplus.be.server.global.lock.LockGuard
+import kr.hhplus.be.server.global.lock.LockStrategy
 
 import org.slf4j.LoggerFactory
 
@@ -39,7 +40,11 @@ class ProcessPaymentUserCase (
 
     private val logger = LoggerFactory.getLogger(ProcessPaymentUserCase::class.java)
 
-    @LockGuard(keys = ["user:#userId", "reservation:#reservationId"])
+    @LockGuard(
+        keys = ["user:#userId", "reservation:#reservationId"],
+        strategy = LockStrategy.PUB_SUB,
+        waitTimeoutMs = 15000L
+    )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, reservationId: Long, token: String): PaymentDto{

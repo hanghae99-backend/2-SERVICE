@@ -23,7 +23,7 @@ class DeductBalanceUseCase(
 ) {
 
     @LockGuard(
-        key = "user:#userId",
+        key = "'balance:' + #userId",
         strategy = LockStrategy.SPIN,
         waitTimeoutMs = 2000L,
         retryIntervalMs = 50L,

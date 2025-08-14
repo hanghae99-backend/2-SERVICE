@@ -41,7 +41,7 @@ class ProcessPaymentUserCase (
     private val logger = LoggerFactory.getLogger(ProcessPaymentUserCase::class.java)
 
     @LockGuard(
-        keys = ["user:#userId", "reservation:#reservationId"],
+        keys = ["'balance:' + #userId", "'reservation:' + #reservationId"],
         strategy = LockStrategy.PUB_SUB,
         waitTimeoutMs = 15000L
     )

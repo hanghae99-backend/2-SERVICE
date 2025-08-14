@@ -18,7 +18,7 @@ class CancelReservationUseCase(
     private val tokenLifecycleManager: TokenLifecycleManager
 ) {
     
-    @LockGuard(key = "reservation:#reservationId")
+    @LockGuard(key = "'reservation:' + #reservationId")
     @Transactional
     @ValidateUserId
     fun execute(reservationId: Long, userId: Long, cancelReason: String?, token: String): Reservation {

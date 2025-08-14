@@ -1,3 +1,15 @@
+logging:
+  level:
+    root: INFO
+    kr.hhplus.be.server: DEBUG
+    org.springframework: DEBUG
+    org.hibernate: DEBUG
+    org.springframework.web: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/application.log
+
 spring:
   application:
     name: hhplus
@@ -20,6 +32,13 @@ spring:
     properties:
       hibernate.timezone.default_storage: NORMALIZE_UTC
       hibernate.jdbc.time_zone: UTC
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    time-zone: UTC
+    date-format: "yyyy-MM-dd'T'HH:mm:ss"
 
 ---
 spring:

@@ -71,8 +71,10 @@ class DistributedLock(
         val acquiredLocks = mutableListOf<String>()
         
         try {
+            // 락 획득 단계
             for (key in sortedKeys) {
-                if (tryAcquireLock(key, lockValues[key]!!, lockTimeoutMs)) {
+                val acquired = tryAcquireLockWithRetry(key, lockValues[key]!!, lockTimeoutMs)
+                if (acquired) {
                     acquiredLocks.add(key)
                 } else {
                     releaseLocks(acquiredLocks, lockValues)
@@ -80,11 +82,39 @@ class DistributedLock(
                 }
             }
             
+            // 비즈니스 로직 실행
             return action()
             
         } finally {
+            // 락 해제
             releaseLocks(sortedKeys, lockValues)
         }
+    }
+    
+    /**
+     * 락 획득을 여러 번 시도하는 방식
+     */
+    private fun tryAcquireLockWithRetry(key: String, value: String, lockTimeoutMs: Long): Boolean {
+        var attempts = 0
+        val maxAttempts = 50
+        
+        while (attempts < maxAttempts) {
+            if (tryAcquireLock(key, value, lockTimeoutMs)) {
+                logger.debug("Lock acquired: $key (attempts: ${attempts + 1})")
+                return true
+            }
+            
+            attempts++
+            try {
+                Thread.sleep(50 + (attempts * 10).toLong()) // 점진적 백오프
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+        }
+        
+        logger.warn("Lock acquisition failed after $maxAttempts attempts: $key")
+        return false
     }
     
     private fun <T> executeWithSpinLock(
@@ -142,6 +172,7 @@ class DistributedLock(
         val sortedKeys = lockKeys.sorted()
         val lockValues = sortedKeys.associateWith { UUID.randomUUID().toString() }
         
+        // 먼저 빠른 락 획득 시도
         if (tryAcquireAllLocks(sortedKeys, lockValues, lockTimeoutMs)) {
             return try {
                 action()
@@ -150,6 +181,7 @@ class DistributedLock(
             }
         }
         
+        // 락 획득 실패 시 Pub/Sub로 대기
         return waitForLockWithPubSub(sortedKeys, lockValues, lockTimeoutMs, waitTimeoutMs, action)
     }
     

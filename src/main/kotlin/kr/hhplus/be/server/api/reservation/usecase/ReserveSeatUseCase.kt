@@ -26,7 +26,7 @@ class ReserveSeatUseCase(
     private val logger = LoggerFactory.getLogger(ReserveSeatUseCase::class.java)
     
     @LockGuard(
-        key = "seat:#seatId",
+        key = "'seat:' + #seatId",
         strategy = LockStrategy.PUB_SUB,
         waitTimeoutMs = 10000L
     )

@@ -25,7 +25,7 @@ class TokenIssueUseCase(
     private val userLocks = ConcurrentHashMap<Long, ReentrantLock>()
     
     @LockGuard(
-        key = "token:issue:#userId",
+        key = "'token:issue:' + #userId",
         strategy = LockStrategy.SIMPLE
     )
     @ValidateUserId

@@ -23,7 +23,7 @@ class ConcertController(
     @GetMapping
     fun getConcerts(
         @RequestParam(required = false) startDate: LocalDate?,
-        @RequestParam(required = false) endDate: LocalDate?
+        @RequestParam(required = false) endDate: LocalDate?,
     ): ResponseEntity<CommonApiResponse<List<ConcertScheduleWithInfoDto>>> {
         val start = startDate ?: LocalDate.now()
         val end = endDate ?: start.plusMonths(3)

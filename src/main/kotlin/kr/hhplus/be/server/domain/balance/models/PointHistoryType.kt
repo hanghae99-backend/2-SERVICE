@@ -1,24 +1,30 @@
 package kr.hhplus.be.server.domain.balance.models
 
 import jakarta.persistence.*
+import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonCreator
+import kr.hhplus.be.server.domain.concert.models.SeatStatusType
+import kr.hhplus.be.server.global.common.BaseEntity
 import java.time.LocalDateTime
 
 @Entity
 @Table(name = "point_history_type")
-data class PointHistoryType(
+class PointHistoryType @JsonCreator constructor(
+    @JsonProperty("code")
     @Id
     @Column(name = "code", length = 50)
-    val code: String,
-    
+    var code: String,
+
+    @JsonProperty("name")
     @Column(name = "name", nullable = false, length = 100)
-    val name: String,
-    
+    var name: String,
+
+    @JsonProperty("description")
     @Column(name = "description", length = 255)
-    val description: String? = null,
-    
+    var description: String? = null,
+
+    @JsonProperty("isActive")
     @Column(name = "is_active", nullable = false)
-    val isActive: Boolean = true,
-    
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
-)
+    var isActive: Boolean = true,
+): BaseEntity()

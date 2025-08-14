@@ -35,10 +35,19 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+      fail-on-empty-beans: false
     deserialization:
       fail-on-unknown-properties: false
+      fail-on-ignored-properties: false
+      fail-on-invalid-subtype: false
+      fail-on-missing-creator-properties: false
+      accept-empty-string-as-null-object: true
+      accept-single-value-as-array: true
     time-zone: UTC
     date-format: "yyyy-MM-dd'T'HH:mm:ss"
+    default-property-inclusion: non_null
+    modules:
+      - com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 
 ---
 spring:

@@ -17,24 +17,24 @@ import java.time.LocalDateTime
         Index(name = "idx_point_history_user_created_desc", columnList = "user_id, created_at DESC")
     ]
 )
-data class PointHistory(
+class PointHistory(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    val historyId: Long = 0,
+    var historyId: Long = 0,
     
     @Column(name = "user_id", nullable = false)
-    val userId: Long,
+    var userId: Long,
     
     @Column(name = "amount", nullable = false, precision = 10, scale = 2)
-    val amount: BigDecimal,
+    var amount: BigDecimal,
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "type_code", referencedColumnName = "code")
-    val historyType: PointHistoryType,
+    var historyType: PointHistoryType,
     
     @Column(name = "description", nullable = false, length = 255)
-    val description: String
+    var description: String
 ) : BaseEntity() {
     
     // PointHistory -> User 연관관계 (N:1)

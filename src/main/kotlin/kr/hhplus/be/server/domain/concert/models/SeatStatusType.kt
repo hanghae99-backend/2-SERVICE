@@ -1,24 +1,27 @@
 package kr.hhplus.be.server.domain.concert.models
 
 import jakarta.persistence.*
-import java.time.LocalDateTime
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
+import kr.hhplus.be.server.global.common.BaseEntity
 
 @Entity
 @Table(name = "seat_status_type")
-data class SeatStatusType(
+class SeatStatusType @JsonCreator constructor(
+    @JsonProperty("code")
     @Id
     @Column(name = "code", length = 50)
-    val code: String,
-    
+    var code: String,
+
+    @JsonProperty("name")
     @Column(name = "name", nullable = false, length = 100)
-    val name: String,
-    
+    var name: String,
+
+    @JsonProperty("description")
     @Column(name = "description", length = 255)
-    val description: String? = null,
-    
+    var description: String? = null,
+
+    @JsonProperty("isActive")
     @Column(name = "is_active", nullable = false)
-    val isActive: Boolean = true,
-    
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
-)
+    var isActive: Boolean = true,
+): BaseEntity()

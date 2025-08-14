@@ -21,9 +21,9 @@ INSERT INTO point (user_id, amount, last_updated, created_at, updated_at) VALUES
                                                                               (10, 350000.00, NOW(), NOW(), NOW());
 
 -- 포인트 히스토리 타입
-INSERT INTO point_history_type (code, name, description, is_active, created_at) VALUES
-                                                                                    ('CHARGE', '충전', '포인트 충전', true, NOW()),
-                                                                                    ('USE', '사용', '포인트 사용', true, NOW());
+INSERT INTO point_history_type (code, name, description, is_active) VALUES
+                                                                                    ('CHARGE', '충전', '포인트 충전', true),
+                                                                                    ('USE', '사용', '포인트 사용', true);
 
 -- 포인트 히스토리
 INSERT INTO point_history (user_id, amount, type_code, description, created_at, updated_at) VALUES
@@ -69,10 +69,10 @@ INSERT INTO concert_schedule (concert_id, concert_date, venue, total_seats, avai
                                                                                                                          (8, '2025-09-23', 'KSPO DOME', 50, 50, NOW(), NOW());
 
 -- 좌석 상태 타입
-INSERT INTO seat_status_type (code, name, description, is_active, created_at) VALUES
-                                                                                  ('AVAILABLE', '예약 가능', '예약 가능한 좌석', true, NOW()),
-                                                                                  ('RESERVED', '임시 예약', '결제 대기 중', true, NOW()),
-                                                                                  ('OCCUPIED', '예약 완료', '결제 완료', true, NOW());
+INSERT INTO seat_status_type (code, name, description, is_active) VALUES
+                                                                                  ('AVAILABLE', '예약 가능', '예약 가능한 좌석', true),
+                                                                                  ('RESERVED', '임시 예약', '결제 대기 중', true),
+                                                                                  ('OCCUPIED', '예약 완료', '결제 완료', true);
 
 -- 좌석 데이터 (각 스케줄별 50개, 10만원 통일)
 -- IU 콘서트 좌석 (01~50)
@@ -109,15 +109,15 @@ CROSS JOIN (
 ) n;
 
 -- 예약/결제 상태 타입
-INSERT INTO reservation_status_type (code, name, description, is_active, created_at) VALUES
-                                                                                         ('TEMPORARY', '임시 예약', '결제 대기 중', true, NOW()),
-                                                                                         ('CONFIRMED', '예약 확정', '결제 완료', true, NOW()),
-                                                                                         ('CANCELLED', '예약 취소', '취소됨', true, NOW());
+INSERT INTO reservation_status_type (code, name, description, is_active) VALUES
+                                                                                         ('TEMPORARY', '임시 예약', '결제 대기 중', true),
+                                                                                         ('CONFIRMED', '예약 확정', '결제 완료', true),
+                                                                                         ('CANCELLED', '예약 취소', '취소됨', true);
 
-INSERT INTO payment_status_type (code, name, description, is_active, created_at) VALUES
-                                                                                     ('PEND', '결제 대기', '처리 중', true, NOW()),
-                                                                                     ('COMP', '결제 완료', '성공', true, NOW()),
-                                                                                     ('FAIL', '결제 실패', '실패', true, NOW());
+INSERT INTO payment_status_type (code, name, description, is_active) VALUES
+                                                                                     ('PEND', '결제 대기', '처리 중', true),
+                                                                                     ('COMP', '결제 완료', '성공', true),
+                                                                                     ('FAIL', '결제 실패', '실패', true);
 
 -- 샘플 예약 데이터 (못진 좌석들은 예약된 상태로 설정)
 -- IU 콘서트 첫 번째 날 좌석 못진 상태 설정

@@ -21,35 +21,35 @@ class Reservation(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    val reservationId: Long = 0,
+    var  reservationId: Long = 0,
 
     @Column(name = "user_id", nullable = false)
-    val userId: Long,
+    var userId: Long,
 
     @Column(name = "concert_id", nullable = false)
-    val concertId: Long,
+    var concertId: Long,
 
     @Column(name = "seat_id", nullable = false)
-    val seatId: Long,
+    var seatId: Long,
 
     @Column(name = "payment_id", nullable = true)
     var paymentId: Long? = null,
 
     @Column(name = "seat_number", nullable = false, length = 10)
-    val seatNumber: String,
+    var seatNumber: String,
 
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
-    val price: BigDecimal,
+    var price: BigDecimal,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "status_code", referencedColumnName = "code")
     var status: ReservationStatusType,
 
     @Column(name = "reserved_at", nullable = false)
-    val reservedAt: LocalDateTime = LocalDateTime.now(),
+    var reservedAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "expires_at", nullable = true)
-    val expiresAt: LocalDateTime? = null,
+    var expiresAt: LocalDateTime? = null,
 
     @Column(name = "confirmed_at", nullable = true)
     var confirmedAt: LocalDateTime? = null,

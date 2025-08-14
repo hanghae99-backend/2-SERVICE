@@ -37,16 +37,19 @@ class TokenLifecycleManager(
     }
     
 
-    fun cleanupExpiredTokens() {
+    fun cleanupExpiredTokens(): Int {
         val expiredTokens = tokenStore.findExpiredActiveTokens()
+        var cleanedCount = 0
         expiredTokens.forEach { expiredToken ->
             try {
                 expireToken(expiredToken)
+                cleanedCount++
                 println("만료된 활성 토큰 정리: $expiredToken")
             } catch (e: Exception) {
                 println("토큰 만료 처리 실패: $expiredToken, 오류: ${e.message}")
             }
         }
+        return cleanedCount
     }
     
     // 예약/결제 완료 시 토큰 만료 및 다음 사용자 활성화

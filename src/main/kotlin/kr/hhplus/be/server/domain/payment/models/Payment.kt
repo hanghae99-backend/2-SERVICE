@@ -1,11 +1,9 @@
 package kr.hhplus.be.server.domain.payment.models
 
 import kr.hhplus.be.server.global.common.BaseEntity
-
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import kr.hhplus.be.server.domain.payment.exception.PaymentAlreadyProcessedException
 import jakarta.persistence.*
-
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -18,34 +16,31 @@ import java.time.LocalDateTime
         Index(name = "idx_payment_reservation", columnList = "reservation_id")
     ]
 )
-data class Payment(
+class Payment(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    val paymentId: Long = 0,
+    var paymentId: Long = 0,
 
     @Column(name = "user_id", nullable = false)
-    val userId: Long,
+    var userId: Long,
 
     @Column(name = "reservation_id", nullable = true)
-    val reservationId: Long? = null,
+    var reservationId: Long? = null,
 
     @Column(name = "amount", nullable = false, precision = 10, scale = 2)
-    val amount: BigDecimal,
+    var amount: BigDecimal,
 
     @Column(name = "payment_method", length = 50)
-    val paymentMethod: String? = null,
+    var paymentMethod: String? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "status_code", referencedColumnName = "code")
     var status: PaymentStatusType,
 
     @Column(name = "paid_at")
-    val paidAt: LocalDateTime? = null,
+    var paidAt: LocalDateTime? = null,
 ) : BaseEntity() {
-
-    // 연관관계 제거 - JPA 연관관계로 인한 트랜잭션 문제를 방지
-    // 필요한 경우 userId로 직접 조회하도록 변경
 
     companion object {
         // 상태 코드 상수
@@ -55,7 +50,6 @@ data class Payment(
         const val STATUS_CANCELLED = "CANC"
         const val STATUS_REFUNDED = "REFD"
 
-        // 예약 관련 결제
         fun createForReservation(
             userId: Long,
             reservationId: Long,
@@ -63,54 +57,61 @@ data class Payment(
             paymentMethod: String = "POINT",
             pendingStatus: PaymentStatusType
         ): Payment {
-            if (userId <= 0) {
-                throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
-            }
-            if (reservationId <= 0) {
-                throw ParameterValidationException("예약 ID는 0보다 커야 합니다: $reservationId")
-            }
-            if (amount <= BigDecimal.ZERO) {
-                throw ParameterValidationException("결제 금액은 0보다 커야 합니다: $amount")
-            }
+            if (userId <= 0) throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
+            if (reservationId <= 0) throw ParameterValidationException("예약 ID는 0보다 커야 합니다: $reservationId")
+            if (amount <= BigDecimal.ZERO) throw ParameterValidationException("결제 금액은 0보다 커야 합니다: $amount")
 
             return Payment(
                 userId = userId,
                 reservationId = reservationId,
                 amount = amount,
-                status = pendingStatus,
-                paymentMethod = paymentMethod
+                paymentMethod = paymentMethod,
+                status = pendingStatus
             )
         }
-        
-        // 일반 결제 (기존 방식 유지)
+
         fun create(
             userId: Long,
             amount: BigDecimal,
             paymentMethod: String = "POINT",
             pendingStatus: PaymentStatusType
         ): Payment {
-            if (userId <= 0) {
-                throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
-            }
-            if (amount <= BigDecimal.ZERO) {
-                throw ParameterValidationException("결제 금액은 0보다 커야 합니다: $amount")
-            }
+            if (userId <= 0) throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
+            if (amount <= BigDecimal.ZERO) throw ParameterValidationException("결제 금액은 0보다 커야 합니다: $amount")
 
             return Payment(
                 userId = userId,
-                reservationId = null, // 예약과 무관한 결제
+                reservationId = null,
                 amount = amount,
-                status = pendingStatus,
-                paymentMethod = paymentMethod
+                paymentMethod = paymentMethod,
+                status = pendingStatus
             )
         }
+    }
+
+    // copy 함수 직접 구현 (paymentId 제외)
+    fun copy(
+        userId: Long = this.userId,
+        reservationId: Long? = this.reservationId,
+        amount: BigDecimal = this.amount,
+        paymentMethod: String? = this.paymentMethod,
+        status: PaymentStatusType = this.status,
+        paidAt: LocalDateTime? = this.paidAt
+    ): Payment {
+        return Payment(
+            userId = userId,
+            reservationId = reservationId,
+            amount = amount,
+            paymentMethod = paymentMethod,
+            status = status,
+            paidAt = paidAt
+        )
     }
 
     fun complete(completedStatus: PaymentStatusType): Payment {
         if (status.code != STATUS_PENDING) {
             throw PaymentAlreadyProcessedException("이미 처리된 결제입니다: $paymentId")
         }
-
         return this.copy(
             status = completedStatus,
             paidAt = LocalDateTime.now()
@@ -121,33 +122,24 @@ data class Payment(
         if (status.code != STATUS_PENDING) {
             throw PaymentAlreadyProcessedException("이미 처리된 결제입니다: $paymentId")
         }
-
-        return this.copy(
-            status = failedStatus
-        )
+        return this.copy(status = failedStatus)
     }
 
     fun cancel(cancelledStatus: PaymentStatusType): Payment {
         if (status.code == STATUS_COMPLETED) {
             throw PaymentAlreadyProcessedException("완료된 결제는 취소할 수 없습니다: $paymentId")
         }
-
-        return this.copy(
-            status = cancelledStatus
-        )
+        return this.copy(status = cancelledStatus)
     }
 
     fun refund(refundedStatus: PaymentStatusType): Payment {
         if (status.code != STATUS_COMPLETED) {
             throw PaymentAlreadyProcessedException("완료된 결제만 환불 가능합니다: $paymentId")
         }
-
-        return this.copy(
-            status = refundedStatus
-        )
+        return this.copy(status = refundedStatus)
     }
 
-    // 상태 체크 메서드들
+    // 상태 체크
     fun isCompleted(): Boolean = status.code == STATUS_COMPLETED
     fun isPending(): Boolean = status.code == STATUS_PENDING
     fun isFailed(): Boolean = status.code == STATUS_FAILED

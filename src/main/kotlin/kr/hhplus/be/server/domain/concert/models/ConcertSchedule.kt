@@ -21,19 +21,19 @@ class ConcertSchedule(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    val scheduleId: Long = 0,
+    var scheduleId: Long = 0,
     
     @Column(name = "concert_id", nullable = false)
-    val concertId: Long,
+    var concertId: Long,
     
     @Column(name = "concert_date", nullable = false)
-    val concertDate: LocalDate,
+    var concertDate: LocalDate,
     
     @Column(name = "venue", nullable = false, length = 200)
-    val venue: String,
+    var venue: String,
     
     @Column(name = "total_seats", nullable = false)
-    val totalSeats: Int,
+    var totalSeats: Int,
     
     @Column(name = "available_seats", nullable = false)
     var availableSeats: Int

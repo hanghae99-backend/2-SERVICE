@@ -21,10 +21,10 @@ class Point(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    val pointId: Long = 0,
+    var pointId: Long = 0,
 
     @Column(name = "user_id", nullable = false, unique = true)
-    val userId: Long,
+    var userId: Long,
 
     @Column(name = "amount", nullable = false, precision = 10, scale = 2)
     var amount: BigDecimal,

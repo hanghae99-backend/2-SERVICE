@@ -34,8 +34,11 @@ class LockGuardAspect(
         
         return distributedLock.executeWithMultiLock(
             lockKeys = lockKeys,
+            strategy = lockGuard.strategy,
             lockTimeoutMs = lockGuard.lockTimeoutMs,
-            waitTimeoutMs = lockGuard.waitTimeoutMs
+            waitTimeoutMs = lockGuard.waitTimeoutMs,
+            retryIntervalMs = lockGuard.retryIntervalMs,
+            maxRetryCount = lockGuard.maxRetryCount
         ) {
             logger.debug("Locks acquired, executing method: ${joinPoint.signature.name}")
             val result = joinPoint.proceed()

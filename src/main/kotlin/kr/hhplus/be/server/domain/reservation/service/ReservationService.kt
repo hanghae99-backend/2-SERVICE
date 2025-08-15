@@ -33,7 +33,7 @@ class ReservationService(
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
     
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
         logger.info("예약 요청 시작 - userId: $userId, seatId: $seatId, thread: ${Thread.currentThread().name}")
         

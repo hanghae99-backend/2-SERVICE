@@ -1,24 +1,27 @@
 package kr.hhplus.be.server.domain.reservation.model
 
+import com.fasterxml.jackson.annotation.JsonCreator
 import jakarta.persistence.*
-import java.time.LocalDateTime
+import com.fasterxml.jackson.annotation.JsonProperty
+import kr.hhplus.be.server.global.common.BaseEntity
 
 @Entity
 @Table(name = "reservation_status_type")
-data class ReservationStatusType(
-    @Id
-    @Column(name = "code", length = 50)
-    val code: String,
-    
-    @Column(name = "name", nullable = false, length = 100)
-    val name: String,
-    
-    @Column(name = "description", length = 255)
-    val description: String? = null,
-    
-    @Column(name = "is_active", nullable = false)
-    val isActive: Boolean = true,
-    
-    @Column(name = "created_at", nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now()
-)
+class ReservationStatusType @JsonCreator constructor(
+@JsonProperty("code")
+@Id
+@Column(name = "code", length = 50)
+var code: String,
+
+@JsonProperty("name")
+@Column(name = "name", nullable = false, length = 100)
+var name: String,
+
+@JsonProperty("description")
+@Column(name = "description", length = 255)
+var description: String? = null,
+
+@JsonProperty("isActive")
+@Column(name = "is_active", nullable = false)
+var isActive: Boolean = true,
+): BaseEntity()

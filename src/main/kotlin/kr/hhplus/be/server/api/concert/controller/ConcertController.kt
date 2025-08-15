@@ -3,6 +3,7 @@ package kr.hhplus.be.server.api.concert.controller
 import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.api.concert.dto.*
 import kr.hhplus.be.server.domain.concert.service.ConcertService
+import kr.hhplus.be.server.domain.concert.service.ConcertStatsService
 import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
@@ -15,13 +16,14 @@ import java.time.LocalDate
 @Validated
 class ConcertController(
     private val concertService: ConcertService,
-    private val seatService: SeatService
+    private val seatService: SeatService,
+    private val concertStatsService: ConcertStatsService
 ) {
 
     @GetMapping
     fun getConcerts(
         @RequestParam(required = false) startDate: LocalDate?,
-        @RequestParam(required = false) endDate: LocalDate?
+        @RequestParam(required = false) endDate: LocalDate?,
     ): ResponseEntity<CommonApiResponse<List<ConcertScheduleWithInfoDto>>> {
         val start = startDate ?: LocalDate.now()
         val end = endDate ?: start.plusMonths(3)
@@ -91,6 +93,32 @@ class ConcertController(
             CommonApiResponse.success(
                 data = seats,
                 message = "좌석 조회 완료"
+            )
+        )
+    }
+
+    @GetMapping("/popular")
+    fun getPopularConcerts(
+        @RequestParam(defaultValue = "10") limit: Int
+    ): ResponseEntity<CommonApiResponse<List<PopularConcertDto>>> {
+        val popularConcerts = concertStatsService.getPopularConcerts(limit)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = popularConcerts,
+                message = "인기 콘서트 조회 완료"
+            )
+        )
+    }
+
+    @GetMapping("/trending")
+    fun getTrendingConcerts(
+        @RequestParam(defaultValue = "5") limit: Int
+    ): ResponseEntity<CommonApiResponse<List<PopularConcertDto>>> {
+        val trendingConcerts = concertStatsService.getTrendingConcerts(limit)
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = trendingConcerts,
+                message = "실시간 트렌딩 콘서트 조회 완료"
             )
         )
     }

@@ -6,6 +6,8 @@ import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.auth.service.QueueManager
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
+import kr.hhplus.be.server.global.lock.LockGuard
+import kr.hhplus.be.server.global.lock.LockStrategy
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
@@ -22,17 +24,14 @@ class TokenIssueUseCase(
     // 사용자별 락을 관리하는 맵
     private val userLocks = ConcurrentHashMap<Long, ReentrantLock>()
     
+    @LockGuard(
+        key = "'token:issue:' + #userId",
+        strategy = LockStrategy.SIMPLE
+    )
     @ValidateUserId
     fun execute(userId: Long): TokenIssueDetail {
-        // 사용자별 락 획득
-        val lock = userLocks.computeIfAbsent(userId) { ReentrantLock() }
-        
-        lock.lock()
-        try {
-            return executeInternal(userId)
-        } finally {
-            lock.unlock()
-        }
+        // 기존 로컬 락 제거, 분산락으로 대체
+        return executeInternal(userId)
     }
     
     private fun executeInternal(userId: Long): TokenIssueDetail {

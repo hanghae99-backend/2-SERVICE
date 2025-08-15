@@ -1,10 +1,10 @@
 package kr.hhplus.be.server.domain.concert.models
 
 import kr.hhplus.be.server.global.common.BaseEntity
-
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import kr.hhplus.be.server.domain.reservation.model.Reservation
 import jakarta.persistence.*
+import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDateTime
 
 @Entity
@@ -19,16 +19,17 @@ class Concert(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    val concertId: Long = 0,
+    var concertId: Long = 0,
     
     @Column(name = "title", nullable = false, length = 200)
-    val title: String,
+    var title: String,
     
     @Column(name = "artist", nullable = false, length = 100)
-    val artist: String,
+    var artist: String,
     
+    @JsonProperty("isActive")
     @Column(name = "is_active", nullable = false)
-    val isActive: Boolean = true
+    var isActive: Boolean = true
 ) : BaseEntity() {
     
     companion object {

@@ -21,10 +21,10 @@ class Point(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    val pointId: Long = 0,
+    var pointId: Long = 0,
 
     @Column(name = "user_id", nullable = false, unique = true)
-    val userId: Long,
+    var userId: Long,
 
     @Column(name = "amount", nullable = false, precision = 10, scale = 2)
     var amount: BigDecimal,
@@ -32,9 +32,6 @@ class Point(
     @Column(name = "last_updated", nullable = false)
     var lastUpdated: LocalDateTime = LocalDateTime.now(),
 
-    @Version
-    @Column(name = "version")
-    var version: Long? = null  // nullable로 변경
 ) : BaseEntity() {
 
     // 연관관계 제거 - JPA 연관관계로 인한 트랜잭션 문제를 방지

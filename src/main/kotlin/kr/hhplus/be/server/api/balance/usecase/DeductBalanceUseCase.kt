@@ -7,6 +7,9 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
+import kr.hhplus.be.server.global.lock.LockGuard
+import kr.hhplus.be.server.global.lock.LockStrategy
+
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -19,11 +22,17 @@ class DeductBalanceUseCase(
     private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
 ) {
 
+    @LockGuard(
+        key = "'balance:' + #userId",
+        strategy = LockStrategy.SPIN,
+        waitTimeoutMs = 2000L,
+        retryIntervalMs = 50L,
+        maxRetryCount = 40
+    )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, amount: BigDecimal): Point {
-        // 결제 시 포인트 차감은 비관적 락 사용 (충돌 시 재시도 비용이 크므로)
-        val currentPoint = pointRepository.findByUserIdWithPessimisticLock(userId)
+        val currentPoint = pointRepository.findByUserId(userId)
             ?: throw PointNotFoundException("포인트 정보를 찾을 수 없습니다")
 
         val deductedPoint = currentPoint.deduct(amount)

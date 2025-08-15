@@ -13,7 +13,6 @@ class RedisTokenStore(
     private val redisTemplate: StringRedisTemplate,
     private val objectMapper: ObjectMapper
 ) : TokenStore {
-    // 테스트 격리용 Redis 전체 초기화 메서드
     fun flushAll() {
         redisTemplate.connectionFactory?.connection?.flushAll()
     }
@@ -21,18 +20,18 @@ class RedisTokenStore(
     companion object {
         private const val TOKEN_PREFIX = "waiting_token:"
         private const val USER_PREFIX = "user_tokens:"
-        private const val WAITING_QUEUE = "waiting_queue"
+        private const val WAITING_QUEUE_ZSET = "waiting_queue_zset"
         private const val ACTIVE_TOKENS = "active_tokens"
         private const val ACTIVE_TOKEN_TIMESTAMP_PREFIX = "active_timestamp:"
+        private const val QUEUE_SEQUENCE_KEY = "queue_sequence"
         private val TOKEN_TTL = Duration.ofMinutes(30)
-        private val ACTIVE_TTL = Duration.ofMinutes(10) // 10분 활성 시간
+        private val ACTIVE_TTL = Duration.ofMinutes(10)
     }
 
     override fun save(token: WaitingToken) {
         val key = TOKEN_PREFIX + token.token
         val value = objectMapper.writeValueAsString(token)
 
-        // 토큰 정보 저장
         redisTemplate.opsForValue().set(key, value, TOKEN_TTL)
         redisTemplate.opsForSet().add(USER_PREFIX + token.userId, token.token)
     }
@@ -43,14 +42,11 @@ class RedisTokenStore(
     }
     
     override fun findActiveTokenByUserId(userId: Long): WaitingToken? {
-        // 사용자의 토큰들을 조회
         val userTokens = redisTemplate.opsForSet().members(USER_PREFIX + userId) ?: return null
         
-        // 활성 상태인 토큰을 찾아서 반환
         for (tokenStr in userTokens) {
-            val token = findByToken(tokenStr)
-            if (token != null && (getTokenStatus(tokenStr) == TokenStatus.WAITING || getTokenStatus(tokenStr) == TokenStatus.ACTIVE)) {
-                return token
+            if (redisTemplate.opsForSet().isMember(ACTIVE_TOKENS, tokenStr) == true) {
+                return findByToken(tokenStr)
             }
         }
         return null
@@ -69,33 +65,28 @@ class RedisTokenStore(
 
     override fun validate(token: String): Boolean = redisTemplate.hasKey(TOKEN_PREFIX + token)
 
-    // ===== 상태 관리 (Redis 기반) =====
+    // 상태 관리
 
     override fun getTokenStatus(token: String): TokenStatus {
         return when {
             redisTemplate.opsForSet().isMember(ACTIVE_TOKENS, token) == true -> TokenStatus.ACTIVE
-            redisTemplate.opsForList().indexOf(WAITING_QUEUE, token) != null -> TokenStatus.WAITING
+            redisTemplate.opsForZSet().rank(WAITING_QUEUE_ZSET, token) != null -> TokenStatus.WAITING
             else -> TokenStatus.EXPIRED
         }
     }
 
     override fun activateToken(token: String) {
-        // 대기열에서 제거하고 활성 토큰으로 이동
         removeFromWaitingQueue(token)
         redisTemplate.opsForSet().add(ACTIVE_TOKENS, token)
 
-        // 활성화 시간 기록 (만료 체크용)
         redisTemplate.opsForValue().set(
             ACTIVE_TOKEN_TIMESTAMP_PREFIX + token,
             System.currentTimeMillis().toString(),
             ACTIVE_TTL
         )
-
-        redisTemplate.expire(ACTIVE_TOKENS, ACTIVE_TTL)
     }
 
     override fun expireToken(token: String) {
-        // 모든 곳에서 제거
         removeFromWaitingQueue(token)
         redisTemplate.opsForSet().remove(ACTIVE_TOKENS, token)
         redisTemplate.delete(ACTIVE_TOKEN_TIMESTAMP_PREFIX + token)
@@ -105,38 +96,57 @@ class RedisTokenStore(
         return redisTemplate.opsForSet().size(ACTIVE_TOKENS) ?: 0L
     }
 
-    // ===== Queue 관리 (간소화) =====
+    // Queue 관리
 
     override fun addToWaitingQueue(token: String) {
-        redisTemplate.opsForList().rightPush(WAITING_QUEUE, token)
+        val sequence = redisTemplate.opsForValue().increment(QUEUE_SEQUENCE_KEY) ?: 1L
+        redisTemplate.opsForZSet().add(WAITING_QUEUE_ZSET, token, sequence.toDouble())
     }
 
     private fun removeFromWaitingQueue(token: String) {
-        redisTemplate.opsForList().remove(WAITING_QUEUE, 0, token)
+        redisTemplate.opsForZSet().remove(WAITING_QUEUE_ZSET, token)
     }
 
     override fun getNextTokensFromQueue(count: Int): List<String> {
-        val tokens = mutableListOf<String>()
-        repeat(count) {
-            val token = redisTemplate.opsForList().leftPop(WAITING_QUEUE)
-            if (token != null) {
-                tokens.add(token)
-            }
+        val tokens = redisTemplate.opsForZSet().range(WAITING_QUEUE_ZSET, 0, (count - 1).toLong())
+
+        tokens?.forEach { token ->
+            redisTemplate.opsForZSet().remove(WAITING_QUEUE_ZSET, token)
         }
-        return tokens
+
+        return tokens?.toList() ?: emptyList()
     }
 
     override fun getQueueSize(): Long {
-        return redisTemplate.opsForList().size(WAITING_QUEUE) ?: 0L
+        return redisTemplate.opsForZSet().zCard(WAITING_QUEUE_ZSET) ?: 0L
     }
 
     override fun getQueuePosition(token: String): Int {
-        // Redis의 LPOS 명령어를 사용하여 대기열에서 토큰의 위치를 찾음
-        val position = redisTemplate.opsForList().indexOf(WAITING_QUEUE, token)
-        return position?.toInt() ?: -1 // 찾지 못했으면 -1 반환
+        val rank = redisTemplate.opsForZSet().rank(WAITING_QUEUE_ZSET, token)
+        return rank?.toInt() ?: -1
     }
 
-    // ===== 콘서트 예약 서비스 특화 =====
+    // 편의 메서드
+
+    override fun getTokenStatusAndPosition(token: String): Pair<TokenStatus, Int?> {
+        val status = getTokenStatus(token)
+        val position = if (status == TokenStatus.WAITING) {
+            getQueuePosition(token).takeIf { it >= 0 }
+        } else {
+            null
+        }
+        return Pair(status, position)
+    }
+
+    override fun isTokenInQueue(token: String): Boolean {
+        return redisTemplate.opsForZSet().rank(WAITING_QUEUE_ZSET, token) != null
+    }
+
+    override fun isTokenActive(token: String): Boolean {
+        return redisTemplate.opsForSet().isMember(ACTIVE_TOKENS, token) == true
+    }
+
+    // 콘서트 예약 특화
 
     override fun findExpiredActiveTokens(): List<String> {
         val activeTokens = redisTemplate.opsForSet().members(ACTIVE_TOKENS) ?: return emptyList()
@@ -152,7 +162,6 @@ class RedisTokenStore(
                     expiredTokens.add(token)
                 }
             } else {
-                // 타임스탬프가 없는 토큰은 만료된 것으로 간주
                 expiredTokens.add(token)
             }
         }

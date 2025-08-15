@@ -13,7 +13,7 @@ import jakarta.persistence.*
 class User(
     @Id
     @Column(name = "user_id")
-    val userId: Long
+    var userId: Long
 ) : BaseEntity() {
 
     companion object {

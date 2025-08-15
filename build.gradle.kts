@@ -49,6 +49,10 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 
+	// Jackson JSR310 (Java 8 Time)
+	implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+
 
 	// DB
 	runtimeOnly("com.mysql:mysql-connector-j")

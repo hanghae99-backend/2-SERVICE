@@ -1,15 +1,16 @@
 package kr.hhplus.be.server.domain.concert.service
 
 import kr.hhplus.be.server.api.concert.dto.*
+import kr.hhplus.be.server.domain.concert.aop.IncrementViewCount
 import kr.hhplus.be.server.domain.concert.exception.ConcertNotFoundException
 import kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
 import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatRepository
 import kr.hhplus.be.server.global.extension.orElseThrow
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
-
 
 @Service
 @Transactional(readOnly = true)
@@ -19,7 +20,7 @@ class ConcertService(
     private val seatRepository: SeatRepository
 ) {
     
-    // 기간별 예약 가능 콘서트 조회 (좌석수 > 0)
+    @Cacheable(value = ["concerts:available"], key = "#startDate.toString() + ':' + #endDate.toString()")
     fun getAvailableConcerts(
         startDate: LocalDate = LocalDate.now(), 
         endDate: LocalDate = LocalDate.now().plusMonths(3)
@@ -30,7 +31,6 @@ class ConcertService(
         
         if (schedules.isEmpty()) return emptyList()
         
-        // 콘서트 정보를 한 번에 조회
         val concertIds = schedules.map { it.concertId }.distinct()
         val concerts = concertIds.mapNotNull { concertRepository.findById(it) }
         val concertMap = concerts.associateBy { it.concertId }
@@ -43,6 +43,8 @@ class ConcertService(
         }
     }
     
+    @IncrementViewCount(concertIdParam = "concertId")
+    @Cacheable(value = ["concerts"], key = "#concertId")
     fun getConcertById(concertId: Long): ConcertDto {
         val concert = concertRepository.findById(concertId)
             .orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId") }
@@ -50,7 +52,7 @@ class ConcertService(
         return ConcertDto.from(concert)
     }
     
-    // 스케줄 + 좌석 정보 포함한 상세 조회
+    @Cacheable(value = ["concerts:detail"], key = "#scheduleId")
     fun getConcertDetailByScheduleId(scheduleId: Long): ConcertDetailDto {
         val schedule = concertScheduleRepository.findById(scheduleId)
             .orElseThrow { ConcertNotFoundException("콘서트 스케줄을 찾을 수 없습니다. ID: $scheduleId") }
@@ -63,6 +65,7 @@ class ConcertService(
         return ConcertDetailDto.from(concert, schedule, seats)
     }
     
+    @Cacheable(value = ["schedules"], key = "#concertId")
     fun getSchedulesByConcertId(concertId: Long): List<ConcertWithScheduleDto> {
         val concert = concertRepository.findById(concertId).orElseThrow { ConcertNotFoundException("콘서트를 찾을 수 없습니다. ID: $concertId") }
         

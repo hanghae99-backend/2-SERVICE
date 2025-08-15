@@ -12,6 +12,7 @@ import kr.hhplus.be.server.domain.reservation.event.ReservationConfirmedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
 import kr.hhplus.be.server.domain.concert.service.SeatService
+import kr.hhplus.be.server.global.lock.LockGuard
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -32,7 +33,7 @@ class ReservationService(
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
     
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
         logger.info("예약 요청 시작 - userId: $userId, seatId: $seatId, thread: ${Thread.currentThread().name}")
         
@@ -41,7 +42,6 @@ class ReservationService(
             statusRepository.getConfirmedStatus().code
         )
         
-        // 비관적 락으로 기존 예약 확인 및 좌석 상태 변경
         val existingReservation = reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses)
         
         if (existingReservation != null) {
@@ -56,7 +56,6 @@ class ReservationService(
 
         val seat = seatService.getSeatById(seatId)
         
-        // 좌석 상태를 예약됨으로 변경 (비관적 락 사용)
         try {
             seatService.reserveSeat(seatId)
             logger.info("좌석 상태 변경 성공 - seatId: $seatId, userId: $userId")
@@ -93,7 +92,7 @@ class ReservationService(
     
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun confirmReservation(reservationId: Long, paymentId: Long): Reservation {
-        val reservation = reservationRepository.findByIdWithPessimisticLock(reservationId)
+        val reservation = reservationRepository.findById(reservationId)
             ?: throw IllegalArgumentException("예약을 찾을 수 없습니다: $reservationId")
             
         reservation.confirm(paymentId, statusRepository.getConfirmedStatus())
@@ -115,7 +114,7 @@ class ReservationService(
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun cancelReservation(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
-        val reservation = reservationRepository.findByIdWithPessimisticLock(reservationId)
+        val reservation = reservationRepository.findById(reservationId)
             ?: throw IllegalArgumentException("예약을 찾을 수 없습니다: $reservationId")
         
         if (reservation.userId != userId) {
@@ -140,7 +139,7 @@ class ReservationService(
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun cancelReservationBySystem(reservationId: Long, cancelReason: String): Reservation {
-        val reservation = reservationRepository.findByIdWithPessimisticLock(reservationId)
+        val reservation = reservationRepository.findById(reservationId)
             ?: throw IllegalArgumentException("예약을 찾을 수 없습니다: $reservationId")
         
         reservation.cancel(statusRepository.getCancelledStatus())
@@ -170,7 +169,7 @@ class ReservationService(
     }
     
     fun getReservationWithLock(reservationId: Long): Reservation {
-        return reservationRepository.findByIdWithPessimisticLock(reservationId)
+        return reservationRepository.findById(reservationId)
             ?: throw IllegalArgumentException("예약을 찾을 수 없습니다: $reservationId")
     }
     
@@ -258,7 +257,7 @@ class ReservationService(
         var cleanedCount = 0
         expiredReservations.forEach { reservation ->
             try {
-                val lockedReservation = reservationRepository.findByIdWithPessimisticLock(reservation.reservationId)
+                val lockedReservation = reservationRepository.findById(reservation.reservationId)
                 
                 if (lockedReservation != null && lockedReservation.isExpired()) {
                     cancelReservationBySystem(reservation.reservationId, "예약 시간 만료")

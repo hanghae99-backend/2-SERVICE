@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
 import kr.hhplus.be.server.api.concert.dto.request.SearchConcertRequest
+import kr.hhplus.be.server.config.ConcurrencyTest
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
@@ -22,6 +23,7 @@ import kr.hhplus.be.server.config.TestDataCleanupService
 import kr.hhplus.be.server.domain.user.model.User
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
@@ -36,9 +38,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-@SpringBootTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles("test")
+@ConcurrencyTest
 class ConcertConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val concertJpaRepository: ConcertJpaRepository,

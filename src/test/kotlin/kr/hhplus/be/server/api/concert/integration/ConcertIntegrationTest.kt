@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.concert.dto.request.SearchConcertRequest
 import kr.hhplus.be.server.config.TestDataCleanupService
+import kr.hhplus.be.server.config.IntegrationTest
 import kr.hhplus.be.server.domain.concert.infrastructure.ConcertJpaRepository
 import kr.hhplus.be.server.domain.concert.infrastructure.ConcertScheduleJpaRepository
 import kr.hhplus.be.server.domain.concert.infrastructure.SeatJpaRepository
@@ -12,10 +13,7 @@ import kr.hhplus.be.server.domain.concert.infrastructure.SeatStatusTypeJpaReposi
 import kr.hhplus.be.server.domain.concert.models.Concert
 import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
 import kr.hhplus.be.server.domain.concert.models.Seat
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
-import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
@@ -25,9 +23,7 @@ import org.springframework.web.context.WebApplicationContext
 import java.math.BigDecimal
 import java.time.LocalDate
 
-@SpringBootTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles("test")
+@IntegrationTest
 @Transactional
 class ConcertIntegrationTest(
     private val webApplicationContext: WebApplicationContext,

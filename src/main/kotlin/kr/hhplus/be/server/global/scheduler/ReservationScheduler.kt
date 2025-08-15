@@ -26,22 +26,27 @@ class ReservationScheduler(
         }
     }
     
-    // 매 30초마다 대기열 처리 (단순한 로직 - service 직접 호출)
-    @Scheduled(fixedRate = 30000)
+    // 매 5초마다 대기열 처리 (테스트 환경에서 빠른 처리를 위함)
+    @Scheduled(fixedRate = 5000)
     fun processQueue() {
         try {
             tokenLifecycleManager.cleanupExpiredTokens()
             queueManager.processQueueAutomatically()
+            val currentTime = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+            println("대기열 처리 완료 - 시간: $currentTime")
         } catch (e: Exception) {
             println("대기열 자동 처리 중 오류 발생: ${e.message}")
         }
     }
     
-    // 매 5분마다 만료된 토큰 정리 (단순한 로직 - service 직접 호출)
-    @Scheduled(fixedRate = 300000)
+    // 매 30초마다 만료된 토큰 정리 (더 빠른 정리를 위함)
+    @Scheduled(fixedRate = 30000)
     fun cleanupExpiredTokens() {
         try {
-            tokenLifecycleManager.cleanupExpiredTokens()
+            val cleanedCount = tokenLifecycleManager.cleanupExpiredTokens()
+            if (cleanedCount > 0) {
+                println("만료된 토큰 ${cleanedCount}개 정리 완료")
+            }
         } catch (e: Exception) {
             println("만료된 토큰 정리 중 오류 발생: ${e.message}")
         }

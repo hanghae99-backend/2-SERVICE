@@ -30,7 +30,6 @@ class ProcessPaymentUserCase (
     private val paymentService: PaymentService,
     private val reservationService: ReservationService,
     private val seatService: SeatService,
-    private val balanceService: BalanceService,
     private val pointRepository: PointRepository,
     private val pointHistoryRepository: PointHistoryRepository,
     private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
@@ -66,24 +65,19 @@ class ProcessPaymentUserCase (
             throw PaymentProcessException("예약이 만료되었습니다: $reservationId")
         }
 
-        val seatId = reservation.seatId
-        
-        // 결제 요청의 seatId와 예약의 seatId가 일치하는지 검증
-        if (reservation.seatId != seatId) {
-            throw PaymentProcessException("예약의 좌석과 결제 요청의 좌석이 일치하지 않습니다")
-        }
         val seat = seatService.getSeatById(seatId)
         val paymentAmount = seat.price
         val payment = paymentService.createReservationPayment(userId, reservationId, paymentAmount)
 
         try {
-            val currentBalance = balanceService.getBalance(userId)
-            paymentService.validatePaymentAmount(currentBalance.amount, payment.amount)
-            
             val currentPoint = pointRepository.findByUserId(userId)
                 ?: throw PointNotFoundException("포인트 정보를 찾을 수 없습니다")
+
+            paymentService.validatePaymentAmount(currentPoint.amount, payment.amount)
+            
             val deductedPoint = currentPoint.deduct(payment.amount)
             pointRepository.save(deductedPoint)
+
             val useType = pointHistoryTypeRepository.getUseType()
             val history = PointHistory.use(userId, payment.amount, useType, "포인트 사용")
             pointHistoryRepository.save(history)

@@ -49,13 +49,8 @@ class ChargeBalanceUseCase(
     
     private fun getOrCreatePoint(userId: Long): Point {
         return pointRepository.findByUserId(userId) ?: run {
-            try {
-                val newPoint = Point.create(userId, BigDecimal.ZERO)
-                pointRepository.save(newPoint)
-            } catch (e: Exception) {
-                pointRepository.findByUserId(userId)
-                    ?: throw IllegalStateException("포인트 생성 실패: $userId")
-            }
+            val newPoint = Point.create(userId, BigDecimal.ZERO)
+            pointRepository.save(newPoint)
         }
     }
     

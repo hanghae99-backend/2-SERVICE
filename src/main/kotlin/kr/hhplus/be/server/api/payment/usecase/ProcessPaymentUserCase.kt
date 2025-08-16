@@ -40,7 +40,7 @@ class ProcessPaymentUserCase(
         logger.info("결제 처리 시작 - userId: $userId, reservationId: $reservationId, seatId: $seatId")
         
         validateToken(token)
-        val reservation = validateReservation(reservationId, userId)
+        validateReservation(reservationId, userId)
         
         val seat = seatService.getSeatById(seatId)
         val payment = paymentService.createReservationPayment(userId, reservationId, seat.price)
@@ -89,8 +89,6 @@ class ProcessPaymentUserCase(
         if (reservation.isExpired()) {
             throw PaymentProcessException("예약이 만료되었습니다: $reservationId")
         }
-        
-        return reservation
     }
     
     private fun handlePaymentFailure(
@@ -102,15 +100,11 @@ class ProcessPaymentUserCase(
     ) {
         logger.error("결제 처리 실패 - userId: $userId, reservationId: $reservationId, paymentId: $paymentId", exception)
         
-        try {
-            paymentService.failPayment(
-                paymentId = paymentId,
-                reservationId = reservationId,
-                reason = exception.message ?: "Unknown error",
-                token = token
-            )
-        } catch (failException: Exception) {
-            logger.error("결제 실패 처리 중 오류 발생 - paymentId: $paymentId", failException)
-        }
+        paymentService.failPayment(
+            paymentId = paymentId,
+            reservationId = reservationId,
+            reason = exception.message ?: "Unknown error",
+            token = token
+        )
     }
 }

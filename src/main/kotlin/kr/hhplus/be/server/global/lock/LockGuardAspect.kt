@@ -103,22 +103,28 @@ class LockGuardAspect(
         val parameterNames = methodSignature.parameterNames
         val args = joinPoint.args
         
-        logger.debug("SpEL 표현식 평가 시작: $expression")
-        logger.debug("메서드: ${joinPoint.signature.name}")
-        logger.debug("파라미터 이름들: ${parameterNames.joinToString(", ")}")
-        logger.debug("파라미터 값들: ${args.joinToString(", ")}")
+        if (logger.isDebugEnabled) {
+            logger.debug("SpEL 표현식 평가 시작: $expression")
+            logger.debug("메서드: ${joinPoint.signature.name}")
+            logger.debug("파라미터 이름들: ${parameterNames.joinToString(", ")}")
+            logger.debug("파라미터 값들: ${args.joinToString(", ")}")
+        }
         
         val context = StandardEvaluationContext()
         
         for (i in parameterNames.indices) {
             context.setVariable(parameterNames[i], args[i])
-            logger.debug("변수 설정: ${parameterNames[i]} = ${args[i]}")
+            if (logger.isDebugEnabled) {
+                logger.debug("변수 설정: ${parameterNames[i]} = ${args[i]}")
+            }
         }
         
         return try {
             val exp = parser.parseExpression(expression)
             val result = exp.getValue(context, String::class.java) ?: expression
-            logger.debug("SpEL 표현식 결과: $result")
+            if (logger.isDebugEnabled) {
+                logger.debug("SpEL 표현식 결과: $result")
+            }
             result
         } catch (e: Exception) {
             logger.error("SpEL 표현식 평가 실패: $expression", e)

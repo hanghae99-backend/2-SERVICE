@@ -63,7 +63,7 @@ class ReservationController(
     fun getReservation(
         @PathVariable @Positive reservationId: Long
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        val reservation = reservationService.getReservationWithDetails(reservationId)
+        val reservation = reservationService.getReservationById(reservationId)
         return ResponseEntity.ok(
             CommonApiResponse.success(
                 data = ReservationDto.fromEntity(reservation),

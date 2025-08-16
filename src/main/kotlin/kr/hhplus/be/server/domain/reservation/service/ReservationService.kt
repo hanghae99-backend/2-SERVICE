@@ -42,13 +42,12 @@ class ReservationService(
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
         logger.info("예약 요청 시작 - userId: $userId, seatId: $seatId")
         
-        validateExistingReservation(seatId)
-        
         val seat = seatService.getSeatById(seatId)
-        reserveSeatStatus(seatId, userId)
+        
+        validateExistingReservation(seatId)
+        seatService.reserveSeat(seatId)
         
         val reservation = createTemporaryReservation(userId, concertId, seatId, seat)
-        
         publishReservationCreatedEvent(reservation)
         
         logger.info("예약 생성 성공 - reservationId: ${reservation.reservationId}, userId: $userId")
@@ -76,20 +75,7 @@ class ReservationService(
             throw ReservationAccessDeniedException(userId, reservationId)
         }
         
-        reservation.cancel(statusRepository.getCancelledStatus())
-        val savedReservation = reservationRepository.save(reservation)
-        
-        val event = ReservationCancelledEvent(
-            reservationId = savedReservation.reservationId,
-            userId = savedReservation.userId,
-            concertId = savedReservation.concertId,
-            seatId = savedReservation.seatId,
-            cancelReason = cancelReason ?: "사용자 취소",
-            isExpired = false
-        )
-        eventPublisher.publish(event)
-
-        return savedReservation
+        return cancelReservationInternal(reservation, cancelReason ?: "사용자 취소", false)
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
@@ -97,42 +83,37 @@ class ReservationService(
         val reservation = reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
         
-        reservation.cancel(statusRepository.getCancelledStatus())
-        val savedReservation = reservationRepository.save(reservation)
+        val savedReservation = cancelReservationInternal(reservation, cancelReason, true)
         
-        val expiredEvent = ReservationExpiredEvent(
+        eventPublisher.publish(ReservationExpiredEvent(
             reservationId = savedReservation.reservationId,
             userId = savedReservation.userId,
             concertId = savedReservation.concertId,
             seatId = savedReservation.seatId
-        )
-        eventPublisher.publish(expiredEvent)
+        ))
         
-        val cancelledEvent = ReservationCancelledEvent(
+        return savedReservation
+    }
+    
+    private fun cancelReservationInternal(reservation: Reservation, cancelReason: String, isExpired: Boolean): Reservation {
+        reservation.cancel(statusRepository.getCancelledStatus())
+        val savedReservation = reservationRepository.save(reservation)
+        
+        eventPublisher.publish(ReservationCancelledEvent(
             reservationId = savedReservation.reservationId,
             userId = savedReservation.userId,
             concertId = savedReservation.concertId,
             seatId = savedReservation.seatId,
             cancelReason = cancelReason,
-            isExpired = true
-        )
-        eventPublisher.publish(cancelledEvent)
+            isExpired = isExpired
+        ))
         
         return savedReservation
-    }
-    
-    fun getReservationWithLock(reservationId: Long): Reservation {
-        return reservationRepository.findById(reservationId)
-            ?: throw ReservationNotFoundException(reservationId)
     }
     
     fun getReservationById(reservationId: Long): Reservation {
         return reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
-    }
-    
-    fun getReservationWithDetails(reservationId: Long): Reservation {
-        return getReservationById(reservationId)
     }
     
     fun getReservationsByCondition(condition: ReservationSearchCondition): ReservationDto.Page {
@@ -215,9 +196,7 @@ class ReservationService(
         var cleanedCount = 0
         expiredReservations.forEach { reservation ->
             try {
-                val lockedReservation = reservationRepository.findById(reservation.reservationId)
-                
-                if (lockedReservation != null && lockedReservation.isExpired()) {
+                if (reservation.isExpired()) {
                     cancelReservationBySystem(reservation.reservationId, "예약 시간 만료")
                     cleanedCount++
                 }
@@ -250,16 +229,6 @@ class ReservationService(
         }
     }
     
-    private fun reserveSeatStatus(seatId: Long, userId: Long) {
-        try {
-            seatService.reserveSeat(seatId)
-            logger.info("좌석 상태 변경 성공 - seatId: $seatId, userId: $userId")
-        } catch (e: Exception) {
-            logger.error("좌석 상태 변경 실패 - seatId: $seatId, userId: $userId", e)
-            throw SeatAlreadyReservedException(seatId)
-        }
-    }
-    
     private fun createTemporaryReservation(userId: Long, concertId: Long, seatId: Long, seat: Any): Reservation {
         val reservation = Reservation.createTemporary(
             userId = userId,
@@ -274,7 +243,7 @@ class ReservationService(
     }
     
     private fun publishReservationCreatedEvent(reservation: Reservation) {
-        val event = ReservationCreatedEvent(
+        eventPublisher.publish(ReservationCreatedEvent(
             reservationId = reservation.reservationId,
             userId = reservation.userId,
             concertId = reservation.concertId,
@@ -282,19 +251,17 @@ class ReservationService(
             seatNumber = reservation.seatNumber,
             price = reservation.price,
             expiresAt = reservation.expiresAt
-        )
-        eventPublisher.publish(event)
+        ))
     }
     
     private fun publishReservationConfirmedEvent(reservation: Reservation, paymentId: Long) {
-        val event = ReservationConfirmedEvent(
+        eventPublisher.publish(ReservationConfirmedEvent(
             reservationId = reservation.reservationId,
             userId = reservation.userId,
             concertId = reservation.concertId,
             seatId = reservation.seatId,
             paymentId = paymentId,
             price = reservation.price
-        )
-        eventPublisher.publish(event)
+        ))
     }
 }

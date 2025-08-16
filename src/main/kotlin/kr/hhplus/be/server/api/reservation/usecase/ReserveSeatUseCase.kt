@@ -36,10 +36,6 @@ class ReserveSeatUseCase(
         
         validateToken(token)
         
-        if (!seatService.isSeatAvailable(seatId)) {
-            throw IllegalStateException("예약할 수 없는 좌석입니다: $seatId")
-        }
-        
         val reservation = reservationService.reserveSeat(userId, concertId, seatId)
         
         logger.info("좌석 예약 완료 - userId: $userId, reservationId: ${reservation.reservationId}")

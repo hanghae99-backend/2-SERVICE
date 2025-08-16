@@ -10,7 +10,6 @@ import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.global.lock.LockStrategy
 
 import org.slf4j.LoggerFactory
-
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -26,21 +25,30 @@ class ReserveSeatUseCase(
     private val logger = LoggerFactory.getLogger(ReserveSeatUseCase::class.java)
     
     @LockGuard(
-        key = "'seat:' + #seatId",
+        keys = ["'seat:' + #seatId", "'user:reservation:' + #userId"],
         strategy = LockStrategy.PUB_SUB,
-        waitTimeoutMs = 10000L
+        waitTimeoutMs = 12000L
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
-        val waitingToken = tokenLifecycleManager.findToken(token)
-        val status = tokenLifecycleManager.getTokenStatus(token)
-        tokenDomainService.validateActiveToken(waitingToken, status)
+        logger.info("좌석 예약 시작 - userId: $userId, seatId: $seatId")
+        
+        validateToken(token)
         
         if (!seatService.isSeatAvailable(seatId)) {
             throw IllegalStateException("예약할 수 없는 좌석입니다: $seatId")
         }
         
-        return reservationService.reserveSeat(userId, concertId, seatId)
+        val reservation = reservationService.reserveSeat(userId, concertId, seatId)
+        
+        logger.info("좌석 예약 완료 - userId: $userId, reservationId: ${reservation.reservationId}")
+        return reservation
+    }
+    
+    private fun validateToken(token: String) {
+        val waitingToken = tokenLifecycleManager.findToken(token)
+        val status = tokenLifecycleManager.getTokenStatus(token)
+        tokenDomainService.validateActiveToken(waitingToken, status)
     }
 }

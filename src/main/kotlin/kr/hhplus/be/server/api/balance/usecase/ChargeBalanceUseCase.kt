@@ -21,34 +21,47 @@ class ChargeBalanceUseCase(
     private val pointHistoryRepository: PointHistoryRepository,
     private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
 ) {
+    
+    private val logger = LoggerFactory.getLogger(ChargeBalanceUseCase::class.java)
+    
     @LockGuard(
         key = "'balance:' + #userId",
         strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 2000L,
-        retryIntervalMs = 50L,
-        maxRetryCount = 40
+        waitTimeoutMs = 3000L,
+        retryIntervalMs = 100L,
+        maxRetryCount = 30
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, amount: BigDecimal): Point {
-        val currentPoint = pointRepository.findByUserId(userId)
-            ?: run {
-                try {
-                    val newPoint = Point.create(userId, BigDecimal.ZERO)
-                    pointRepository.save(newPoint)
-                } catch (e: Exception) {
-                    pointRepository.findByUserId(userId)
-                        ?: throw IllegalStateException("포인트 생성 실패: $userId")
-                }
-            }
-
+        logger.info("포인트 충전 시작 - userId: $userId, amount: $amount")
+        
+        val currentPoint = getOrCreatePoint(userId)
+        
         val chargedPoint = currentPoint.charge(amount)
         val savedPoint = pointRepository.save(chargedPoint)
-
+        
+        saveChargeHistory(userId, amount)
+        
+        logger.info("포인트 충전 완료 - userId: $userId, 충전 후 잔액: ${savedPoint.amount}")
+        return savedPoint
+    }
+    
+    private fun getOrCreatePoint(userId: Long): Point {
+        return pointRepository.findByUserId(userId) ?: run {
+            try {
+                val newPoint = Point.create(userId, BigDecimal.ZERO)
+                pointRepository.save(newPoint)
+            } catch (e: Exception) {
+                pointRepository.findByUserId(userId)
+                    ?: throw IllegalStateException("포인트 생성 실패: $userId")
+            }
+        }
+    }
+    
+    private fun saveChargeHistory(userId: Long, amount: BigDecimal) {
         val chargeType = pointHistoryTypeRepository.getChargeType()
         val history = PointHistory.charge(userId, amount, chargeType, "포인트 충전")
         pointHistoryRepository.save(history)
-
-        return savedPoint
     }
 }

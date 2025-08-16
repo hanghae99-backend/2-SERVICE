@@ -17,20 +17,15 @@ import org.springframework.stereotype.Component
 class LockGuardAspect(
     private val distributedLock: DistributedLock
 ) {
+    
     private val logger = LoggerFactory.getLogger(LockGuardAspect::class.java)
     private val parser: ExpressionParser = SpelExpressionParser()
     
     @Around("@annotation(lockGuard)")
     fun executeWithLock(joinPoint: ProceedingJoinPoint, lockGuard: LockGuard): Any? {
-        val lockKeys = if (lockGuard.keys.isNotEmpty()) {
-            lockGuard.keys.map { generateLockKey(joinPoint, it) }.sorted() // 정렬로 데드락 방지
-        } else if (lockGuard.key.isNotEmpty()) {
-            listOf(generateLockKey(joinPoint, lockGuard.key))
-        } else {
-            throw IllegalArgumentException("LockGuard에 key 또는 keys를 지정해야 합니다")
-        }
+        val lockKeys = generateLockKeys(joinPoint, lockGuard)
         
-        logger.info("🔒 분산락 시작 - 키: $lockKeys, 전략: ${lockGuard.strategy}, 메소드: ${joinPoint.signature.name}")
+        logger.info("🔒 분산락 시작 - 키: $lockKeys, 전략: ${lockGuard.strategy}, 메서드: ${joinPoint.signature.name}")
         val startTime = System.currentTimeMillis()
         
         return try {
@@ -62,6 +57,39 @@ class LockGuardAspect(
         }
     }
     
+    private fun generateLockKeys(joinPoint: ProceedingJoinPoint, lockGuard: LockGuard): List<String> {
+        return if (lockGuard.keys.isNotEmpty()) {
+            lockGuard.keys.map { generateLockKey(joinPoint, it) }.let { sortLockKeys(it) }
+        } else if (lockGuard.key.isNotEmpty()) {
+            listOf(generateLockKey(joinPoint, lockGuard.key))
+        } else {
+            throw IllegalArgumentException("락 키가 지정되지 않았습니다")
+        }
+    }
+    
+    private fun sortLockKeys(keys: List<String>): List<String> {
+        return keys.sortedWith { key1, key2 ->
+            val priority1 = getLockPriority(key1)
+            val priority2 = getLockPriority(key2)
+            
+            when {
+                priority1 != priority2 -> priority1.compareTo(priority2)
+                else -> key1.compareTo(key2)
+            }
+        }
+    }
+    
+    private fun getLockPriority(key: String): Int {
+        return when {
+            key.contains("user:") -> 1
+            key.contains("balance:") -> 2
+            key.contains("reservation:") -> 3
+            key.contains("seat:") -> 4
+            key.contains("payment:") -> 5
+            else -> 999
+        }
+    }
+    
     private fun generateLockKey(joinPoint: ProceedingJoinPoint, keyExpression: String): String {
         return if (keyExpression.contains("#")) {
             evaluateSpelExpression(joinPoint, keyExpression)
@@ -76,7 +104,7 @@ class LockGuardAspect(
         val args = joinPoint.args
         
         logger.debug("SpEL 표현식 평가 시작: $expression")
-        logger.debug("메소드: ${joinPoint.signature.name}")
+        logger.debug("메서드: ${joinPoint.signature.name}")
         logger.debug("파라미터 이름들: ${parameterNames.joinToString(", ")}")
         logger.debug("파라미터 값들: ${args.joinToString(", ")}")
         
@@ -87,15 +115,15 @@ class LockGuardAspect(
             logger.debug("변수 설정: ${parameterNames[i]} = ${args[i]}")
         }
         
-        try {
+        return try {
             val exp = parser.parseExpression(expression)
             val result = exp.getValue(context, String::class.java) ?: expression
             logger.debug("SpEL 표현식 결과: $result")
-            return result
+            result
         } catch (e: Exception) {
             logger.error("SpEL 표현식 평가 실패: $expression", e)
             logger.error("사용 가능한 변수들: ${parameterNames.joinToString(", ")}")
-            throw e
+            throw IllegalArgumentException("SpEL 표현식 평가 실패: $expression", e)
         }
     }
 }

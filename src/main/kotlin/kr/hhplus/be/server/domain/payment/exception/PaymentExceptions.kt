@@ -1,24 +1,47 @@
 package kr.hhplus.be.server.domain.payment.exception
 
+import kr.hhplus.be.server.global.exception.DomainException
 import org.springframework.http.HttpStatus
 
+abstract class PaymentException(
+    message: String,
+    errorCode: String,
+    httpStatus: HttpStatus = HttpStatus.BAD_REQUEST,
+    cause: Throwable? = null
+) : DomainException("PAYMENT", message, errorCode, httpStatus, cause)
 
-data class PaymentNotFoundException(
-    override val message: String = PaymentErrorCode.NotFound.defaultMessage,
-    val errorCode: String = PaymentErrorCode.NotFound.code,
-    val status: HttpStatus = PaymentErrorCode.NotFound.httpStatus
-) : RuntimeException(message)
+class PaymentNotFoundException(paymentId: Long)
+    : PaymentException(
+        message = "결제를 찾을 수 없습니다: $paymentId",
+        errorCode = "NOT_FOUND",
+        httpStatus = HttpStatus.NOT_FOUND
+    )
 
+class PaymentProcessException(message: String, cause: Throwable? = null)
+    : PaymentException(
+        message = message,
+        errorCode = "PROCESS_FAILED",
+        httpStatus = HttpStatus.INTERNAL_SERVER_ERROR,
+        cause = cause
+    )
 
-data class PaymentAlreadyProcessedException(
-    override val message: String = PaymentErrorCode.AlreadyProcessed.defaultMessage,
-    val errorCode: String = PaymentErrorCode.AlreadyProcessed.code,
-    val status: HttpStatus = PaymentErrorCode.AlreadyProcessed.httpStatus
-) : RuntimeException(message)
+class PaymentAlreadyCompletedException(paymentId: Long)
+    : PaymentException(
+        message = "이미 완료된 결제입니다: $paymentId",
+        errorCode = "ALREADY_COMPLETED",
+        httpStatus = HttpStatus.CONFLICT
+    )
 
+class PaymentAmountValidationException(message: String)
+    : PaymentException(
+        message = message,
+        errorCode = "AMOUNT_VALIDATION_FAILED",
+        httpStatus = HttpStatus.BAD_REQUEST
+    )
 
-data class PaymentProcessException(
-    override val message: String = PaymentErrorCode.ProcessFailed.defaultMessage,
-    val errorCode: String = PaymentErrorCode.ProcessFailed.code,
-    val status: HttpStatus = PaymentErrorCode.ProcessFailed.httpStatus
-) : RuntimeException(message)
+class InvalidPaymentStatusTransitionException(paymentId: Long, from: String, to: String)
+    : PaymentException(
+        message = "결제 $paymentId 의 상태를 $from 에서 $to 로 변경할 수 없습니다",
+        errorCode = "INVALID_STATUS_TRANSITION",
+        httpStatus = HttpStatus.BAD_REQUEST
+    )

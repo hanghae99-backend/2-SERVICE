@@ -51,3 +51,19 @@ class ReservationAccessDeniedException(userId: Long, reservationId: Long)
         errorCode = "ACCESS_DENIED",
         httpStatus = HttpStatus.FORBIDDEN
     )
+
+class ReservationCancelFailedException(message: String, cause: Throwable? = null)
+    : ReservationException(
+        message = message,
+        errorCode = "CANCEL_FAILED",
+        httpStatus = HttpStatus.INTERNAL_SERVER_ERROR,
+        cause = cause
+    )
+
+class ReservationFailedException(message: String, cause: Throwable? = null)
+    : ReservationException(
+        message = message,
+        errorCode = "RESERVATION_FAILED",
+        httpStatus = HttpStatus.INTERNAL_SERVER_ERROR,
+        cause = cause
+    )

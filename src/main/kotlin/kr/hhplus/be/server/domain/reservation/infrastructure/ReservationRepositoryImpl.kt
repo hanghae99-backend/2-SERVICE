@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.reservation.infrastructure
 
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Repository
@@ -48,12 +48,24 @@ class ReservationRepositoryImpl(
         return reservationJpaRepository.findByExpiresAtBeforeAndStatusCode(currentTime, statusCode)
     }
     
+    override fun findByStatusCodeInOrderByReservedAtDesc(statusCodes: List<String>): List<Reservation> {
+        return reservationJpaRepository.findByStatusCodeInOrderByReservedAtDesc(statusCodes)
+    }
+    
     override fun findByStatusCodeInOrderByReservedAtDesc(statusCodes: List<String>, pageable: Pageable): Page<Reservation> {
         return reservationJpaRepository.findByStatusCodeInOrderByReservedAtDesc(statusCodes, pageable)
     }
     
+    override fun findByUserIdAndStatusCodeInOrderByReservedAtDesc(userId: Long, statusCodes: List<String>): List<Reservation> {
+        return reservationJpaRepository.findByUserIdAndStatusCodeInOrderByReservedAtDesc(userId, statusCodes)
+    }
+    
     override fun findByUserIdAndStatusCodeInOrderByReservedAtDesc(userId: Long, statusCodes: List<String>, pageable: Pageable): Page<Reservation> {
         return reservationJpaRepository.findByUserIdAndStatusCodeInOrderByReservedAtDesc(userId, statusCodes, pageable)
+    }
+    
+    override fun findByConcertIdAndStatusCodeInOrderByReservedAtDesc(concertId: Long, statusCodes: List<String>): List<Reservation> {
+        return reservationJpaRepository.findByConcertIdAndStatusCodeInOrderByReservedAtDesc(concertId, statusCodes)
     }
     
     override fun findByConcertIdAndStatusCodeInOrderByReservedAtDesc(concertId: Long, statusCodes: List<String>, pageable: Pageable): Page<Reservation> {

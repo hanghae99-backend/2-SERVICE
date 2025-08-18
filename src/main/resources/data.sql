@@ -1,11 +1,11 @@
 -- 콘서트 예약 시스템 초기 데이터 (좌석 50개, 10만원 통일)
 
 -- 사용자 데이터
-INSERT INTO users (user_id, created_at, updated_at) VALUES
-                                                        (1, NOW(), NOW()), (2, NOW(), NOW()), (3, NOW(), NOW()),
-                                                        (4, NOW(), NOW()), (5, NOW(), NOW()), (6, NOW(), NOW()),
-                                                        (7, NOW(), NOW()), (8, NOW(), NOW()), (9, NOW(), NOW()),
-                                                        (10, NOW(), NOW());
+INSERT INTO users (user_id, name, status, created_at, updated_at) VALUES
+                                                        (1, 'User1', 'ACTIVE', NOW(), NOW()), (2, 'User2', 'ACTIVE', NOW(), NOW()), (3, 'User3', 'ACTIVE', NOW(), NOW()),
+                                                        (4, 'User4', 'ACTIVE', NOW(), NOW()), (5, 'User5', 'ACTIVE', NOW(), NOW()), (6, 'User6', 'ACTIVE', NOW(), NOW()),
+                                                        (7, 'User7', 'ACTIVE', NOW(), NOW()), (8, 'User8', 'ACTIVE', NOW(), NOW()), (9, 'User9', 'ACTIVE', NOW(), NOW()),
+                                                        (10, 'User10', 'ACTIVE', NOW(), NOW());
 
 -- 포인트 초기 잔액 (updated_at 필드 추가)
 INSERT INTO point (user_id, amount, last_updated, created_at, updated_at) VALUES
@@ -21,9 +21,9 @@ INSERT INTO point (user_id, amount, last_updated, created_at, updated_at) VALUES
                                                                               (10, 350000.00, NOW(), NOW(), NOW());
 
 -- 포인트 히스토리 타입
-INSERT INTO point_history_type (code, name, description, is_active) VALUES
-                                                                                    ('CHARGE', '충전', '포인트 충전', true),
-                                                                                    ('USE', '사용', '포인트 사용', true);
+INSERT INTO point_history_type (code, name, description, is_active, category, sort_order, affects_balance, sign, created_at, updated_at) VALUES
+                                                                                    ('CHARGE', '충전', '포인트 충전', true, 'CHARGE', 1, true, 1, NOW(), NOW()),
+                                                                                    ('USE', '사용', '포인트 사용', true, 'USE', 2, true, -1, NOW(), NOW());
 
 -- 포인트 히스토리
 INSERT INTO point_history (user_id, amount, type_code, description, created_at, updated_at) VALUES
@@ -69,10 +69,10 @@ INSERT INTO concert_schedule (concert_id, concert_date, venue, total_seats, avai
                                                                                                                          (8, '2025-09-23', 'KSPO DOME', 50, 50, NOW(), NOW());
 
 -- 좌석 상태 타입
-INSERT INTO seat_status_type (code, name, description, is_active) VALUES
-                                                                                  ('AVAILABLE', '예약 가능', '예약 가능한 좌석', true),
-                                                                                  ('RESERVED', '임시 예약', '결제 대기 중', true),
-                                                                                  ('OCCUPIED', '예약 완료', '결제 완료', true);
+INSERT INTO seat_status_type (code, name, description, is_active, sort_order, color_code, created_at, updated_at) VALUES
+                                                                                  ('AVAILABLE', '예약 가능', '예약 가능한 좌석', true, 1, '#28a745', NOW(), NOW()),
+                                                                                  ('RESERVED', '임시 예약', '결제 대기 중', true, 2, '#ffc107', NOW(), NOW()),
+                                                                                  ('OCCUPIED', '예약 완료', '결제 완료', true, 3, '#dc3545', NOW(), NOW());
 
 -- 좌석 데이터 (각 스케줄별 50개, 10만원 통일)
 -- IU 콘서트 좌석 (01~50)
@@ -109,15 +109,15 @@ CROSS JOIN (
 ) n;
 
 -- 예약/결제 상태 타입
-INSERT INTO reservation_status_type (code, name, description, is_active) VALUES
-                                                                                         ('TEMPORARY', '임시 예약', '결제 대기 중', true),
-                                                                                         ('CONFIRMED', '예약 확정', '결제 완료', true),
-                                                                                         ('CANCELLED', '예약 취소', '취소됨', true);
+INSERT INTO reservation_status_type (code, name, description, is_active, category, sort_order, is_final, auto_expire_minutes, created_at, updated_at) VALUES
+                                                                                         ('TEMPORARY', '임시 예약', '결제 대기 중', true, 'NORMAL', 1, false, 5, NOW(), NOW()),
+                                                                                         ('CONFIRMED', '예약 확정', '결제 완료', true, 'NORMAL', 2, false, null, NOW(), NOW()),
+                                                                                         ('CANCELLED', '예약 취소', '취소됨', true, 'CANCELLED', 4, true, null, NOW(), NOW());
 
-INSERT INTO payment_status_type (code, name, description, is_active) VALUES
-                                                                                     ('PEND', '결제 대기', '처리 중', true),
-                                                                                     ('COMP', '결제 완료', '성공', true),
-                                                                                     ('FAIL', '결제 실패', '실패', true);
+INSERT INTO payment_status_type (code, name, description, is_active, category, sort_order, is_final, requires_action, created_at, updated_at) VALUES
+                                                                                     ('PEND', '결제 대기', '처리 중', true, 'NORMAL', 1, false, true, NOW(), NOW()),
+                                                                                     ('COMP', '결제 완료', '성공', true, 'NORMAL', 3, true, false, NOW(), NOW()),
+                                                                                     ('FAIL', '결제 실패', '실패', true, 'ERROR', 4, true, false, NOW(), NOW());
 
 -- 샘플 예약 데이터 (못진 좌석들은 예약된 상태로 설정)
 -- IU 콘서트 첫 번째 날 좌석 못진 상태 설정

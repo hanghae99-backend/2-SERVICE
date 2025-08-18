@@ -16,9 +16,10 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 
 @Service
-class ProcessPaymentUserCase(
+class ProcessPaymentUseCase(
     private val paymentService: PaymentService,
     private val reservationService: ReservationService,
     private val seatService: SeatService,
@@ -27,7 +28,9 @@ class ProcessPaymentUserCase(
     private val tokenLifecycleManager: TokenLifecycleManager
 ) {
     
-    private val logger = LoggerFactory.getLogger(ProcessPaymentUserCase::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(ProcessPaymentUseCase::class.java)
+    }
 
     @LockGuard(
         keys = ["'balance:' + #userId", "'reservation:' + #reservationId"],
@@ -37,7 +40,7 @@ class ProcessPaymentUserCase(
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, reservationId: Long, seatId: Long, token: String): PaymentDto {
-        logger.info("결제 처리 시작 - userId: $userId, reservationId: $reservationId, seatId: $seatId")
+        logger.info("결제 처리 시작 - userId: {}, reservationId: {}, seatId: {}", userId, reservationId, seatId)
         
         validateToken(token)
         validateReservation(reservationId, userId)
@@ -58,7 +61,7 @@ class ProcessPaymentUserCase(
                 token = token
             )
             
-            logger.info("결제 처리 완료 - userId: $userId, paymentId: ${payment.paymentId}")
+            logger.info("결제 처리 완료 - userId: {}, paymentId: {}", userId, payment.paymentId)
             completedPayment
             
         } catch (e: Exception) {
@@ -76,13 +79,13 @@ class ProcessPaymentUserCase(
     private fun validateReservation(reservationId: Long, userId: Long) {
         val reservation = reservationService.getReservationById(reservationId)
         
-        logger.info("예약 상태 검증 - reservationId: $reservationId, status: ${reservation.status.code}")
+        logger.info("예약 상태 검증 - reservationId: {}, status: {}", reservationId, reservation.status.code)
         
         if (reservation.userId != userId) {
             throw PaymentProcessException("예약의 사용자가 일치하지 않습니다")
         }
         
-        if (!reservation.isTemporary()) {
+        if (reservation.status.code != "TEMPORARY") {
             throw PaymentProcessException("임시 예약 상태가 아닙니다: $reservationId, 현재 상태: ${reservation.status.code}")
         }
         
@@ -98,7 +101,7 @@ class ProcessPaymentUserCase(
         exception: Exception,
         userId: Long
     ) {
-        logger.error("결제 처리 실패 - userId: $userId, reservationId: $reservationId, paymentId: $paymentId", exception)
+        logger.error("결제 처리 실패 - userId: {}, reservationId: {}, paymentId: {}", userId, reservationId, paymentId, exception)
         
         paymentService.failPayment(
             paymentId = paymentId,

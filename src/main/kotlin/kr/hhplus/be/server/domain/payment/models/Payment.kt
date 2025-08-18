@@ -2,7 +2,7 @@ package kr.hhplus.be.server.domain.payment.models
 
 import kr.hhplus.be.server.global.common.BaseEntity
 import kr.hhplus.be.server.global.exception.ParameterValidationException
-import kr.hhplus.be.server.domain.payment.exception.PaymentAlreadyProcessedException
+import kr.hhplus.be.server.domain.common.PaymentAlreadyProcessedException
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -89,57 +89,35 @@ class Payment(
         }
     }
 
-    // copy 함수 직접 구현 (paymentId 제외)
-    fun copy(
-        userId: Long = this.userId,
-        reservationId: Long? = this.reservationId,
-        amount: BigDecimal = this.amount,
-        paymentMethod: String? = this.paymentMethod,
-        status: PaymentStatusType = this.status,
-        paidAt: LocalDateTime? = this.paidAt
-    ): Payment {
-        return Payment(
-            userId = userId,
-            reservationId = reservationId,
-            amount = amount,
-            paymentMethod = paymentMethod,
-            status = status,
-            paidAt = paidAt
-        )
-    }
-
-    fun complete(completedStatus: PaymentStatusType): Payment {
+    fun complete(completedStatus: PaymentStatusType) {
         if (status.code != STATUS_PENDING) {
-            throw PaymentAlreadyProcessedException("이미 처리된 결제입니다: $paymentId")
+            throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
-        return this.copy(
-            status = completedStatus,
-            paidAt = LocalDateTime.now()
-        )
+        this.status = completedStatus
+        this.paidAt = LocalDateTime.now()
     }
 
-    fun fail(failedStatus: PaymentStatusType): Payment {
+    fun fail(failedStatus: PaymentStatusType) {
         if (status.code != STATUS_PENDING) {
-            throw PaymentAlreadyProcessedException("이미 처리된 결제입니다: $paymentId")
+            throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
-        return this.copy(status = failedStatus)
+        this.status = failedStatus
     }
 
-    fun cancel(cancelledStatus: PaymentStatusType): Payment {
+    fun cancel(cancelledStatus: PaymentStatusType) {
         if (status.code == STATUS_COMPLETED) {
-            throw PaymentAlreadyProcessedException("완료된 결제는 취소할 수 없습니다: $paymentId")
+            throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
-        return this.copy(status = cancelledStatus)
+        this.status = cancelledStatus
     }
 
-    fun refund(refundedStatus: PaymentStatusType): Payment {
+    fun refund(refundedStatus: PaymentStatusType) {
         if (status.code != STATUS_COMPLETED) {
-            throw PaymentAlreadyProcessedException("완료된 결제만 환불 가능합니다: $paymentId")
+            throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
-        return this.copy(status = refundedStatus)
+        this.status = refundedStatus
     }
 
-    // 상태 체크
     fun isCompleted(): Boolean = status.code == STATUS_COMPLETED
     fun isPending(): Boolean = status.code == STATUS_PENDING
     fun isFailed(): Boolean = status.code == STATUS_FAILED

@@ -2,9 +2,10 @@ package kr.hhplus.be.server.domain.reservation.service
 
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.extension.orElseThrow
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
-import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
+import kr.hhplus.be.server.api.concert.dto.SeatDto
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchCondition
 import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
@@ -40,7 +41,7 @@ class ReservationService(
     
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
-        logger.info("예약 요청 시작 - userId: $userId, seatId: $seatId")
+        logger.info("예약 요청 시작 - userId: {}, seatId: {}", userId, seatId)
         
         val seat = seatService.getSeatById(seatId)
         
@@ -50,7 +51,7 @@ class ReservationService(
         val reservation = createTemporaryReservation(userId, concertId, seatId, seat)
         publishReservationCreatedEvent(reservation)
         
-        logger.info("예약 생성 성공 - reservationId: ${reservation.reservationId}, userId: $userId")
+        logger.info("예약 생성 성공 - reservationId: {}, userId: {}", reservation.reservationId, userId)
         return reservation
     }
     
@@ -116,69 +117,42 @@ class ReservationService(
             ?: throw ReservationNotFoundException(reservationId)
     }
     
-    fun getReservationsByCondition(condition: ReservationSearchCondition): ReservationDto.Page {
-        val pageable = PageRequest.of(
-            condition.pageNumber - 1,
-            condition.pageSize,
-            if (condition.sortDirection.uppercase() == "DESC") 
-                Sort.by(condition.sortBy).descending() 
-            else 
-                Sort.by(condition.sortBy).ascending()
-        )
-        
-        val page = when {
+    fun getReservationsByCondition(condition: ReservationSearchCondition): List<ReservationDto> {
+        val reservations = when {
             condition.userId != null && condition.statusList != null -> {
                 reservationRepository.findByUserIdAndStatusCodeInOrderByReservedAtDesc(
-                    condition.userId, condition.statusList, pageable
-                )
+                    condition.userId, condition.statusList
+                ).take(condition.limit)
             }
             condition.userId != null -> {
-                reservationRepository.findByUserIdOrderByReservedAtDesc(condition.userId, pageable)
+                reservationRepository.findByUserIdOrderByReservedAtDesc(condition.userId).take(condition.limit)
             }
             condition.concertId != null && condition.statusList != null -> {
                 reservationRepository.findByConcertIdAndStatusCodeInOrderByReservedAtDesc(
-                    condition.concertId, condition.statusList, pageable
-                )
+                    condition.concertId, condition.statusList
+                ).take(condition.limit)
             }
             condition.concertId != null -> {
-                reservationRepository.findByConcertIdOrderByReservedAtDesc(condition.concertId, pageable)
+                reservationRepository.findByConcertIdOrderByReservedAtDesc(condition.concertId).take(condition.limit)
             }
             condition.statusList != null -> {
-                reservationRepository.findByStatusCodeInOrderByReservedAtDesc(condition.statusList, pageable)
+                reservationRepository.findByStatusCodeInOrderByReservedAtDesc(condition.statusList).take(condition.limit)
             }
             else -> {
-                reservationRepository.findAll(pageable)
+                reservationRepository.findAll().take(condition.limit)
             }
         }
         
-        return ReservationDto.Page.fromEntity(
-            reservations = page.content,
-            totalCount = page.totalElements.toInt(),
-            pageNumber = condition.pageNumber,
-            pageSize = condition.pageSize
-        )
+        return reservations.map { ReservationDto.fromEntity(it) }
     }
 
-    fun getExpiredReservations(pageNumber: Int, pageSize: Int): ReservationDto.Page {
+    fun getExpiredReservations(limit: Int = 100): List<ReservationDto> {
         val expiredReservations = reservationRepository.findByExpiresAtBeforeAndStatusCode(
             LocalDateTime.now(), 
             statusRepository.getTemporaryStatus().code
-        )
+        ).take(limit)
         
-        val startIndex = (pageNumber - 1) * pageSize
-        val endIndex = minOf(startIndex + pageSize, expiredReservations.size)
-        val pageContent = if (startIndex < expiredReservations.size) {
-            expiredReservations.subList(startIndex, endIndex)
-        } else {
-            emptyList()
-        }
-        
-        return ReservationDto.Page.fromEntity(
-            reservations = pageContent,
-            totalCount = expiredReservations.size,
-            pageNumber = pageNumber,
-            pageSize = pageSize
-        )
+        return expiredReservations.map { ReservationDto.fromEntity(it) }
     }
 
     @LockGuard(
@@ -201,7 +175,7 @@ class ReservationService(
                     cleanedCount++
                 }
             } catch (e: Exception) {
-                logger.warn("Failed to cleanup expired reservation: ${reservation.reservationId}", e)
+                logger.warn("Failed to cleanup expired reservation: {}", reservation.reservationId, e)
             }
         }
         
@@ -217,7 +191,7 @@ class ReservationService(
         val existingReservation = reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses)
         
         if (existingReservation != null) {
-            logger.warn("기존 예약 존재 - reservationId: ${existingReservation.reservationId}, status: ${existingReservation.status.code}")
+            logger.warn("기존 예약 존재 - reservationId: {}, status: {}", existingReservation.reservationId, existingReservation.status.code)
             
             if (existingReservation.isConfirmed()) {
                 throw ReservationAlreadyConfirmedException(existingReservation.reservationId)
@@ -229,7 +203,7 @@ class ReservationService(
         }
     }
     
-    private fun createTemporaryReservation(userId: Long, concertId: Long, seatId: Long, seat: Any): Reservation {
+    private fun createTemporaryReservation(userId: Long, concertId: Long, seatId: Long, seat: SeatDto): Reservation {
         val reservation = Reservation.createTemporary(
             userId = userId,
             concertId = concertId,

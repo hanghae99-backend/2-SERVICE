@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.payment.infrastructure
 
 import kr.hhplus.be.server.domain.payment.models.Payment
-import kr.hhplus.be.server.domain.payment.repository.PaymentRepository
+import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
 import org.springframework.stereotype.Repository
 
 @Repository

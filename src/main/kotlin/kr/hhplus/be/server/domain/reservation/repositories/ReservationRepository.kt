@@ -1,6 +1,6 @@
-package kr.hhplus.be.server.domain.reservation.repository
+package kr.hhplus.be.server.domain.reservation.repositories
 
-import kr.hhplus.be.server.domain.reservation.model.Reservation
+import kr.hhplus.be.server.domain.reservation.models.Reservation
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import java.time.LocalDateTime
@@ -15,8 +15,11 @@ interface ReservationRepository {
     fun findByConcertIdOrderByReservedAtDesc(concertId: Long, pageable: Pageable): Page<Reservation>
     fun findBySeatIdAndStatusCodeIn(seatId: Long, statusCodes: List<String>): Reservation?
     fun findByExpiresAtBeforeAndStatusCode(currentTime: LocalDateTime, statusCode: String): List<Reservation>
+    fun findByStatusCodeInOrderByReservedAtDesc(statusCodes: List<String>): List<Reservation>
     fun findByStatusCodeInOrderByReservedAtDesc(statusCodes: List<String>, pageable: Pageable): Page<Reservation>
+    fun findByUserIdAndStatusCodeInOrderByReservedAtDesc(userId: Long, statusCodes: List<String>): List<Reservation>
     fun findByUserIdAndStatusCodeInOrderByReservedAtDesc(userId: Long, statusCodes: List<String>, pageable: Pageable): Page<Reservation>
+    fun findByConcertIdAndStatusCodeInOrderByReservedAtDesc(concertId: Long, statusCodes: List<String>): List<Reservation>
     fun findByConcertIdAndStatusCodeInOrderByReservedAtDesc(concertId: Long, statusCodes: List<String>, pageable: Pageable): Page<Reservation>
     fun findByReservedAtBetween(startDate: LocalDateTime, endDate: LocalDateTime): List<Reservation>
     fun findAll(): List<Reservation>

@@ -1,6 +1,6 @@
-package kr.hhplus.be.server.domain.reservation.repository
+package kr.hhplus.be.server.domain.reservation.repositories
 
-import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 
 
 interface ReservationStatusTypePojoRepository {

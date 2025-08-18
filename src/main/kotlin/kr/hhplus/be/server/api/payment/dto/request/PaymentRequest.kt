@@ -1,24 +1,31 @@
 package kr.hhplus.be.server.api.payment.dto.request
 
-@io.swagger.v3.oas.annotations.media.Schema(description = "결제 요청")
+import io.swagger.v3.oas.annotations.media.Schema
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Pattern
+import jakarta.validation.constraints.Positive
+import jakarta.validation.constraints.Size
+
+@Schema(description = "결제 요청")
 data class PaymentRequest(
-    @jakarta.validation.constraints.NotNull(message = "사용자 ID는 필수입니다")
-    @jakarta.validation.constraints.Positive(message = "사용자 ID는 양수여야 합니다")
-    @io.swagger.v3.oas.annotations.media.Schema(description = "사용자 ID", example = "1")
+    @field:NotNull(message = "사용자 ID는 필수입니다")
+    @field:Positive(message = "사용자 ID는 양수여야 합니다")
+    @Schema(description = "사용자 ID", example = "1", required = true)
     val userId: Long,
 
-    @jakarta.validation.constraints.NotNull(message = "예약 ID는 필수입니다")
-    @jakarta.validation.constraints.Positive(message = "예약 ID는 양수여야 합니다")
-    @io.swagger.v3.oas.annotations.media.Schema(description = "예약 ID", example = "1")
+    @field:NotNull(message = "예약 ID는 필수입니다")
+    @field:Positive(message = "예약 ID는 양수여야 합니다")
+    @Schema(description = "예약 ID", example = "1", required = true)
     val reservationId: Long,
 
-    @jakarta.validation.constraints.NotNull(message = "좌석 ID는 필수입니다")
-    @jakarta.validation.constraints.Positive(message = "좌석 ID는 양수여야 합니다")
-    @io.swagger.v3.oas.annotations.media.Schema(description = "좌석 ID", example = "1")
+    @field:NotNull(message = "좌석 ID는 필수입니다")
+    @field:Positive(message = "좌석 ID는 양수여야 합니다")
+    @Schema(description = "좌석 ID", example = "1", required = true)
     val seatId: Long,
 
-    @jakarta.validation.constraints.NotBlank(message = "토큰은 필수입니다")
-    @jakarta.validation.constraints.Size(min = 10, max = 100, message = "토큰 길이는 10-100자 사이여야 합니다")
-    @io.swagger.v3.oas.annotations.media.Schema(description = "대기열 토큰", example = "token-uuid-1234")
+    @field:NotBlank(message = "토큰은 필수입니다")
+    @field:Size(min = 10, max = 100, message = "토큰 길이는 10-100자 사이여야 합니다")
+    @Schema(description = "대기열 토큰", example = "AT_1234567890ABCDEF", required = true)
     val token: String
 )

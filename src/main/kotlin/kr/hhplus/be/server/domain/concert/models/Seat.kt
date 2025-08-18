@@ -58,28 +58,41 @@ class Seat(
         }
     }
 
-    fun reserve(reservedStatus: SeatStatusType): Seat {
-        if (status.code != STATUS_AVAILABLE) throw InvalidSeatStatusException("예약 가능한 좌석이 아닙니다. 현재 상태: ${status.code}")
-        return this.copy(status = reservedStatus)
+    fun reserve(reservedStatus: SeatStatusType) {
+        validateCanReserve()
+        this.status = reservedStatus
     }
 
-    fun occupy(occupiedStatus: SeatStatusType): Seat {
-        if (status.code != STATUS_RESERVED) throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
-        return this.copy(status = occupiedStatus)
+    fun confirm(occupiedStatus: SeatStatusType) {
+        validateCanConfirm()
+        this.status = occupiedStatus
     }
 
-    fun confirm(occupiedStatus: SeatStatusType): Seat {
-        if (status.code != STATUS_RESERVED) throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
-        return this.copy(status = occupiedStatus)
+    fun release(availableStatus: SeatStatusType) {
+        validateCanRelease()
+        this.status = availableStatus
     }
 
-    fun release(availableStatus: SeatStatusType): Seat {
-        if (status.code != STATUS_RESERVED) throw InvalidSeatStatusException("임시 예약된 좌석이 아닙니다. 현재 상태: ${status.code}")
-        return this.copy(status = availableStatus)
+    fun setMaintenance(maintenanceStatus: SeatStatusType) {
+        this.status = maintenanceStatus
     }
 
-    fun setMaintenance(maintenanceStatus: SeatStatusType): Seat {
-        return this.copy(status = maintenanceStatus)
+    private fun validateCanReserve() {
+        if (!canBeReserved()) {
+            throw InvalidSeatStatusException("예약 불가능한 좌석입니다: $seatNumber, 현재 상태: ${status.code}")
+        }
+    }
+
+    private fun validateCanConfirm() {
+        if (!isReserved()) {
+            throw InvalidSeatStatusException("예약된 좌석이 아닙니다: $seatNumber, 현재 상태: ${status.code}")
+        }
+    }
+
+    private fun validateCanRelease() {
+        if (!isReserved()) {
+            throw InvalidSeatStatusException("예약된 좌석이 아닙니다: $seatNumber, 현재 상태: ${status.code}")
+        }
     }
 
     fun isAvailable(): Boolean = status.code == STATUS_AVAILABLE
@@ -89,23 +102,4 @@ class Seat(
 
     val statusName: String
         get() = status.name
-
-    // 수동 copy 함수
-    fun copy(
-        seatId: Long = this.seatId,
-        scheduleId: Long = this.scheduleId,
-        seatNumber: String = this.seatNumber,
-        seatGrade: String = this.seatGrade,
-        price: BigDecimal = this.price,
-        status: SeatStatusType = this.status
-    ): Seat {
-        return Seat(
-            seatId = seatId,
-            scheduleId = scheduleId,
-            seatNumber = seatNumber,
-            seatGrade = seatGrade,
-            price = price,
-            status = status
-        )
-    }
 }

@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.domain.payment.repository
+package kr.hhplus.be.server.domain.payment.repositories
 
 import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
 

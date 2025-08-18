@@ -21,3 +21,8 @@ abstract class DomainException(
     httpStatus: HttpStatus = HttpStatus.BAD_REQUEST,
     cause: Throwable? = null
 ) : BusinessException(message, errorCode, httpStatus, cause)
+
+open class ApplicationException(
+    message: String,
+    cause: Throwable? = null
+) : RuntimeException(message, cause)

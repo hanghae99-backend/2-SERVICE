@@ -1,5 +1,8 @@
 package kr.hhplus.be.server.api.reservation.controller
 
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.global.response.CommonApiResponse
@@ -16,22 +19,30 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/v1/reservations")
 @Validated
+@Tag(name = "Reservation", description = "예약 관리 API")
 class ReservationController(
     private val reservationService: ReservationService,
     private val reserveSeatUseCase: ReserveSeatUseCase,
     private val cancelReservationUseCase: CancelReservationUseCase
 ) {
 
+    @Operation(
+        summary = "좌석 예약 생성",
+        description = "콘서트 좌석을 임시 예약합니다. 임시 예약은 5분간 유지되며, 결제를 완료해야 예약이 확정됩니다."
+    )
     @PostMapping
     fun createReservation(
-        @Valid @RequestBody request: ReservationCreateRequest
+        @Valid @RequestBody 
+        @Parameter(description = "예약 생성 요청", required = true)
+        request: ReservationCreateRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
         val reservation = reserveSeatUseCase.execute(
-            request.userId,
-            request.concertId,
-            request.seatId,
-            request.token
+            userId = request.userId,
+            concertId = request.concertId,
+            seatId = request.seatId,
+            token = request.token
         )
+        
         return ResponseEntity.status(201).body(
             CommonApiResponse.success(
                 data = ReservationDto.fromEntity(reservation),
@@ -40,17 +51,28 @@ class ReservationController(
         )
     }
 
+    @Operation(
+        summary = "예약 취소",
+        description = "기존 예약을 취소합니다. 결제 완료된 예약의 경우 환불 처리가 함께 진행됩니다."
+    )
     @DeleteMapping("/{reservationId}")
     fun cancelReservation(
-        @PathVariable @Positive reservationId: Long,
-        @Valid @RequestBody request: ReservationCancelRequest
+        @PathVariable 
+        @Parameter(description = "예약 ID", required = true, example = "1")
+        @Positive(message = "예약 ID는 양수여야 합니다")
+        reservationId: Long,
+        
+        @Valid @RequestBody 
+        @Parameter(description = "예약 취소 요청", required = true)
+        request: ReservationCancelRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
         val reservation = cancelReservationUseCase.execute(
-            reservationId,
-            request.userId,
-            request.cancelReason,
-            request.token
+            reservationId = reservationId,
+            userId = request.userId,
+            cancelReason = request.cancelReason,
+            token = request.token
         )
+        
         return ResponseEntity.ok(
             CommonApiResponse.success(
                 data = ReservationDto.fromEntity(reservation),
@@ -59,11 +81,19 @@ class ReservationController(
         )
     }
 
+    @Operation(
+        summary = "예약 정보 조회",
+        description = "특정 예약의 상세 정보를 조회합니다."
+    )
     @GetMapping("/{reservationId}")
     fun getReservation(
-        @PathVariable @Positive reservationId: Long
+        @PathVariable 
+        @Parameter(description = "예약 ID", required = true, example = "1")
+        @Positive(message = "예약 ID는 양수여야 합니다")
+        reservationId: Long
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
         val reservation = reservationService.getReservationById(reservationId)
+        
         return ResponseEntity.ok(
             CommonApiResponse.success(
                 data = ReservationDto.fromEntity(reservation),

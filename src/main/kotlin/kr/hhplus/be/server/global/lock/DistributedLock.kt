@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.util.*
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicInteger
 
 @Component
 class DistributedLock(
@@ -18,6 +18,11 @@ class DistributedLock(
     private val redisMessageListenerContainer: RedisMessageListenerContainer?
 ) {
     private val logger = LoggerFactory.getLogger(DistributedLock::class.java)
+    
+    // 성능 모니터링을 위한 메트릭
+    private val lockAcquisitionCount = AtomicInteger(0)
+    private val lockFailureCount = AtomicInteger(0)
+    private val totalWaitTime = AtomicInteger(0)
     
     fun <T> executeWithLock(
         lockKey: String,
@@ -48,15 +53,33 @@ class DistributedLock(
         maxRetryCount: Int = 100,
         action: () -> T
     ): T {
-        return when (strategy) {
-            LockStrategy.SIMPLE -> executeWithSimpleLock(lockKeys, lockTimeoutMs, action)
-            LockStrategy.SPIN -> executeWithSpinLock(lockKeys, lockTimeoutMs, waitTimeoutMs, retryIntervalMs, maxRetryCount, action)
-            LockStrategy.PUB_SUB -> {
-                if (redisMessageListenerContainer == null) {
-                    executeWithSpinLock(lockKeys, lockTimeoutMs, waitTimeoutMs, retryIntervalMs, maxRetryCount, action)
-                } else {
-                    executeWithPubSubLock(lockKeys, lockTimeoutMs, waitTimeoutMs, action)
+        val startTime = System.currentTimeMillis()
+        
+        return try {
+            val result = when (strategy) {
+                LockStrategy.SIMPLE -> executeWithSimpleLock(lockKeys, lockTimeoutMs, action)
+                LockStrategy.SPIN -> executeWithAdaptiveSpinLock(lockKeys, lockTimeoutMs, waitTimeoutMs, retryIntervalMs, maxRetryCount, action)
+                LockStrategy.PUB_SUB -> {
+                    if (redisMessageListenerContainer == null) {
+                        executeWithAdaptiveSpinLock(lockKeys, lockTimeoutMs, waitTimeoutMs, retryIntervalMs, maxRetryCount, action)
+                    } else {
+                        executeWithOptimizedPubSubLock(lockKeys, lockTimeoutMs, waitTimeoutMs, action)
+                    }
                 }
+            }
+            
+            lockAcquisitionCount.incrementAndGet()
+            result
+            
+        } catch (e: Exception) {
+            lockFailureCount.incrementAndGet()
+            throw e
+        } finally {
+            val elapsed = System.currentTimeMillis() - startTime
+            totalWaitTime.addAndGet(elapsed.toInt())
+            
+            if (elapsed > 1000) { // 1초 이상 걸린 경우 경고
+                logger.warn("🐌 락 처리 시간 초과: {}ms, keys: {}, strategy: {}", elapsed, lockKeys, strategy)
             }
         }
     }
@@ -67,13 +90,12 @@ class DistributedLock(
         action: () -> T
     ): T {
         val sortedKeys = lockKeys.sorted()
-        val lockValues = sortedKeys.associateWith { UUID.randomUUID().toString() }
+        val lockValues = sortedKeys.associateWith { generateLockValue() }
         val acquiredLocks = mutableListOf<String>()
         
         try {
-            // 락 획득 단계
             for (key in sortedKeys) {
-                val acquired = tryAcquireLockWithRetry(key, lockValues[key]!!, lockTimeoutMs)
+                val acquired = tryAcquireLockWithFastFail(key, lockValues[key]!!, lockTimeoutMs)
                 if (acquired) {
                     acquiredLocks.add(key)
                 } else {
@@ -82,42 +104,14 @@ class DistributedLock(
                 }
             }
             
-            // 비즈니스 로직 실행
             return action()
             
         } finally {
-            // 락 해제
             releaseLocks(sortedKeys, lockValues)
         }
     }
     
-    /**
-     * 락 획득을 여러 번 시도하는 방식
-     */
-    private fun tryAcquireLockWithRetry(key: String, value: String, lockTimeoutMs: Long): Boolean {
-        var attempts = 0
-        val maxAttempts = 50
-        
-        while (attempts < maxAttempts) {
-            if (tryAcquireLock(key, value, lockTimeoutMs)) {
-                logger.debug("Lock acquired: $key (attempts: ${attempts + 1})")
-                return true
-            }
-            
-            attempts++
-            try {
-                Thread.sleep(50 + (attempts * 10).toLong()) // 점진적 백오프
-            } catch (e: InterruptedException) {
-                Thread.currentThread().interrupt()
-                return false
-            }
-        }
-        
-        logger.warn("Lock acquisition failed after $maxAttempts attempts: $key")
-        return false
-    }
-    
-    private fun <T> executeWithSpinLock(
+    private fun <T> executeWithAdaptiveSpinLock(
         lockKeys: List<String>,
         lockTimeoutMs: Long,
         waitTimeoutMs: Long,
@@ -126,29 +120,33 @@ class DistributedLock(
         action: () -> T
     ): T {
         val sortedKeys = lockKeys.sorted()
-        val lockValues = sortedKeys.associateWith { UUID.randomUUID().toString() }
+        val lockValues = sortedKeys.associateWith { generateLockValue() }
         val startTime = System.currentTimeMillis()
         var retryCount = 0
+        var backoffMs = retryIntervalMs
         
         while (System.currentTimeMillis() - startTime < waitTimeoutMs && retryCount < maxRetryCount) {
             val acquiredLocks = mutableListOf<String>()
+            var allAcquired = true
             
             try {
                 for (key in sortedKeys) {
                     if (tryAcquireLock(key, lockValues[key]!!, lockTimeoutMs)) {
                         acquiredLocks.add(key)
                     } else {
-                        releaseLocks(acquiredLocks, lockValues)
+                        allAcquired = false
                         break
                     }
                 }
                 
-                if (acquiredLocks.size == sortedKeys.size) {
+                if (allAcquired) {
                     return try {
                         action()
                     } finally {
                         releaseLocks(sortedKeys, lockValues)
                     }
+                } else {
+                    releaseLocks(acquiredLocks, lockValues)
                 }
                 
             } catch (e: Exception) {
@@ -157,23 +155,26 @@ class DistributedLock(
             }
             
             retryCount++
-            Thread.sleep(retryIntervalMs)
+            
+            val adaptiveBackoff = calculateAdaptiveBackoff(retryCount, backoffMs, retryIntervalMs)
+            Thread.sleep(adaptiveBackoff)
+            
+            backoffMs = minOf(backoffMs * 2, 500L)
         }
         
-        throw ConcurrentAccessException("Spin Lock 획득 실패: $sortedKeys")
+        throw ConcurrentAccessException("Adaptive Spin Lock 획득 실패: $sortedKeys (retries: $retryCount)")
     }
     
-    private fun <T> executeWithPubSubLock(
+    private fun <T> executeWithOptimizedPubSubLock(
         lockKeys: List<String>,
         lockTimeoutMs: Long,
         waitTimeoutMs: Long,
         action: () -> T
     ): T {
         val sortedKeys = lockKeys.sorted()
-        val lockValues = sortedKeys.associateWith { UUID.randomUUID().toString() }
+        val lockValues = sortedKeys.associateWith { generateLockValue() }
         
-        // 먼저 빠른 락 획득 시도
-        if (tryAcquireAllLocks(sortedKeys, lockValues, lockTimeoutMs)) {
+        if (tryAcquireAllLocksAtomic(sortedKeys, lockValues, lockTimeoutMs)) {
             return try {
                 action()
             } finally {
@@ -181,11 +182,10 @@ class DistributedLock(
             }
         }
         
-        // 락 획득 실패 시 Pub/Sub로 대기
-        return waitForLockWithPubSub(sortedKeys, lockValues, lockTimeoutMs, waitTimeoutMs, action)
+        return waitForLockWithOptimizedPubSub(sortedKeys, lockValues, lockTimeoutMs, waitTimeoutMs, action)
     }
     
-    private fun <T> waitForLockWithPubSub(
+    private fun <T> waitForLockWithOptimizedPubSub(
         lockKeys: List<String>,
         lockValues: Map<String, String>,
         lockTimeoutMs: Long,
@@ -194,30 +194,18 @@ class DistributedLock(
     ): T {
         val latch = CountDownLatch(1)
         val listeners = mutableListOf<MessageListener>()
-        var result: T? = null
-        var exception: Exception? = null
+        val result = CompletableFuture<T>()
         
         try {
             lockKeys.forEach { key ->
+                val listener = createOptimizedListener(key, lockKeys, lockValues, lockTimeoutMs, action, result, latch)
                 val channelPattern = PatternTopic("lock:release:$key")
-                val listener = MessageListener { _: Message, _: ByteArray? ->
-                    if (tryAcquireAllLocks(lockKeys, lockValues, lockTimeoutMs)) {
-                        try {
-                            result = action()
-                        } catch (e: Exception) {
-                            exception = e
-                        } finally {
-                            releaseLocks(lockKeys, lockValues)
-                            latch.countDown()
-                        }
-                    }
-                }
                 
                 redisMessageListenerContainer!!.addMessageListener(listener, channelPattern)
                 listeners.add(listener)
             }
             
-            if (tryAcquireAllLocks(lockKeys, lockValues, lockTimeoutMs)) {
+            if (tryAcquireAllLocksAtomic(lockKeys, lockValues, lockTimeoutMs)) {
                 return try {
                     action()
                 } finally {
@@ -228,12 +216,10 @@ class DistributedLock(
             val acquired = latch.await(waitTimeoutMs, TimeUnit.MILLISECONDS)
             
             if (!acquired) {
-                throw ConcurrentAccessException("Pub/Sub Lock 대기 시간 초과: $lockKeys")
+                throw ConcurrentAccessException("Optimized Pub/Sub Lock 대기 시간 초과: $lockKeys")
             }
             
-            exception?.let { throw it }
-            
-            return result ?: throw IllegalStateException("결과가 null입니다")
+            return result.get(1000, TimeUnit.MILLISECONDS)
             
         } finally {
             listeners.forEach { listener ->
@@ -246,7 +232,43 @@ class DistributedLock(
         }
     }
     
-    private fun tryAcquireAllLocks(
+    private fun <T> createOptimizedListener(
+        triggerKey: String,
+        lockKeys: List<String>,
+        lockValues: Map<String, String>,
+        lockTimeoutMs: Long,
+        action: () -> T,
+        result: CompletableFuture<T>,
+        latch: CountDownLatch
+    ): MessageListener {
+        return MessageListener { _: Message, _: ByteArray? ->
+            if (latch.count > 0 && tryAcquireAllLocksAtomic(lockKeys, lockValues, lockTimeoutMs)) {
+                try {
+                    val actionResult = action()
+                    result.complete(actionResult)
+                } catch (e: Exception) {
+                    result.completeExceptionally(e)
+                } finally {
+                    releaseLocks(lockKeys, lockValues)
+                    latch.countDown()
+                }
+            }
+        }
+    }
+    
+    private fun tryAcquireLockWithFastFail(key: String, value: String, timeoutMs: Long): Boolean {
+        repeat(3) { attempt ->
+            if (tryAcquireLock(key, value, timeoutMs)) {
+                return true
+            }
+            if (attempt < 2) {
+                Thread.sleep(10L * (attempt + 1))
+            }
+        }
+        return false
+    }
+    
+    private fun tryAcquireAllLocksAtomic(
         lockKeys: List<String>,
         lockValues: Map<String, String>,
         lockTimeoutMs: Long
@@ -269,6 +291,14 @@ class DistributedLock(
         }
     }
     
+    private fun calculateAdaptiveBackoff(retryCount: Int, currentBackoff: Long, baseInterval: Long): Long {
+        return when {
+            retryCount <= 5 -> baseInterval
+            retryCount <= 15 -> currentBackoff
+            else -> minOf(currentBackoff + baseInterval, 1000L)
+        }
+    }
+    
     private fun tryAcquireLock(key: String, value: String, timeoutMs: Long): Boolean {
         val result = redisTemplate.opsForValue()
             .setIfAbsent(key, value, Duration.ofMillis(timeoutMs))
@@ -277,14 +307,24 @@ class DistributedLock(
     
     private fun releaseLock(key: String, value: String) {
         try {
-            val currentValue = redisTemplate.opsForValue().get(key) as? String
+            val script = """
+                if redis.call("get", KEYS[1]) == ARGV[1] then
+                    redis.call("del", KEYS[1])
+                    redis.call("publish", "lock:release:" .. KEYS[1], "released")
+                    return 1
+                else
+                    return 0
+                end
+            """.trimIndent()
             
-            if (currentValue == value) {
-                val deleted = redisTemplate.delete(key)
-                
-                if (deleted) {
-                    redisTemplate.convertAndSend("lock:release:$key", "released")
-                }
+            redisTemplate.execute<Long?> { connection ->
+                connection.eval(
+                    script.toByteArray(),
+                    org.springframework.data.redis.connection.ReturnType.INTEGER,
+                    1,
+                    key.toByteArray(),
+                    value.toByteArray()
+                ) as? Long
             }
             
         } catch (e: Exception) {
@@ -299,4 +339,37 @@ class DistributedLock(
             }
         }
     }
+    
+    private fun generateLockValue(): String {
+        return "${UUID.randomUUID()}-${Thread.currentThread().id}-${System.currentTimeMillis()}"
+    }
+    
+    // 성능 모니터링 메서드
+    fun getLockStatistics(): LockStatistics {
+        return LockStatistics(
+            acquisitionCount = lockAcquisitionCount.get(),
+            failureCount = lockFailureCount.get(),
+            totalWaitTimeMs = totalWaitTime.get(),
+            averageWaitTimeMs = if (lockAcquisitionCount.get() > 0) {
+                totalWaitTime.get() / lockAcquisitionCount.get()
+            } else 0,
+            successRate = if (lockAcquisitionCount.get() + lockFailureCount.get() > 0) {
+                lockAcquisitionCount.get().toDouble() / (lockAcquisitionCount.get() + lockFailureCount.get()) * 100
+            } else 0.0
+        )
+    }
+    
+    fun resetStatistics() {
+        lockAcquisitionCount.set(0)
+        lockFailureCount.set(0)
+        totalWaitTime.set(0)
+    }
 }
+
+data class LockStatistics(
+    val acquisitionCount: Int,
+    val failureCount: Int,
+    val totalWaitTimeMs: Int,
+    val averageWaitTimeMs: Int,
+    val successRate: Double
+)

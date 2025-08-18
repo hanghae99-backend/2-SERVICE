@@ -1,11 +1,10 @@
 package kr.hhplus.be.server.domain.balance.models
 
 import kr.hhplus.be.server.global.common.BaseEntity
-
 import jakarta.persistence.*
-import kr.hhplus.be.server.domain.balance.exception.InvalidPointAmountException
+import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
 import kr.hhplus.be.server.domain.balance.exception.InsufficientBalanceException
-
+import kr.hhplus.be.server.domain.common.BalanceBusinessRules
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -34,16 +33,10 @@ class Point(
 
 ) : BaseEntity() {
 
-    // 연관관계 제거 - JPA 연관관계로 인한 트랜잭션 문제를 방지
-    // User가 필요한 경우 userId로 직접 조회하도록 변경
-
     companion object {
-        private val MAX_BALANCE = BigDecimal("50000000")
-        private val MIN_CHARGE_AMOUNT = BigDecimal("1000")
-
         fun create(userId: Long, amount: BigDecimal): Point {
             if (amount < BigDecimal.ZERO) {
-                throw InvalidPointAmountException("포인트 잔액은 음수일 수 없습니다")
+                throw InvalidAmountException(amount)
             }
 
             return Point(
@@ -53,47 +46,32 @@ class Point(
         }
     }
 
-    fun charge(chargeAmount: BigDecimal): Point {
-        validateChargeAmount(chargeAmount)
-        validateMaxBalance(chargeAmount)
+    fun charge(chargeAmount: BigDecimal) {
+        BalanceBusinessRules.validateChargeAmount(chargeAmount)
+        BalanceBusinessRules.validateBalanceLimit(this.amount, chargeAmount)
 
         this.amount = this.amount.add(chargeAmount)
         this.lastUpdated = LocalDateTime.now()
-
-        return this
     }
 
-    private fun validateChargeAmount(amount: BigDecimal) {
-        if (amount <= BigDecimal.ZERO) {
-            throw InvalidPointAmountException("충전 금액은 0보다 커야 합니다: $amount")
-        }
-        if (amount < MIN_CHARGE_AMOUNT) {
-            throw InvalidPointAmountException("최소 충전 금액은 ${MIN_CHARGE_AMOUNT}원입니다: $amount")
-        }
-    }
-
-    private fun validateMaxBalance(chargeAmount: BigDecimal) {
-        val newAmount = this.amount.add(chargeAmount)
-        if (newAmount > MAX_BALANCE) {
-            throw InvalidPointAmountException(
-                "최대 잔액 한도를 초과합니다. 현재: ${this.amount}, 충전 후: $newAmount, 한도: $MAX_BALANCE"
-            )
-        }
-    }
-
-    fun deduct(deductAmount: BigDecimal): Point  {
-        if (deductAmount <= BigDecimal.ZERO) {
-            throw InvalidPointAmountException("차감 금액은 0보다 커야 합니다")
-        }
-
-        if (this.amount < deductAmount) {
-            throw InsufficientBalanceException("잔액이 부족합니다. 현재 잔액: ${this.amount}, 차감 요청: ${deductAmount}")
-        }
+    fun deduct(deductAmount: BigDecimal) {
+        validateDeductAmount(deductAmount)
+        validateSufficientBalance(deductAmount)
 
         this.amount = this.amount.subtract(deductAmount)
         this.lastUpdated = LocalDateTime.now()
+    }
 
-        return this
+    private fun validateDeductAmount(deductAmount: BigDecimal) {
+        if (deductAmount <= BigDecimal.ZERO) {
+            throw InvalidAmountException(deductAmount)
+        }
+    }
+
+    private fun validateSufficientBalance(deductAmount: BigDecimal) {
+        if (this.amount < deductAmount) {
+            throw InsufficientBalanceException(this.userId, this.amount, deductAmount)
+        }
     }
 
     fun hasEnoughBalance(amount: BigDecimal): Boolean {

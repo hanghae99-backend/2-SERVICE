@@ -35,11 +35,10 @@ class ChargeBalanceUseCase(
     @ValidateUserId
     fun execute(userId: Long, amount: BigDecimal): Point {
         logger.info("포인트 충전 시작 - userId: $userId, amount: $amount")
-        
         val currentPoint = getOrCreatePoint(userId)
         
-        val chargedPoint = currentPoint.charge(amount)
-        val savedPoint = pointRepository.save(chargedPoint)
+        currentPoint.charge(amount)
+        val savedPoint = pointRepository.save(currentPoint)
         
         saveChargeHistory(userId, amount)
         
@@ -51,6 +50,7 @@ class ChargeBalanceUseCase(
         return pointRepository.findByUserId(userId) ?: run {
             val newPoint = Point.create(userId, BigDecimal.ZERO)
             pointRepository.save(newPoint)
+            newPoint
         }
     }
     

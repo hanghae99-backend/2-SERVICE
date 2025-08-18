@@ -23,7 +23,9 @@ class DeductBalanceUseCase(
     private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
 ) {
     
-    private val logger = LoggerFactory.getLogger(DeductBalanceUseCase::class.java)
+    companion object {
+        private val logger = LoggerFactory.getLogger(DeductBalanceUseCase::class.java)
+    }
 
     @LockGuard(
         key = "'balance:' + #userId",
@@ -34,24 +36,45 @@ class DeductBalanceUseCase(
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
-    fun execute(userId: Long, amount: BigDecimal): Point {
-        logger.info("포인트 차감 시작 - userId: $userId, amount: $amount")
+    fun execute(userId: Long, amount: BigDecimal, description: String = "포인트 사용"): Point {
+        logger.info("포인트 차감 시작 - userId: {}, amount: {}, description: {}", userId, amount, description)
+        
+        validateAmount(amount)
         
         val currentPoint = pointRepository.findByUserId(userId)
             ?: throw PointNotFoundException(userId)
 
-        val deductedPoint = currentPoint.deduct(amount)
-        val savedPoint = pointRepository.save(deductedPoint)
+        logger.debug("현재 잔액 확인 - userId: {}, currentBalance: {}", userId, currentPoint.amount)
         
-        saveUseHistory(userId, amount)
+        currentPoint.deduct(amount)
+        val savedPoint = pointRepository.save(currentPoint)
         
-        logger.info("포인트 차감 완료 - userId: $userId, 차감 후 잔액: ${savedPoint.amount}")
+        saveUseHistory(userId, amount, description)
+        
+        logger.info(
+            "포인트 차감 완료 - userId: {}, 차감액: {}, 차감 후 잔액: {}", 
+            userId, amount, savedPoint.amount
+        )
+        
         return savedPoint
     }
     
-    private fun saveUseHistory(userId: Long, amount: BigDecimal) {
-        val useType = pointHistoryTypeRepository.getUseType()
-        val history = PointHistory.use(userId, amount, useType, "포인트 사용")
-        pointHistoryRepository.save(history)
+    private fun validateAmount(amount: BigDecimal) {
+        if (amount <= BigDecimal.ZERO) {
+            throw IllegalArgumentException("차감 금액은 0보다 커야 합니다: $amount")
+        }
+    }
+    
+    private fun saveUseHistory(userId: Long, amount: BigDecimal, description: String) {
+        try {
+            val useType = pointHistoryTypeRepository.getUseType()
+            val history = PointHistory.use(userId, amount, useType, description)
+            pointHistoryRepository.save(history)
+            
+            logger.debug("포인트 사용 이력 저장 완료 - userId: {}, amount: {}", userId, amount)
+        } catch (e: Exception) {
+            logger.error("포인트 사용 이력 저장 실패 - userId: {}, amount: {}", userId, amount, e)
+            throw e
+        }
     }
 }

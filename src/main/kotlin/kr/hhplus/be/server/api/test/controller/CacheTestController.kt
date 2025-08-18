@@ -3,11 +3,13 @@ package kr.hhplus.be.server.api.test.controller
 import kr.hhplus.be.server.api.concert.dto.PopularConcertDto
 import kr.hhplus.be.server.api.test.service.CacheTestService
 import kr.hhplus.be.server.global.response.CommonApiResponse
+import org.springframework.context.annotation.Profile
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/test/cache")
+@Profile("!prod") // 프로덕션 환경에서는 비활성화
 class CacheTestController(
     private val cacheTestService: CacheTestService
 ) {

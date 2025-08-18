@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.payment.infrastructure
 
 import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
-import kr.hhplus.be.server.domain.payment.repository.PaymentStatusTypePojoRepository
+import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
 import org.springframework.stereotype.Repository
 
 @Repository

@@ -7,7 +7,7 @@ import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatStatusTypePojoRepository
 import kr.hhplus.be.server.global.extension.orElseThrow
-import kr.hhplus.be.server.global.lock.LockGuard
+import kr.hhplus.be.server.domain.common.ConcertBusinessRules
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
@@ -52,36 +52,36 @@ class SeatService(
     }
 
     fun getSeatById(seatId: Long): SeatDto {
-        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
+        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
         return SeatDto.from(seat)
     }
 
     fun isSeatAvailable(seatId: Long): Boolean {
-        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
+        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
         return seat.isAvailable()
     }
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(seatId: Long): SeatDto {
-        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
+        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
         
         if (!seat.isAvailable()) {
             throw IllegalStateException("이미 예약된 좌석입니다. ID: $seatId")
         }
         
         val reservedStatus = seatStatusTypeRepository.getReservedStatus()
-        val reservedSeat = seat.reserve(reservedStatus)
-        val savedSeat = seatRepository.save(reservedSeat)
+        seat.reserve(reservedStatus)
+        val savedSeat = seatRepository.save(seat)
         
         return SeatDto.from(savedSeat)
     }
     
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun confirmSeat(seatId: Long): SeatDto {
-        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
+        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
         val occupiedStatus = seatStatusTypeRepository.getOccupiedStatus()
 
-        val confirmedSeat = seat.confirm(occupiedStatus)
-        val savedSeat = seatRepository.save(confirmedSeat)
+        seat.confirm(occupiedStatus)
+        val savedSeat = seatRepository.save(seat)
         
         return SeatDto.from(savedSeat)
     }
@@ -89,15 +89,15 @@ class SeatService(
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun releaseSeat(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId)
-            .orElseThrow { SeatNotFoundException("좌석을 찾을 수 없습니다. ID: $seatId") }
+            .orElseThrow { SeatNotFoundException(seatId) }
         
         if (!seat.isReserved()) {
             throw IllegalStateException("예약 상태가 아닌 좌석입니다. ID: $seatId")
         }
         
         val availableStatus = seatStatusTypeRepository.getAvailableStatus()
-        val releasedSeat = seat.release(availableStatus)
-        val savedSeat = seatRepository.save(releasedSeat)
+        seat.release(availableStatus)
+        val savedSeat = seatRepository.save(seat)
         
         return SeatDto.from(savedSeat)
     }

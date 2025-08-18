@@ -1,11 +1,11 @@
 package kr.hhplus.be.server.domain.balance.models
 
 import kr.hhplus.be.server.global.common.BaseEntity
-
 import jakarta.persistence.*
-import kr.hhplus.be.server.domain.balance.exception.InvalidPointAmountException
-import kr.hhplus.be.server.domain.user.model.User
+import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
+import kr.hhplus.be.server.domain.common.BalanceBusinessRules
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Entity
@@ -14,7 +14,8 @@ import java.time.LocalDateTime
     indexes = [
         Index(name = "idx_point_history_user_id_created_at", columnList = "user_id, created_at"),
         Index(name = "idx_point_history_type_code_created_at", columnList = "type_code, created_at"),
-        Index(name = "idx_point_history_user_created_desc", columnList = "user_id, created_at DESC")
+        Index(name = "idx_point_history_user_created_desc", columnList = "user_id, created_at DESC"),
+        Index(name = "idx_point_history_date_type", columnList = "created_at, type_code, amount")
     ]
 )
 class PointHistory(
@@ -34,46 +35,147 @@ class PointHistory(
     var historyType: PointHistoryType,
     
     @Column(name = "description", nullable = false, length = 255)
-    var description: String
+    var description: String,
+    
+    @Column(name = "balance_after", nullable = true, precision = 10, scale = 2)
+    var balanceAfter: BigDecimal? = null,
+    
+    @Column(name = "related_entity_type", nullable = true, length = 50)
+    var relatedEntityType: String? = null,
+    
+    @Column(name = "related_entity_id", nullable = true)
+    var relatedEntityId: Long? = null
 ) : BaseEntity() {
     
-    // PointHistory -> User 연관관계 (N:1)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    val user: User? = null
-    
     companion object {
-        // 타입 코드 상수
         const val TYPE_CHARGE = "CHARGE"
         const val TYPE_USE = "USE"
+        const val TYPE_REFUND = "REFUND"
+        const val TYPE_ADJUSTMENT = "ADJUSTMENT"
         
-        fun charge(userId: Long, amount: BigDecimal, chargeType: PointHistoryType, description: String = "포인트 충전"): PointHistory {
-            if (amount <= BigDecimal.ZERO) {
-                throw InvalidPointAmountException("충전 금액은 0보다 커야 합니다")
-            }
+        fun charge(
+            userId: Long, 
+            amount: BigDecimal, 
+            chargeType: PointHistoryType, 
+            description: String = "포인트 충전",
+            balanceAfter: BigDecimal? = null
+        ): PointHistory {
+            validateAmount(amount, "충전")
             
             return PointHistory(
                 userId = userId,
                 amount = amount,
                 historyType = chargeType,
-                description = description
+                description = description,
+                balanceAfter = balanceAfter
             )
         }
         
-        fun use(userId: Long, amount: BigDecimal, useType: PointHistoryType, description: String = "포인트 사용"): PointHistory {
-            if (amount <= BigDecimal.ZERO) {
-                throw InvalidPointAmountException("사용 금액은 0보다 커야 합니다")
-            }
-
+        fun use(
+            userId: Long, 
+            amount: BigDecimal, 
+            useType: PointHistoryType, 
+            description: String = "포인트 사용",
+            balanceAfter: BigDecimal? = null,
+            relatedEntityType: String? = null,
+            relatedEntityId: Long? = null
+        ): PointHistory {
+            validateAmount(amount, "사용")
+            
             return PointHistory(
                 userId = userId,
                 amount = amount,
                 historyType = useType,
-                description = description
+                description = description,
+                balanceAfter = balanceAfter,
+                relatedEntityType = relatedEntityType,
+                relatedEntityId = relatedEntityId
             )
+        }
+        
+        fun refund(
+            userId: Long,
+            amount: BigDecimal,
+            refundType: PointHistoryType,
+            description: String = "포인트 환불",
+            balanceAfter: BigDecimal? = null,
+            relatedEntityType: String? = null,
+            relatedEntityId: Long? = null
+        ): PointHistory {
+            validateAmount(amount, "환불")
+            
+            return PointHistory(
+                userId = userId,
+                amount = amount,
+                historyType = refundType,
+                description = description,
+                balanceAfter = balanceAfter,
+                relatedEntityType = relatedEntityType,
+                relatedEntityId = relatedEntityId
+            )
+        }
+        
+        fun adjustment(
+            userId: Long,
+            amount: BigDecimal,
+            adjustmentType: PointHistoryType,
+            description: String,
+            balanceAfter: BigDecimal? = null
+        ): PointHistory {
+            if (description.isBlank()) {
+                throw IllegalArgumentException("조정 사유는 필수입니다")
+            }
+            
+            return PointHistory(
+                userId = userId,
+                amount = amount,
+                historyType = adjustmentType,
+                description = description,
+                balanceAfter = balanceAfter,
+                relatedEntityType = "ADMIN_ADJUSTMENT"
+            )
+        }
+        
+        private fun validateAmount(amount: BigDecimal, operation: String) {
+            if (amount <= BigDecimal.ZERO) {
+                throw InvalidAmountException(amount)
+            }
         }
     }
     
     val typeName: String
         get() = historyType.name
+    
+    val typeCode: String
+        get() = historyType.code
+    
+    fun isCharge(): Boolean = historyType.code == TYPE_CHARGE
+    fun isUse(): Boolean = historyType.code == TYPE_USE
+    fun isRefund(): Boolean = historyType.code == TYPE_REFUND
+    fun isAdjustment(): Boolean = historyType.code == TYPE_ADJUSTMENT
+    
+    fun isRelatedTo(entityType: String, entityId: Long): Boolean {
+        return relatedEntityType == entityType && relatedEntityId == entityId
+    }
+    
+    fun getTransactionDate(): LocalDate {
+        return createdAt?.toLocalDate() ?: LocalDate.now()
+    }
+    
+    fun isToday(): Boolean {
+        return getTransactionDate() == LocalDate.now()
+    }
+    
+    fun isInDateRange(startDate: LocalDate, endDate: LocalDate): Boolean {
+        val transactionDate = getTransactionDate()
+        return !transactionDate.isBefore(startDate) && !transactionDate.isAfter(endDate)
+    }
+    
+    fun getDisplayAmount(): String {
+        return when {
+            isCharge() || isRefund() -> "+${amount}"
+            isUse() -> "-${amount}"
+            else -> amount.toString()
+        }
+    }
 }

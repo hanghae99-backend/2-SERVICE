@@ -72,6 +72,7 @@ class TokenService(
             }
             TokenStatus.ACTIVE -> Triple("서비스 이용 가능합니다", null, null)
             TokenStatus.EXPIRED -> Triple("토큰이 만료되었습니다", null, null)
+            TokenStatus.USED -> Triple("토큰이 사용되었습니다", null, null)
         }
         
         return TokenQueueDetail.fromTokenWithQueue(
@@ -97,6 +98,7 @@ class TokenService(
             TokenStatus.WAITING -> "대기 중입니다"
             TokenStatus.ACTIVE -> "서비스 이용 가능합니다"
             TokenStatus.EXPIRED -> "토큰이 만료되었습니다"
+            TokenStatus.USED -> "토큰이 사용되었습니다"
         }
         
         return TokenDto.create(

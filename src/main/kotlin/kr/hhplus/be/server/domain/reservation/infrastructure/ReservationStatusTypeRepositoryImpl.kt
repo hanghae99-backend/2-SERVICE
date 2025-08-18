@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.reservation.infrastructure
 
-import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
 import org.springframework.stereotype.Repository
 
 @Repository

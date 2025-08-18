@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.user.infrastructure
 
-import kr.hhplus.be.server.domain.user.model.User
-import kr.hhplus.be.server.domain.user.repository.UserRepository
+import kr.hhplus.be.server.domain.user.models.User
+import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import org.springframework.stereotype.Repository
 
 @Repository
@@ -19,6 +19,10 @@ class UserRepositoryImpl(
 
     override fun existsById(id: Long): Boolean {
         return userJpaRepository.existsById(id)
+    }
+
+    override fun existsByEmail(email: String): Boolean {
+        return userJpaRepository.existsByEmail(email)
     }
 
     override fun findAll(): List<User> {

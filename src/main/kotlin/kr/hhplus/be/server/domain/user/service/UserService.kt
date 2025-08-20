@@ -18,16 +18,12 @@ class UserService(
     
     @Transactional
     fun createUser(userCreateRequest: UserCreateRequest): UserDto {
-        // 이메일 중복 체크
-        if (userRepository.existsByEmail(userCreateRequest.email)) {
-            throw UserAlreadyExistsException("이미 존재하는 이메일입니다: ${userCreateRequest.email}")
+        // 사용자 ID 중복 체크
+        if (userRepository.existsById(userCreateRequest.userId)) {
+            throw UserAlreadyExistsException("이미 존재하는 사용자 ID입니다: ${userCreateRequest.userId}")
         }
         
-        val user = User.create(
-            userId = 0, // JPA에서 자동 생성
-            name = userCreateRequest.name,
-            email = userCreateRequest.email
-        )
+        val user = User.create(userCreateRequest.userId)
         val savedUser = userRepository.save(user)
 
         return UserDto.fromEntity(savedUser)

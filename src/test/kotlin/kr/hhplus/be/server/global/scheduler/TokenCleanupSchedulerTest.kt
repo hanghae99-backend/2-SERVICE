@@ -22,7 +22,7 @@ class TokenCleanupSchedulerTest : DescribeSpec({
         context("만료된 토큰 정리 스케줄러가 실행될 때") {
             it("TokenLifecycleManager의 cleanupExpiredTokens를 호출해야 한다") {
                 // given
-                every { tokenLifecycleManager.cleanupExpiredTokens() } just Runs
+                every { tokenLifecycleManager.cleanupExpiredTokens() } returns 5
                 
                 // when
                 tokenCleanupScheduler.cleanupExpiredTokens()

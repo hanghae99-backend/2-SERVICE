@@ -7,34 +7,28 @@ import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import io.mockk.justRun
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistory
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
-import kr.hhplus.be.server.domain.balance.exception.InvalidPointAmountException
-import kr.hhplus.be.server.domain.balance.exception.PointNotFoundException
-import kr.hhplus.be.server.domain.balance.exception.InsufficientBalanceException
-import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
-import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
-import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 class BalanceServiceTest : DescribeSpec({
     
     val pointRepository = mockk<PointRepository>()
     val pointHistoryRepository = mockk<PointHistoryRepository>()
-    val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
-    val eventPublisher = mockk< DomainEventPublisher>()
+    
     val balanceService = BalanceService(
         pointRepository,
-        pointHistoryRepository,
+        pointHistoryRepository
     )
     
     describe("getBalance") {
-        context("기존 포인트가 있는 사용자의 잔액 조회할 때") {
-            it("해당 사용자의 포인트를 반환해야 한다") {
+        context("포인트 계정이 있을 때") {
+            it("현재 잔액을 반환해야 한다") {
                 // given
                 val userId = 1L
                 val point = Point.create(userId, BigDecimal("10000"))
@@ -47,11 +41,12 @@ class BalanceServiceTest : DescribeSpec({
                 // then
                 result shouldNotBe null
                 result.amount shouldBe BigDecimal("10000")
+                verify { pointRepository.findByUserId(userId) }
             }
         }
         
-        context("포인트가 없는 사용자의 잔액 조회할 때") {
-            it("0원 포인트를 반환해야 한다") {
+        context("포인트 계정이 없을 때") {
+            it("0원으로 초기화된 포인트를 반환해야 한다") {
                 // given
                 val userId = 1L
                 
@@ -63,20 +58,21 @@ class BalanceServiceTest : DescribeSpec({
                 // then
                 result shouldNotBe null
                 result.amount shouldBe BigDecimal.ZERO
+                verify { pointRepository.findByUserId(userId) }
             }
         }
     }
-
+    
     describe("getPointHistory") {
-        context("포인트 이력이 있는 사용자의 이력 조회할 때") {
-            it("해당 사용자의 포인트 이력을 반환해야 한다") {
+        context("사용자의 포인트 이력을 조회할 때") {
+            it("이력 목록을 반환해야 한다") {
                 // given
                 val userId = 1L
-                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
-                val useType = PointHistoryType("USE", "사용", "포인트 사용", true, LocalDateTime.now())
+                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전")
+                val useType = PointHistoryType("USE", "사용", "포인트 사용")
                 val histories = listOf(
-                    PointHistory.charge(userId, BigDecimal("10000"), chargeType, "포인트 충전"),
-                    PointHistory.use(userId, BigDecimal("5000"), useType, "포인트 사용")
+                    PointHistory.charge(userId, BigDecimal("10000"), chargeType, "충전", BigDecimal("10000")),
+                    PointHistory.use(userId, BigDecimal("3000"), useType, "사용", BigDecimal("7000"))
                 )
                 
                 every { pointHistoryRepository.findByUserIdOrderByCreatedAtDesc(userId) } returns histories
@@ -87,23 +83,27 @@ class BalanceServiceTest : DescribeSpec({
                 // then
                 result shouldNotBe null
                 result.size shouldBe 2
+                verify { pointHistoryRepository.findByUserIdOrderByCreatedAtDesc(userId) }
             }
         }
-        
-        context("포인트 이력이 없는 사용자의 이력 조회할 때") {
-            it("빈 리스트를 반환해야 한다") {
+    }
+    
+    describe("getTodayChargeAmount") {
+        context("오늘 충전 금액을 조회할 때") {
+            it("오늘 충전한 총 금액을 반환해야 한다") {
                 // given
                 val userId = 1L
-                val histories = emptyList<PointHistory>()
+                val today = LocalDate.now()
+                val todayChargeAmount = BigDecimal("50000")
                 
-                every { pointHistoryRepository.findByUserIdOrderByCreatedAtDesc(userId) } returns histories
+                every { pointHistoryRepository.findChargeAmountByUserIdAndDate(userId, today) } returns todayChargeAmount
                 
                 // when
-                val result = balanceService.getPointHistory(userId)
+                val result = balanceService.getTodayChargeAmount(userId)
                 
                 // then
-                result shouldNotBe null
-                result.size shouldBe 0
+                result shouldBe BigDecimal("50000")
+                verify { pointHistoryRepository.findChargeAmountByUserIdAndDate(userId, today) }
             }
         }
     }

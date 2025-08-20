@@ -207,6 +207,33 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse)
     }
 
+    // === 도메인 특정 예외 ===
+    @ExceptionHandler(kr.hhplus.be.server.domain.user.exception.UserNotFoundException::class)
+    fun handleUserNotFoundException(e: kr.hhplus.be.server.domain.user.exception.UserNotFoundException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 사용자 없음: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message,
+            errorCode = e.errorCode
+        )
+        
+        return ResponseEntity.status(e.status).body(errorResponse)
+    }
+
+    @ExceptionHandler(kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException::class)
+    fun handleTokenNotFoundException(e: kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 토큰 없음: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message,
+            errorCode = e.errorCode
+        )
+        
+        return ResponseEntity.status(e.status).body(errorResponse)
+    }
+
     // === 보안 관련 예외 ===
     @ExceptionHandler(AccessDeniedException::class)
     fun handleAccessDeniedException(e: AccessDeniedException): ResponseEntity<CommonApiResponse<Nothing>> {

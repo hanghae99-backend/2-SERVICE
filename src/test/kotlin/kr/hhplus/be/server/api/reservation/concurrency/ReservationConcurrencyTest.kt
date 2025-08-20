@@ -19,11 +19,11 @@ import kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
 import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatStatusTypePojoRepository
-import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
-import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
-import kr.hhplus.be.server.domain.user.model.User
-import kr.hhplus.be.server.domain.user.repository.UserRepository
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
+import kr.hhplus.be.server.domain.user.models.User
+import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import kr.hhplus.be.server.config.TestDataCleanupService
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest

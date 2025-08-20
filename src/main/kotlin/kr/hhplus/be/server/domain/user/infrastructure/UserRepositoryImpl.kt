@@ -21,9 +21,6 @@ class UserRepositoryImpl(
         return userJpaRepository.existsById(id)
     }
 
-    override fun existsByEmail(email: String): Boolean {
-        return userJpaRepository.existsByEmail(email)
-    }
 
     override fun findAll(): List<User> {
         return userJpaRepository.findAll()

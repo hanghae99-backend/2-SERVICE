@@ -45,12 +45,12 @@ class ReservationControllerTest : DescribeSpec({
                     confirmedAt = null
                 )
                 
-                val mockStatus = mockk<kr.hhplus.be.server.domain.reservation.model.ReservationStatusType>()
+                val mockStatus = mockk<kr.hhplus.be.server.domain.reservation.models.ReservationStatusType>()
                 every { mockStatus.code } returns "TEMP"
                 every { mockStatus.name } returns "임시예약"
                 every { mockStatus.description } returns "임시 예약 상태"
                 
-                val mockReservation = mockk<kr.hhplus.be.server.domain.reservation.model.Reservation>(relaxed = true)
+                val mockReservation = mockk<kr.hhplus.be.server.domain.reservation.models.Reservation>(relaxed = true)
                 every { mockReservation.reservationId } returns 1L
                 every { mockReservation.userId } returns userId
                 every { mockReservation.concertId } returns concertId
@@ -83,7 +83,7 @@ class ReservationControllerTest : DescribeSpec({
                 val reservationController = ReservationController(reservationService, reserveSeatUseCase, cancelReservationUseCase)
                 val invalidReservationId = 999L
                 
-                every { reservationService.getReservationWithDetails(invalidReservationId) } throws NoSuchElementException("예약을 찾을 수 없습니다")
+                every { reservationService.getReservationById(invalidReservationId) } throws NoSuchElementException("예약을 찾을 수 없습니다")
                 
                 // when & then
                 shouldThrow<NoSuchElementException> {
@@ -141,12 +141,12 @@ class ReservationControllerTest : DescribeSpec({
                     confirmedAt = LocalDateTime.now()
                 )
                 
-                val mockStatus = mockk<kr.hhplus.be.server.domain.reservation.model.ReservationStatusType>()
+                val mockStatus = mockk<kr.hhplus.be.server.domain.reservation.models.ReservationStatusType>()
                 every { mockStatus.code } returns "CONF"
                 every { mockStatus.name } returns "확정"
                 every { mockStatus.description } returns "확정된 예약"
                 
-                val mockReservation = mockk<kr.hhplus.be.server.domain.reservation.model.Reservation>(relaxed = true)
+                val mockReservation = mockk<kr.hhplus.be.server.domain.reservation.models.Reservation>(relaxed = true)
                 every { mockReservation.reservationId } returns reservationId
                 every { mockReservation.userId } returns 1L
                 every { mockReservation.concertId } returns 1L
@@ -158,7 +158,7 @@ class ReservationControllerTest : DescribeSpec({
                 every { mockReservation.expiresAt } returns null
                 every { mockReservation.confirmedAt } returns LocalDateTime.now()
                 every { mockReservation.paymentId } returns 1L
-                every { reservationService.getReservationWithDetails(reservationId) } returns mockReservation
+                every { reservationService.getReservationById(reservationId) } returns mockReservation
                 
                 // when
                 val response = reservationController.getReservation(reservationId)

@@ -16,14 +16,14 @@ import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.concert.models.*
 import kr.hhplus.be.server.domain.concert.repositories.*
 import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
-import kr.hhplus.be.server.domain.payment.repository.PaymentRepository
-import kr.hhplus.be.server.domain.payment.repository.PaymentStatusTypePojoRepository
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
-import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
-import kr.hhplus.be.server.domain.user.model.User
-import kr.hhplus.be.server.domain.user.repository.UserRepository
+import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
+import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
+import kr.hhplus.be.server.domain.user.models.User
+import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import kr.hhplus.be.server.config.TestDataCleanupService
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
@@ -212,6 +212,7 @@ class PaymentConcurrencyTest(
                             val request = PaymentRequest(
                                 userId = user.userId,
                                 reservationId = testReservations[index].reservationId,
+                                seatId = testReservations[index].seatId,
                                 token = testTokens[index].token
                             )
 
@@ -313,6 +314,7 @@ class PaymentConcurrencyTest(
                             val request = PaymentRequest(
                                 userId = user.userId,
                                 reservationId = reservation.reservationId,
+                                seatId = reservation.seatId,
                                 token = testTokens[0].token
                             )
 

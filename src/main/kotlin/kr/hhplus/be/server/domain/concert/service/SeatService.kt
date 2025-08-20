@@ -79,7 +79,6 @@ class SeatService(
     fun confirmSeat(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
         val occupiedStatus = seatStatusTypeRepository.getOccupiedStatus()
-
         seat.confirm(occupiedStatus)
         val savedSeat = seatRepository.save(seat)
         

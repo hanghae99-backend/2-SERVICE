@@ -17,14 +17,14 @@ import kr.hhplus.be.server.domain.concert.models.*
 import kr.hhplus.be.server.domain.concert.repositories.*
 import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
-import kr.hhplus.be.server.domain.payment.repository.PaymentRepository
-import kr.hhplus.be.server.domain.payment.repository.PaymentStatusTypePojoRepository
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
-import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
-import kr.hhplus.be.server.domain.user.model.User
-import kr.hhplus.be.server.domain.user.repository.UserRepository
+import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
+import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
+import kr.hhplus.be.server.domain.user.models.User
+import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.springframework.http.MediaType
@@ -227,6 +227,7 @@ class PaymentIntegrationTest(
                 val request = PaymentRequest(
                     userId = testUser.userId,
                     reservationId = testReservation.reservationId,
+                    seatId = testReservation.seatId,
                     token = validToken.token
                 )
 
@@ -264,6 +265,7 @@ class PaymentIntegrationTest(
                 val request = PaymentRequest(
                     userId = 999L,
                     reservationId = testReservation.reservationId,
+                    seatId = testReservation.seatId,
                     token = validToken.token
                 )
 
@@ -284,6 +286,7 @@ class PaymentIntegrationTest(
                 val request = PaymentRequest(
                     userId = testUser.userId,
                     reservationId = 999L,
+                    seatId = testReservation.seatId,
                     token = validToken.token
                 )
 
@@ -310,6 +313,7 @@ class PaymentIntegrationTest(
                 val request = PaymentRequest(
                     userId = testUser.userId,
                     reservationId = testReservation.reservationId,
+                    seatId = testReservation.seatId,
                     token = "invalid-token"
                 )
 

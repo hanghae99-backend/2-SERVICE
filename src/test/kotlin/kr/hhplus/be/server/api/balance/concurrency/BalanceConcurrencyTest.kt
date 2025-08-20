@@ -10,8 +10,8 @@ import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
-import kr.hhplus.be.server.domain.user.model.User
-import kr.hhplus.be.server.domain.user.repository.UserRepository
+import kr.hhplus.be.server.domain.user.models.User
+import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import

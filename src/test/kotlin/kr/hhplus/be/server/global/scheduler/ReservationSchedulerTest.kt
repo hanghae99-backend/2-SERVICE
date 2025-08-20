@@ -8,16 +8,22 @@ import io.mockk.verify
 import kr.hhplus.be.server.domain.auth.service.QueueManager
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
+import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.global.lock.DistributedLock
 
 class ReservationSchedulerTest : DescribeSpec({
     
     val reservationService = mockk<ReservationService>()
     val tokenLifecycleManager = mockk<TokenLifecycleManager>()
     val queueManager = mockk<QueueManager>()
+    val domainEventPublisher = mockk<DomainEventPublisher>()
+    val distributedLock = mockk<DistributedLock>()
     val reservationScheduler = ReservationScheduler(
         reservationService,
         tokenLifecycleManager,
-        queueManager
+        queueManager,
+        domainEventPublisher,
+        distributedLock
     )
     
     describe("cleanupExpiredReservations") {
@@ -69,8 +75,8 @@ class ReservationSchedulerTest : DescribeSpec({
         context("대기열 자동 처리를 실행할 때") {
             it("토큰 생명주기 관리자와 큐 매니저의 메서드를 호출해야 한다") {
                 // given
-                every { tokenLifecycleManager.cleanupExpiredTokens() } returns Unit
-                every { queueManager.processQueueAutomatically() } returns Unit
+                every { tokenLifecycleManager.cleanupExpiredTokens() } returns 3
+                every { queueManager.processQueueAutomatically() } returns 2
                 
                 // when
                 reservationScheduler.processQueue()
@@ -85,7 +91,7 @@ class ReservationSchedulerTest : DescribeSpec({
             it("예외를 처리하고 계속 실행되어야 한다") {
                 // given
                 every { tokenLifecycleManager.cleanupExpiredTokens() } throws RuntimeException("정리 실패")
-                every { queueManager.processQueueAutomatically() } returns Unit
+                every { queueManager.processQueueAutomatically() } returns 1
                 
                 // when
                 reservationScheduler.processQueue()
@@ -101,7 +107,7 @@ class ReservationSchedulerTest : DescribeSpec({
         context("만료된 토큰 정리를 실행할 때") {
             it("토큰 생명주기 관리자의 정리 메서드를 호출해야 한다") {
                 // given
-                every { tokenLifecycleManager.cleanupExpiredTokens() } returns Unit
+                every { tokenLifecycleManager.cleanupExpiredTokens() } returns 5
                 
                 // when
                 reservationScheduler.cleanupExpiredTokens()

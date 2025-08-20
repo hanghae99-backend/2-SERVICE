@@ -13,14 +13,12 @@ import jakarta.persistence.*
 )
 class User(
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
-    var userId: Long,
+    var userId: Long = 0,
     
     @Column(name = "name", nullable = false, length = 100)
     var name: String = "User$userId",
-    
-    @Column(name = "email", nullable = true, length = 255)
-    var email: String? = null,
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -28,15 +26,29 @@ class User(
 ) : BaseEntity() {
 
     companion object {
-        fun create(userId: Long, name: String? = null, email: String? = null): User {
+        fun create(userId: Long = 0, name: String? = null): User {
+            // userId가 0이면 JPA에서 자동 생성, 0이 아니면 직접 지정
+            val actualName = if (userId > 0) {
+                name ?: "User$userId"
+            } else {
+                name ?: "User"
+            }
+            
+            return User(
+                userId = userId,
+                name = actualName
+            )
+        }
+        
+        // 테스트용: 특정 ID를 가진 사용자 생성
+        fun createWithId(userId: Long, name: String? = null): User {
             if (userId <= 0) {
                 throw kr.hhplus.be.server.global.exception.ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
             }
             
             return User(
                 userId = userId,
-                name = name ?: "User$userId",
-                email = email
+                name = name ?: "User$userId"
             )
         }
     }
@@ -56,12 +68,9 @@ class User(
         this.status = UserStatus.SUSPENDED
     }
     
-    fun updateProfile(name: String?, email: String?) {
+    fun updateProfile(name: String?) {
         name?.let { 
             if (it.isNotBlank()) this.name = it 
-        }
-        email?.let { 
-            if (it.isNotBlank()) this.email = it 
         }
     }
     

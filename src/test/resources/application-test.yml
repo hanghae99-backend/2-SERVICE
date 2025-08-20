@@ -9,8 +9,8 @@ spring:
     redis:
       host: localhost
       port: 6379
-      timeout: 5000ms
-      connect-timeout: 3000ms
+      timeout: 5000
+      connect-timeout: 3000
       database: 0
       
   datasource:

@@ -36,8 +36,8 @@ class ConcertServiceTest : DescribeSpec({
                 val concert = Concert(
                     concertId = concertId,
                     title = "Test Concert",
-                    artist = "Test",
-                    isActive = true,
+                    artist = "Test Artist",
+                    isActive = true
                 )
                 
                 every { concertRepository.findById(concertId) } returns concert
@@ -91,8 +91,8 @@ class ConcertServiceTest : DescribeSpec({
                 )
                 val schedules = listOf(schedule1, schedule2)
                 
-                val concert1 = Concert(1L, "Concert 1", "Description 1")
-                val concert2 = Concert(2L, "Concert 2", "Description 2")
+                val concert1 = Concert(1L, "Concert 1", "Artist 1")
+                val concert2 = Concert(2L, "Concert 2", "Artist 2")
                 
                 every { 
                     concertScheduleRepository.findByConcertDateBetweenAndAvailableSeatsGreaterThanOrderByConcertDateAsc(

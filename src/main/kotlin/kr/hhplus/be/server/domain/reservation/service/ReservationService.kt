@@ -17,6 +17,7 @@ import kr.hhplus.be.server.domain.reservation.exception.ReservationAlreadyConfir
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAccessDeniedException
 import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.domain.concert.exception.SeatAlreadyReservedException
+import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.global.lock.LockStrategy
 import org.slf4j.LoggerFactory
@@ -34,7 +35,8 @@ class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
     private val eventPublisher: DomainEventPublisher,
-    private val seatService: SeatService
+    private val seatService: SeatService,
+    private val selloutRankingService: SelloutRankingService
 ) {
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
@@ -50,6 +52,13 @@ class ReservationService(
         
         val reservation = createTemporaryReservation(userId, concertId, seatId, seat)
         publishReservationCreatedEvent(reservation)
+        
+        // 매진 랭킹 업데이트 (예약 수 +1)
+        try {
+            selloutRankingService.incrementReservationCount(concertId)
+        } catch (e: Exception) {
+            logger.warn("매진 랭킹 업데이트 실패 - concertId: {}", concertId, e)
+        }
         
         logger.info("예약 생성 성공 - reservationId: {}, userId: {}", reservation.reservationId, userId)
         return reservation
@@ -108,6 +117,13 @@ class ReservationService(
             cancelReason = cancelReason,
             isExpired = isExpired
         ))
+        
+        // 매진 랭킹 업데이트 (예약 수 -1)
+        try {
+            selloutRankingService.decrementReservationCount(savedReservation.concertId)
+        } catch (e: Exception) {
+            logger.warn("매진 랭킹 업데이트 실패 - concertId: {}", savedReservation.concertId, e)
+        }
         
         return savedReservation
     }

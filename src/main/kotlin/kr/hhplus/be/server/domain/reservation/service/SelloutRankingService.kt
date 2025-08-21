@@ -37,6 +37,20 @@ class SelloutRankingService(
         }
         
         return buildSelloutRankingDtos(rankingIds)
+    }
+    
+    @Async
+    fun incrementReservationCount(concertId: Long) {
+        redisTemplate.opsForZSet()
+            .incrementScore(SELLOUT_RANKING_KEY, concertId.toString(), 1.0)
+    }
+    
+    @Async
+    fun decrementReservationCount(concertId: Long) {
+        redisTemplate.opsForZSet()
+            .incrementScore(SELLOUT_RANKING_KEY, concertId.toString(), -1.0)
+    }
+    
     fun rebuildSelloutRanking() {
         val newVersion = System.currentTimeMillis()
         val tempKey = "${SELLOUT_RANKING_KEY}:${newVersion}"

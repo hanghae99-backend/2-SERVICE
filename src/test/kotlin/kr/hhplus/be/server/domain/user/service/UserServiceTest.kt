@@ -66,7 +66,7 @@ class UserServiceTest : DescribeSpec({
             it("사용자를 반환해야 한다") {
                 // given
                 val userId = 1L
-                val user = User.createWithId(userId, "테스트 사용자")
+                val user = User.createWithId(userId)
                 
                 every { userRepository.findById(userId) } returns user
                 
@@ -103,7 +103,7 @@ class UserServiceTest : DescribeSpec({
             it("UserDto를 반환해야 한다") {
                 // given
                 val userId = 1L
-                val user = User.createWithId(userId, "테스트 사용자")
+                val user = User.createWithId(userId)
                 
                 every { userRepository.findById(userId) } returns user
                 

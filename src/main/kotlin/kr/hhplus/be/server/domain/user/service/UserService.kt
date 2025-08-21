@@ -23,7 +23,7 @@ class UserService(
             throw UserAlreadyExistsException("이미 존재하는 사용자 ID입니다: ${userCreateRequest.userId}")
         }
         
-        val user = User.create(userCreateRequest.userId)
+        val user = User.createWithId(userCreateRequest.userId)
         val savedUser = userRepository.save(user)
 
         return UserDto.fromEntity(savedUser)

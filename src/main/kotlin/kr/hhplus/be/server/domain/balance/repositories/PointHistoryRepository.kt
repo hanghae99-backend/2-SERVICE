@@ -11,4 +11,5 @@ interface PointHistoryRepository {
     fun findAll(): List<PointHistory>
     fun deleteAll() // 테스트용 - 모든 포인트 이력 데이터 삭제
     fun findChargeAmountByUserIdAndDate(userId: Long, date: LocalDate): BigDecimal?
+    fun flush() // 추가
 }

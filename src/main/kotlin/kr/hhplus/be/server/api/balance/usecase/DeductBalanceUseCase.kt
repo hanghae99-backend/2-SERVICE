@@ -37,6 +37,12 @@ class DeductBalanceUseCase(
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, amount: BigDecimal, description: String = "포인트 사용"): Point {
+        return executeInternal(userId, amount, description)
+    }
+
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @ValidateUserId
+    fun executeInternal(userId: Long, amount: BigDecimal, description: String = "포인트 사용"): Point {
         logger.info("포인트 차감 시작 - userId: {}, amount: {}, description: {}", userId, amount, description)
         
         validateAmount(amount)

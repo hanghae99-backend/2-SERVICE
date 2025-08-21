@@ -27,9 +27,10 @@ class ChargeBalanceUseCase(
     @LockGuard(
         key = "'balance:' + #userId",
         strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 3000L,
-        retryIntervalMs = 100L,
-        maxRetryCount = 30
+        lockTimeoutMs = 3000L,   // 락 보유 시간을 3초로 제한
+        waitTimeoutMs = 15000L,  // 대기 시간은 15초로 증가
+        retryIntervalMs = 30L,   // 더 빠른 재시도
+        maxRetryCount = 200      // 충분한 재시도 횟수
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
@@ -49,7 +50,6 @@ class ChargeBalanceUseCase(
     private fun getOrCreatePoint(userId: Long): Point {
         return pointRepository.findByUserId(userId) ?: run {
             val newPoint = Point.create(userId, BigDecimal.ZERO)
-            pointRepository.save(newPoint)
             newPoint
         }
     }

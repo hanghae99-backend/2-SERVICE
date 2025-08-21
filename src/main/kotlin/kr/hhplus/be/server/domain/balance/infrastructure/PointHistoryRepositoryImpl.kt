@@ -38,4 +38,8 @@ class PointHistoryRepositoryImpl(
             it.createdAt?.toLocalDate() == date && it.historyType.code == "CHARGE"
         }.sumOf { it.amount }
     }
+    
+    override fun flush() {
+        pointHistoryJpaRepository.flush()
+    }
 }

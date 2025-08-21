@@ -134,15 +134,13 @@ class ReservationSchedulerTest : DescribeSpec({
         context("대기열 자동 처리를 실행할 때") {
             it("토큰 생명주기 관리자와 큐 매니저의 메서드를 호출해야 한다") {
                 // given
-                every { tokenLifecycleManager.cleanupExpiredTokens() } returns 3
-                every { queueManager.processQueueAutomatically() } returns 2
+                every { tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue() } returns Pair(3, 2)
                 
                 // when
                 reservationScheduler.processQueue()
                 
                 // then
-                verify { tokenLifecycleManager.cleanupExpiredTokens() }
-                verify { queueManager.processQueueAutomatically() }
+                verify { tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue() }
                 verify { 
                     distributedLock.executeWithLock<Unit>(
                         lockKey = "scheduler:queue:process",
@@ -160,8 +158,7 @@ class ReservationSchedulerTest : DescribeSpec({
         context("대기열 처리 중 예외가 발생할 때") {
             it("예외를 처리하고 계속 실행되어야 한다") {
                 // given
-                every { tokenLifecycleManager.cleanupExpiredTokens() } throws RuntimeException("정리 실패")
-                every { queueManager.processQueueAutomatically() } returns 1
+                every { tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue() } throws RuntimeException("정리 실패")
                 
                 // when & then
                 try {
@@ -171,7 +168,7 @@ class ReservationSchedulerTest : DescribeSpec({
                 }
                 
                 // then
-                verify { tokenLifecycleManager.cleanupExpiredTokens() }
+                verify { tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue() }
                 verify { 
                     distributedLock.executeWithLock<Unit>(
                         lockKey = "scheduler:queue:process",
@@ -188,17 +185,17 @@ class ReservationSchedulerTest : DescribeSpec({
         }
     }
     
-    describe("cleanupExpiredTokens") {
+    describe("cleanupExpiredTokensAndProcessQueue") {
         context("만료된 토큰 정리를 실행할 때") {
             it("토큰 생명주기 관리자의 정리 메서드를 호출해야 한다") {
                 // given
-                every { tokenLifecycleManager.cleanupExpiredTokens() } returns 5
+                every { tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue() } returns Pair(5, 2)
                 
                 // when
-                reservationScheduler.cleanupExpiredTokens()
+                reservationScheduler.cleanupExpiredTokensAndProcessQueue()
                 
                 // then
-                verify { tokenLifecycleManager.cleanupExpiredTokens() }
+                verify { tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue() }
                 verify { 
                     distributedLock.executeWithLock<Unit>(
                         lockKey = "scheduler:token:cleanup",
@@ -216,17 +213,17 @@ class ReservationSchedulerTest : DescribeSpec({
         context("토큰 정리 중 예외가 발생할 때") {
             it("예외를 처리하고 계속 실행되어야 한다") {
                 // given
-                every { tokenLifecycleManager.cleanupExpiredTokens() } throws RuntimeException("정리 실패")
+                every { tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue() } throws RuntimeException("정리 실패")
                 
                 // when & then
                 try {
-                    reservationScheduler.cleanupExpiredTokens()
+                    reservationScheduler.cleanupExpiredTokensAndProcessQueue()
                 } catch (e: RuntimeException) {
                     // 예외가 발생하는 것이 정상
                 }
                 
                 // then
-                verify { tokenLifecycleManager.cleanupExpiredTokens() }
+                verify { tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue() }
                 verify { 
                     distributedLock.executeWithLock<Unit>(
                         lockKey = "scheduler:token:cleanup",

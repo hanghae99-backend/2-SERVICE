@@ -81,7 +81,7 @@ class ReservationScheduler(
     }
     
     /**
-     * 대기열 처리 - 활성 토큰 생성 및 만료 토큰 정리
+     * 대기열 처리 - 만료 토큰 체크하고 대기열에서 자동 갈아끼우기
      */
     @Scheduled(fixedRateString = "\${app.scheduler.queue.process.interval:5000}")
     fun processQueue() {
@@ -94,18 +94,15 @@ class ReservationScheduler(
                 val startTime = System.currentTimeMillis()
                 val currentTime = LocalDateTime.now().format(timeFormatter)
                 
-                // 1. 만료된 토큰 정리
-                val expiredTokenCount = tokenLifecycleManager.cleanupExpiredTokens()
-                
-                // 2. 대기열 자동 처리
-                val processedTokenCount = queueManager.processQueueAutomatically()
+                // 만료 토큰 정리와 동시에 대기열 자동 처리
+                val (expiredTokenCount, activatedTokenCount) = tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue()
                 
                 val elapsed = System.currentTimeMillis() - startTime
                 queueProcessCount.incrementAndGet()
                 
-                if (expiredTokenCount > 0 || processedTokenCount > 0) {
-                    logger.info("🔄 대기열 처리 완료 [{}] - 만료: {}개, 활성화: {}개 ({}ms)", 
-                        currentTime, expiredTokenCount, processedTokenCount, elapsed)
+                if (expiredTokenCount > 0 || activatedTokenCount > 0) {
+                    logger.info("🔄 대기열 처리 완료 [{}] - 만료정리: {}개, 새로활성화: {}개 ({}ms)", 
+                        currentTime, expiredTokenCount, activatedTokenCount, elapsed)
                 } else {
                     logger.debug("🔍 대기열 처리 완료 [{}] - 변경사항 없음 ({}ms)", currentTime, elapsed)
                 }
@@ -124,10 +121,10 @@ class ReservationScheduler(
     }
     
     /**
-     * 만료된 토큰 정리 - 더 빠른 정리를 위한 별도 스케줄
+     * 만료된 토큰 정리 및 대기열 자동 처리 - 더 빠른 정리를 위한 별도 스케줄
      */
     @Scheduled(fixedRateString = "\${app.scheduler.token.cleanup.interval:30000}")
-    fun cleanupExpiredTokens() {
+    fun cleanupExpiredTokensAndProcessQueue() {
         distributedLock.executeWithLock(
             lockKey = "scheduler:token:cleanup",
             lockTimeoutMs = 25000L,
@@ -135,13 +132,13 @@ class ReservationScheduler(
         ) {
             try {
                 val startTime = System.currentTimeMillis()
-                val cleanedCount = tokenLifecycleManager.cleanupExpiredTokens()
+                val (cleanedCount, activatedCount) = tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue()
                 val elapsed = System.currentTimeMillis() - startTime
                 
                 tokenCleanupCount.addAndGet(cleanedCount)
                 
-                if (cleanedCount > 0) {
-                    logger.info("🧹 만료된 토큰 정리 완료: {}개 ({}ms)", cleanedCount, elapsed)
+                if (cleanedCount > 0 || activatedCount > 0) {
+                    logger.info("🧹 토큰 정리 및 대기열 처리 완료: 정리 {}개, 활성화 {}개 ({}ms)", cleanedCount, activatedCount, elapsed)
                 } else {
                     logger.debug("🔍 만료된 토큰 없음 ({}ms)", elapsed)
                 }

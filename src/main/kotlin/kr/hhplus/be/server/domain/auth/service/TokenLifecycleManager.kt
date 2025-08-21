@@ -37,6 +37,31 @@ class TokenLifecycleManager(
     }
     
 
+    fun cleanupExpiredTokensAndProcessQueue(): Pair<Int, Int> {
+        val expiredTokens = tokenStore.findExpiredActiveTokens()
+        var cleanedCount = 0
+        
+        // 1. 만료된 토큰 정리
+        expiredTokens.forEach { expiredToken ->
+            try {
+                expireToken(expiredToken)
+                cleanedCount++
+                println("만료된 활성 토큰 정리: $expiredToken")
+            } catch (e: Exception) {
+                println("토큰 만료 처리 실패: $expiredToken, 오류: ${e.message}")
+            }
+        }
+        
+        // 2. 만료된 토큰 수만큼 대기열에서 새로운 토큰 활성화
+        val activatedCount = if (cleanedCount > 0) {
+            queueManager.processQueueAutomatically()
+        } else {
+            0
+        }
+        
+        return Pair(cleanedCount, activatedCount)
+    }
+    
     fun cleanupExpiredTokens(): Int {
         val expiredTokens = tokenStore.findExpiredActiveTokens()
         var cleanedCount = 0

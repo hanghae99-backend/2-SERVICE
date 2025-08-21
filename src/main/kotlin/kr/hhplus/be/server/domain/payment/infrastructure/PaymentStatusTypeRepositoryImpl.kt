@@ -80,4 +80,9 @@ class PaymentStatusTypeRepositoryImpl(
     override fun isValidStatus(code: String): Boolean {
         return existsByCodeAndIsActiveTrue(code)
     }
+    
+    // ========== JPA 연동 메서드 ==========
+    override fun flush() {
+        jpaRepository.flush()
+    }
 }

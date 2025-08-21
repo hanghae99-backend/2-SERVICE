@@ -141,6 +141,14 @@ class PaymentIntegrationTest(
                 description = "예약된 좌석"
             )
         )
+        
+        val occupiedStatus = seatStatusTypeRepository.save(
+            SeatStatusType(
+                code = "OCCUPIED",
+                name = "점유완료",
+                description = "결제 완료된 좌석"
+            )
+        )
         seatStatusTypeRepository.flush()
 
         // 좌석 생성 (사용 가능 상태로)
@@ -174,12 +182,27 @@ class PaymentIntegrationTest(
         // 결제 상태 타입
         paymentStatusTypeRepository.save(
             PaymentStatusType(
-                code = "COMPLETED",
+                code = "PEND",
+                name = "결제대기",
+                description = "결제 처리 대기중"
+            )
+        )
+        
+        paymentStatusTypeRepository.save(
+            PaymentStatusType(
+                code = "COMP",
                 name = "결제완료",
                 description = "결제가 성공적으로 완료됨"
             )
         )
 
+        pointHistoryTypeRepository.save(
+            PointHistoryType(
+                code = "USE",
+                name = "사용",
+                description = "포인트 사용"
+            )
+        )
         // 좌석을 예약 상태로 변경
         testSeat.reserve(reservedStatus)
         seatRepository.save(testSeat)

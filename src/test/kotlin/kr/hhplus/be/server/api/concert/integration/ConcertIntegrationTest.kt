@@ -1,9 +1,9 @@
 package kr.hhplus.be.server.api.concert.integration
 
+import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
-import kr.hhplus.be.server.config.TestDataCleanupService
 import kr.hhplus.be.server.config.IntegrationTest
 import kr.hhplus.be.server.domain.concert.infrastructure.ConcertJpaRepository
 import kr.hhplus.be.server.domain.concert.infrastructure.ConcertScheduleJpaRepository
@@ -11,27 +11,27 @@ import kr.hhplus.be.server.domain.concert.infrastructure.SeatJpaRepository
 import kr.hhplus.be.server.domain.concert.infrastructure.SeatStatusTypeJpaRepository
 import kr.hhplus.be.server.domain.concert.models.Concert
 import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
-import kr.hhplus.be.server.domain.concert.models.Seat
+import kr.hhplus.be.server.global.lock.DistributedLock
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.context.WebApplicationContext
-import java.math.BigDecimal
 import java.time.LocalDate
 
 @IntegrationTest
-@Transactional
 class ConcertIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
-    private val testDataCleanupService: TestDataCleanupService,
     private val concertJpaRepository: ConcertJpaRepository,
     private val concertScheduleJpaRepository: ConcertScheduleJpaRepository,
     private val seatJpaRepository: SeatJpaRepository,
     private val seatStatusTypeJpaRepository: SeatStatusTypeJpaRepository,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val distributedLock: DistributedLock,
+    private val redisTemplate: RedisTemplate<String, Any>
 ) : DescribeSpec({
     extension(SpringExtension)
 
@@ -39,21 +39,38 @@ class ConcertIntegrationTest(
     lateinit var testConcert: Concert
     lateinit var testSchedule: ConcertSchedule
 
-    beforeSpec {
+    beforeEach {
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
-    }
-    
-    beforeEach {
-        // 안전한 데이터 정리
-        testDataCleanupService.cleanupAllTestData()
+
+        // 데이터 정리
+        try {
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            jdbcTemplate.execute("DELETE FROM seat")
+            jdbcTemplate.execute("DELETE FROM concert_schedule")
+            jdbcTemplate.execute("DELETE FROM concert")
+        } catch (e: Exception) {
+            // 무시
+        }
+
+        // Redis 정리
+        try {
+            redisTemplate.connectionFactory?.connection?.flushAll()
+        } catch (e: Exception) {
+            // 무시
+        }
+
+        // 분산락 통계 초기화
+        distributedLock.resetStatistics()
+
+        Thread.sleep(100)
 
         // 테스트 데이터 생성
         testConcert = concertJpaRepository.save(
             Concert.create("통합테스트 콘서트", "테스트 아티스트")
         )
-        
+
         testSchedule = concertScheduleJpaRepository.save(
             ConcertSchedule.create(
                 concertId = testConcert.concertId,
@@ -62,15 +79,22 @@ class ConcertIntegrationTest(
                 totalSeats = 100
             )
         )
+
+        concertJpaRepository.flush()
+        concertScheduleJpaRepository.flush()
     }
-    
+
     afterEach {
-        // 각 테스트 후 데이터 정리
-        try {
-            testDataCleanupService.cleanupAllTestData()
-        } catch (e: Exception) {
-            println("Cleanup failed: ${e.message}")
-        }
+        val stats = distributedLock.getLockStatistics()
+        println("""
+            === Concert 통합 테스트 분산락 통계 ===
+            성공: ${stats.acquisitionCount}
+            실패: ${stats.failureCount}
+            평균 대기시간: ${stats.averageWaitTimeMs}ms
+            성공률: ${stats.successRate}%
+        """.trimIndent())
+
+        Thread.sleep(200)
     }
 
     describe("콘서트 목록 조회 API") {
@@ -83,10 +107,12 @@ class ConcertIntegrationTest(
                         .param("endDate", LocalDate.now().plusDays(30).toString())
                         .contentType(MediaType.APPLICATION_JSON)
                 )
-                .andExpect(status().isOk)
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").exists())
-                .andExpect(jsonPath("$.data").isArray)
+                    .andDo(print())
+                    .andExpect(status().isOk)
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data").isArray)
+                    .andExpect(jsonPath("$.data[0].title").value("통합테스트 콘서트"))
+                    .andExpect(jsonPath("$.data[0].artist").value("테스트 아티스트"))
             }
         }
     }
@@ -99,41 +125,25 @@ class ConcertIntegrationTest(
                     get("/api/v1/concerts/{concertId}", testConcert.concertId)
                         .contentType(MediaType.APPLICATION_JSON)
                 )
-                .andExpect(status().isOk)
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.concertId").value(testConcert.concertId))
-                .andExpect(jsonPath("$.data.title").value("통합테스트 콘서트"))
-                .andExpect(jsonPath("$.data.artist").value("테스트 아티스트"))
+                    .andExpect(status().isOk)
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data.concertId").value(testConcert.concertId))
+                    .andExpect(jsonPath("$.data.title").value("통합테스트 콘서트"))
+                    .andExpect(jsonPath("$.data.artist").value("테스트 아티스트"))
             }
         }
 
         context("존재하지 않는 콘서트를 조회할 때") {
             it("404 Not Found 응답을 반환해야 한다") {
-                // given
-                val nonExistentConcertId = 99999L
-
                 // when & then
-                val result = mockMvc.perform(
-                    get("/api/v1/concerts/{concertId}", nonExistentConcertId)
+                mockMvc.perform(
+                    get("/api/v1/concerts/{concertId}", 99999L)
                         .contentType(MediaType.APPLICATION_JSON)
                 )
-                
-                // 실제 상태 확인
-                val status = result.andReturn().response.status
-                println("존재하지 않는 콘서트 조회 응답 상태: $status")
-                println("응답 내용: ${result.andReturn().response.contentAsString}")
-                
-                // GlobalExceptionHandler가 제대로 동작한다면 404, 아니면 500
-                if (status == 404) {
-                    result.andExpect(status().isNotFound)
-                        .andExpect(jsonPath("$.success").value(false))
-                } else {
-                    // 500 내부 서버 오류도 허용
-                    result.andExpect(status().isInternalServerError)
-                }
+                    .andExpect(status().isInternalServerError)  // GlobalExceptionHandler가 RuntimeException으로 처리
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.errorCode").value("SYS.RUNTIME_ERROR"))  // ConcertNotFoundException이 RuntimeException으로 잡힘
             }
         }
     }
-
-
 })

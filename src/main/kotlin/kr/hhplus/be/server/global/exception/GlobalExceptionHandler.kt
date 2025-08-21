@@ -16,7 +16,6 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import jakarta.validation.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
-// import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.data.redis.RedisConnectionFailureException
@@ -214,7 +213,20 @@ class GlobalExceptionHandler {
         logger.warn("[{}] 사용자 없음: {}", requestInfo, e.message)
         
         val errorResponse = CommonApiResponse.error<Nothing>(
-            message = e.message,
+            message = e.message ?: "사용자를 찾을 수 없습니다",
+            errorCode = e.errorCode
+        )
+        
+        return ResponseEntity.status(e.status).body(errorResponse)
+    }
+
+    @ExceptionHandler(kr.hhplus.be.server.domain.user.exception.UserAlreadyExistsException::class)
+    fun handleUserAlreadyExistsException(e: kr.hhplus.be.server.domain.user.exception.UserAlreadyExistsException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 사용자 이미 존재: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "이미 존재하는 사용자입니다",
             errorCode = e.errorCode
         )
         

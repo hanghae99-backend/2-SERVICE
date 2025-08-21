@@ -51,6 +51,10 @@ class InMemoryTokenStore : TokenStore {
         return tokens[tokenString]
     }
     
+    override fun findAll(): List<WaitingToken> {
+        return tokens.values.toList()
+    }
+    
     override fun delete(token: String) {
         val waitingToken = tokens[token]
         tokens.remove(token)

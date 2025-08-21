@@ -27,10 +27,10 @@ class DistributedLock(
     fun <T> executeWithLock(
         lockKey: String,
         strategy: LockStrategy = LockStrategy.SPIN,
-        lockTimeoutMs: Long = 10000L,
-        waitTimeoutMs: Long = 5000L,
-        retryIntervalMs: Long = 50L,
-        maxRetryCount: Int = 100,
+        lockTimeoutMs: Long = 3000L,
+        waitTimeoutMs: Long = 1000L,
+        retryIntervalMs: Long = 10L,
+        maxRetryCount: Int = 50,
         action: () -> T
     ): T {
         return executeWithMultiLock(
@@ -47,10 +47,10 @@ class DistributedLock(
     fun <T> executeWithMultiLock(
         lockKeys: List<String>,
         strategy: LockStrategy = LockStrategy.SPIN,
-        lockTimeoutMs: Long = 10000L,
-        waitTimeoutMs: Long = 5000L,
-        retryIntervalMs: Long = 50L,
-        maxRetryCount: Int = 100,
+        lockTimeoutMs: Long = 3000L,
+        waitTimeoutMs: Long = 1000L,
+        retryIntervalMs: Long = 10L,
+        maxRetryCount: Int = 50,
         action: () -> T
     ): T {
         val startTime = System.currentTimeMillis()
@@ -78,7 +78,7 @@ class DistributedLock(
             val elapsed = System.currentTimeMillis() - startTime
             totalWaitTime.addAndGet(elapsed.toInt())
             
-            if (elapsed > 1000) { // 1초 이상 걸린 경우 경고
+            if (elapsed > 500) { // 500ms 이상 걸린 경우 경고
                 logger.warn("🐌 락 처리 시간 초과: {}ms, keys: {}, strategy: {}", elapsed, lockKeys, strategy)
             }
         }
@@ -125,7 +125,13 @@ class DistributedLock(
         var retryCount = 0
         var backoffMs = retryIntervalMs
         
-        while (System.currentTimeMillis() - startTime < waitTimeoutMs && retryCount < maxRetryCount) {
+        while (retryCount < maxRetryCount) {
+            // 시간 체크를 먼저 수행
+            val elapsedTime = System.currentTimeMillis() - startTime
+            if (elapsedTime >= waitTimeoutMs) {
+                break
+            }
+            
             val acquiredLocks = mutableListOf<String>()
             var allAcquired = true
             
@@ -156,10 +162,20 @@ class DistributedLock(
             
             retryCount++
             
-            val adaptiveBackoff = calculateAdaptiveBackoff(retryCount, backoffMs, retryIntervalMs)
-            Thread.sleep(adaptiveBackoff)
+            // 남은 시간 계산
+            val remainingTime = waitTimeoutMs - (System.currentTimeMillis() - startTime)
+            if (remainingTime <= 0) {
+                break
+            }
             
-            backoffMs = minOf(backoffMs * 2, 500L)
+            val adaptiveBackoff = calculateAdaptiveBackoff(retryCount, backoffMs, retryIntervalMs)
+            val sleepTime = minOf(adaptiveBackoff, remainingTime)
+            
+            if (sleepTime > 0) {
+                Thread.sleep(sleepTime)
+            }
+            
+            backoffMs = minOf(backoffMs * 2, 100L)
         }
         
         throw ConcurrentAccessException("Adaptive Spin Lock 획득 실패: $sortedKeys (retries: $retryCount)")
@@ -293,9 +309,10 @@ class DistributedLock(
     
     private fun calculateAdaptiveBackoff(retryCount: Int, currentBackoff: Long, baseInterval: Long): Long {
         return when {
-            retryCount <= 5 -> baseInterval
-            retryCount <= 15 -> currentBackoff
-            else -> minOf(currentBackoff + baseInterval, 1000L)
+            retryCount <= 5 -> baseInterval  // 처음 5회는 빠르게 재시도
+            retryCount <= 15 -> minOf((currentBackoff * 1.2).toLong(), 50L)  // 점진적 증가
+            retryCount <= 30 -> minOf((currentBackoff * 1.1).toLong(), 100L)  // 더 느리게 증가
+            else -> minOf(currentBackoff, 200L)  // 최대 200ms 대기
         }
     }
     
@@ -363,6 +380,26 @@ class DistributedLock(
         lockAcquisitionCount.set(0)
         lockFailureCount.set(0)
         totalWaitTime.set(0)
+    }
+    
+    fun clearAllLocks() {
+        try {
+            val keys = redisTemplate.keys("lock:*")
+            if (keys.isNotEmpty()) {
+                redisTemplate.delete(keys)
+                logger.info("🧯 모든 락 정리 완료: {}개", keys.size)
+            }
+        } catch (e: Exception) {
+            logger.warn("락 정리 중 오류 발생", e)
+        }
+    }
+    
+    fun getLockCount(): Int {
+        return try {
+            redisTemplate.keys("lock:*").size
+        } catch (e: Exception) {
+            0
+        }
     }
 }
 

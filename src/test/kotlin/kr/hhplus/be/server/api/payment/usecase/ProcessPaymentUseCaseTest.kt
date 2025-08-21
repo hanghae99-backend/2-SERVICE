@@ -91,7 +91,8 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { reservationService.getReservationById(reservationId) } returns mockReservation
                 every { seatService.getSeatById(seatId) } returns mockSeat
                 every { paymentService.createReservationPayment(userId, reservationId, amount) } returns mockInitialPayment
-                every { deductBalanceUseCase.execute(userId, amount) } returns mockPoint
+                every { deductBalanceUseCase.executeInternal(userId, amount) } returns mockPoint
+                every { paymentService.failPayment(any(), any(), any(), any()) } returns mockInitialPayment
                 every { reservationService.confirmReservation(reservationId, 1L) } returns mockConfirmedReservation
                 every { seatService.confirmSeat(seatId) } returns mockConfirmedSeat
                 every { paymentService.completePayment(1L, reservationId, seatId, token) } returns mockCompletedPayment
@@ -109,7 +110,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 verify { reservationService.getReservationById(reservationId) }
                 verify { seatService.getSeatById(seatId) }
                 verify { paymentService.createReservationPayment(userId, reservationId, amount) }
-                verify { deductBalanceUseCase.execute(userId, amount) }
+                verify { deductBalanceUseCase.executeInternal(userId, amount) }
                 verify { reservationService.confirmReservation(reservationId, 1L) }
                 verify { seatService.confirmSeat(seatId) }
                 verify { paymentService.completePayment(1L, reservationId, seatId, token) }

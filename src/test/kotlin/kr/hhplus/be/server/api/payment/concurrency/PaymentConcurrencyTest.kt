@@ -126,6 +126,16 @@ class PaymentConcurrencyTest(
                 description = "포인트 사용"
             )
         )
+        
+        // USE 타입도 추가 (호환성을 위해)
+        pointHistoryTypeRepository.save(
+            PointHistoryType(
+                code = "USE",
+                name = "사용",
+                description = "포인트 사용"
+            )
+        )
+        pointHistoryTypeRepository.flush()
 
         // 콘서트 생성
         testConcert = concertRepository.save(
@@ -161,6 +171,15 @@ class PaymentConcurrencyTest(
                 description = "예약된 좌석"
             )
         )
+        
+        val occupiedStatus = seatStatusTypeRepository.save(
+            SeatStatusType(
+                code = "OCCUPIED",
+                name = "점유완료",
+                description = "결제 완료된 좌석"
+            )
+        )
+        seatStatusTypeRepository.flush()
 
         // 좌석 생성 (사용 가능 상태로)
         testSeat = seatRepository.save(
@@ -188,6 +207,7 @@ class PaymentConcurrencyTest(
                 description = "결제 완료된 확정 예약"
             )
         )
+        reservationStatusTypeRepository.flush()
 
         // 결제 상태 타입
         paymentStatusTypeRepository.save(
@@ -214,6 +234,7 @@ class PaymentConcurrencyTest(
                 description = "결제 처리 실패"
             )
         )
+        paymentStatusTypeRepository.flush()
 
         // 각 사용자별로 개별 좌석과 예약 생성
         testReservations = testUsers.mapIndexed { index, user ->
@@ -253,7 +274,9 @@ class PaymentConcurrencyTest(
         testTokens = testUsers.map { user ->
             val token = tokenFactory.createWaitingToken(user.userId)
             tokenStore.save(token)
+            Thread.sleep(50) // 저장 대기
             tokenStore.activateToken(token.token)
+            Thread.sleep(50) // 활성화 대기
             token
         }
         

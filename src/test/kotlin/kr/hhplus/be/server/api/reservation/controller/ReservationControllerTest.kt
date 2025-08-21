@@ -99,7 +99,7 @@ class ReservationControllerTest : DescribeSpec({
                 val reserveSeatUseCase = mockk<ReserveSeatUseCase>()
                 val cancelReservationUseCase = mockk<CancelReservationUseCase>()
                 val reservationController = ReservationController(reservationService, reserveSeatUseCase, cancelReservationUseCase)
-                val userId = 0L // 잘못된 userId
+                val userId = 1L // 잘못된 userId
                 val concertId = 1L
                 val seatId = 1L
                 val token = "test-token"

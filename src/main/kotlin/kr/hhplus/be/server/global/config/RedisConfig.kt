@@ -1,5 +1,11 @@
 package kr.hhplus.be.server.global.config
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.KotlinModule
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.EnableCaching
@@ -57,13 +63,33 @@ class RedisConfig {
     }
 
     @Bean
+    @Qualifier("redis")
+    fun redisObjectMapper(): ObjectMapper {
+        val polymorphicTypeValidator = BasicPolymorphicTypeValidator.builder()
+            .allowIfBaseType(Any::class.java)
+            .build()
+
+        return ObjectMapper().apply {
+            registerModule(JavaTimeModule())
+            registerModule(KotlinModule.Builder().build())
+            disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            activateDefaultTyping(polymorphicTypeValidator, ObjectMapper.DefaultTyping.NON_FINAL)
+        }
+    }
+
+    @Bean
+    fun redisSerializer(): GenericJackson2JsonRedisSerializer {
+        return GenericJackson2JsonRedisSerializer(redisObjectMapper())
+    }
+
+    @Bean
     fun redisTemplate(): RedisTemplate<String, Any> {
         val template = RedisTemplate<String, Any>()
         template.connectionFactory = redisConnectionFactory()
         template.keySerializer = StringRedisSerializer()
-        template.valueSerializer = GenericJackson2JsonRedisSerializer()
+        template.valueSerializer = redisSerializer()
         template.hashKeySerializer = StringRedisSerializer()
-        template.hashValueSerializer = GenericJackson2JsonRedisSerializer()
+        template.hashValueSerializer = redisSerializer()
         template.setEnableTransactionSupport(true)
         template.afterPropertiesSet()
         return template
@@ -96,7 +122,7 @@ class RedisConfig {
         val defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(Duration.ofMinutes(30))
             .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(StringRedisSerializer()))
-            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(GenericJackson2JsonRedisSerializer()))
+            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(redisSerializer()))
             .disableCachingNullValues()
             .prefixCacheNameWith("concert-service:")
 
@@ -138,20 +164,4 @@ class RedisConfig {
             
             .build()
     }
-    
-    // 로컬 개발 환경용 임베디드 Redis (테스트용)
-    // Embedded Redis Server는 의존성 없이 비활성화
-    // @Bean
-    // @Profile("local")
-    // fun embeddedRedisServer(): EmbeddedRedisServer {
-    //     return EmbeddedRedisServer(redisPort)
-    // }
 }
-
-// 로컬 개발용 임베디드 Redis 서버 (현재 비활성화)
-/*
-@Profile("local")
-class EmbeddedRedisServer(private val port: Int) {
-    // 임베디드 Redis 의존성이 필요할 때 활성화
-}
-*/

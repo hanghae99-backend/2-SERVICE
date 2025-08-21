@@ -1,11 +1,11 @@
 -- 콘서트 예약 시스템 초기 데이터 (좌석 50개, 10만원 통일)
 
 -- 사용자 데이터
-INSERT INTO users (user_id, name, status, created_at, updated_at) VALUES
-                                                        (1, 'User1', 'ACTIVE', NOW(), NOW()), (2, 'User2', 'ACTIVE', NOW(), NOW()), (3, 'User3', 'ACTIVE', NOW(), NOW()),
-                                                        (4, 'User4', 'ACTIVE', NOW(), NOW()), (5, 'User5', 'ACTIVE', NOW(), NOW()), (6, 'User6', 'ACTIVE', NOW(), NOW()),
-                                                        (7, 'User7', 'ACTIVE', NOW(), NOW()), (8, 'User8', 'ACTIVE', NOW(), NOW()), (9, 'User9', 'ACTIVE', NOW(), NOW()),
-                                                        (10, 'User10', 'ACTIVE', NOW(), NOW());
+INSERT INTO users (user_id, created_at, updated_at) VALUES
+                                                        (1, NOW(), NOW()), (2, NOW(), NOW()), (3, NOW(), NOW()),
+                                                        (4, NOW(), NOW()), (5, NOW(), NOW()), (6, NOW(), NOW()),
+                                                        (7, NOW(), NOW()), (8, NOW(), NOW()), (9, NOW(), NOW()),
+                                                        (10, NOW(), NOW());
 
 -- 포인트 초기 잔액 (updated_at 필드 추가)
 INSERT INTO point (user_id, amount, last_updated, created_at, updated_at) VALUES

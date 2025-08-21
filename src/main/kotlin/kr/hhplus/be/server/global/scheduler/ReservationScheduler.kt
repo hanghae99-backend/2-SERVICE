@@ -3,6 +3,7 @@ package kr.hhplus.be.server.global.scheduler
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.auth.service.QueueManager
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
+import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.lock.DistributedLock
 import org.slf4j.LoggerFactory
@@ -20,6 +21,7 @@ class ReservationScheduler(
     private val reservationService: ReservationService,
     private val tokenLifecycleManager: TokenLifecycleManager,
     private val queueManager: QueueManager,
+    private val selloutRankingService: SelloutRankingService,
     private val domainEventPublisher: DomainEventPublisher,
     private val distributedLock: DistributedLock
 ) {
@@ -38,10 +40,14 @@ class ReservationScheduler(
     @Value("\${app.scheduler.token.cleanup.interval:30000}")
     private var tokenCleanupInterval: Long = 30000
     
+    @Value("\${app.scheduler.sellout.ranking.interval:300000}")
+    private var selloutRankingInterval: Long = 300000
+    
     // 성능 모니터링
     private val reservationCleanupCount = AtomicInteger(0)
     private val queueProcessCount = AtomicInteger(0)
     private val tokenCleanupCount = AtomicInteger(0)
+    private val selloutRankingCount = AtomicInteger(0)
     private val errorCount = AtomicInteger(0)
     
     /**
@@ -146,6 +152,39 @@ class ReservationScheduler(
             } catch (e: Exception) {
                 errorCount.incrementAndGet()
                 logger.error("❌ 만료된 토큰 정리 중 오류 발생", e)
+                throw e
+            }
+        }
+    }
+    
+    /**
+     * 매진 랭킹 재구축 - 5분마다
+     */
+    @Scheduled(fixedRateString = "\${app.scheduler.sellout.ranking.interval:300000}")
+    fun rebuildSelloutRanking() {
+        distributedLock.executeWithLock(
+            lockKey = "scheduler:sellout:ranking",
+            lockTimeoutMs = 240000L,
+            waitTimeoutMs = 30000L
+        ) {
+            try {
+                val startTime = System.currentTimeMillis()
+                
+                selloutRankingService.rebuildSelloutRanking()
+                selloutRankingService.cleanupSelloutRanking()
+                
+                val elapsed = System.currentTimeMillis() - startTime
+                selloutRankingCount.incrementAndGet()
+                
+                logger.info("🚀 매진 랭킹 재구축 완료 ({}ms)", elapsed)
+                
+                if (elapsed > 30000) {
+                    logger.warn("⚠️ 매진 랭킹 재구축 시간 초과: {}ms", elapsed)
+                }
+                
+            } catch (e: Exception) {
+                errorCount.incrementAndGet()
+                logger.error("❌ 매진 랭킹 재구축 중 오류 발생", e)
                 throw e
             }
         }

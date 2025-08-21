@@ -18,4 +18,5 @@ interface ConcertScheduleRepository {
     fun delete(schedule: ConcertSchedule)
     fun deleteAll()
     fun flush() // 추가
+    fun findByConcertIdIn(concertIds: List<Long>): List<ConcertSchedule> // 매진 랭킹용
 }

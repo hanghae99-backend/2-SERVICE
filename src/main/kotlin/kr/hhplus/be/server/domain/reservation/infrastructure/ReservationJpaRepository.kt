@@ -49,4 +49,15 @@ interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
     
     // 기간별 조회 (통계용)
     fun findByReservedAtBetween(startDate: LocalDateTime, endDate: LocalDateTime): List<Reservation>
+    
+    // 매진 랭킹용 - 최근 1시간 콘서트별 예약 수
+    @Query("""
+        SELECT r.concertId, COUNT(r) 
+        FROM Reservation r 
+        WHERE r.reservedAt >= :since 
+        AND r.status.code IN ('RESERVED', 'CONFIRMED')
+        GROUP BY r.concertId 
+        ORDER BY COUNT(r) DESC
+    """)
+    fun countReservationsByConcertIdAndHour(@Param("since") since: LocalDateTime): List<Array<Any>>
 }

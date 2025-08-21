@@ -55,4 +55,8 @@ class ConcertScheduleRepositoryImpl(
     override fun flush() {
         concertScheduleJpaRepository.flush()
     }
+    
+    override fun findByConcertIdIn(concertIds: List<Long>): List<ConcertSchedule> {
+        return concertScheduleJpaRepository.findByConcertIdIn(concertIds)
+    }
 }

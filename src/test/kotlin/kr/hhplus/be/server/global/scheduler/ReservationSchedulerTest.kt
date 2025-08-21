@@ -11,6 +11,7 @@ import io.mockk.verify
 import kr.hhplus.be.server.domain.auth.service.QueueManager
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
+import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.global.lock.LockStrategy
@@ -20,12 +21,14 @@ class ReservationSchedulerTest : DescribeSpec({
     val reservationService = mockk<ReservationService>()
     val tokenLifecycleManager = mockk<TokenLifecycleManager>()
     val queueManager = mockk<QueueManager>()
+    val selloutRankingService = mockk<SelloutRankingService>()
     val domainEventPublisher = mockk<DomainEventPublisher>()
     val distributedLock = mockk<DistributedLock>()
     val reservationScheduler = ReservationScheduler(
         reservationService,
         tokenLifecycleManager,
         queueManager,
+        selloutRankingService,
         domainEventPublisher,
         distributedLock
     )

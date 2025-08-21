@@ -10,6 +10,7 @@ import kr.hhplus.be.server.api.concert.dto.*
 import kr.hhplus.be.server.domain.concert.service.ConcertService
 import kr.hhplus.be.server.domain.concert.service.ConcertStatsService
 import kr.hhplus.be.server.domain.concert.service.SeatService
+import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -23,7 +24,8 @@ import java.time.LocalDate
 class ConcertController(
     private val concertService: ConcertService,
     private val seatService: SeatService,
-    private val concertStatsService: ConcertStatsService
+    private val concertStatsService: ConcertStatsService,
+    private val selloutRankingService: SelloutRankingService
 ) {
 
     @Operation(
@@ -169,6 +171,28 @@ class ConcertController(
             CommonApiResponse.success(
                 data = trendingConcerts,
                 message = "실시간 트렌딩 콘서트 조회 완료"
+            )
+        )
+    }
+
+    @Operation(
+        summary = "매진 랭킹 조회",
+        description = "최근 1시간 동안 예약이 많이 발생한 콘서트의 매진 랭킹을 조회합니다."
+    )
+    @GetMapping("/sellout-ranking")
+    fun getSelloutRanking(
+        @RequestParam(defaultValue = "10") 
+        @Parameter(description = "조회할 콘서트 수", example = "10")
+        @Min(value = 1, message = "최소 1개 이상이어야 합니다")
+        @Max(value = 50, message = "최대 50개까지 조회 가능합니다")
+        limit: Int
+    ): ResponseEntity<CommonApiResponse<List<SelloutRankingDto>>> {
+        val selloutRanking = selloutRankingService.getSelloutRanking(limit)
+        
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = selloutRanking,
+                message = "매진 랭킹 조회 완료"
             )
         )
     }

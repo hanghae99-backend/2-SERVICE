@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 import java.time.Duration
@@ -11,10 +12,12 @@ import java.time.Duration
 @Component
 class RedisTokenStore(
     private val redisTemplate: StringRedisTemplate,
-    private val objectMapper: ObjectMapper
+    @Qualifier("redis") private val objectMapper: ObjectMapper
 ) : TokenStore {
     fun flushAll() {
-        redisTemplate.connectionFactory?.connection?.flushAll()
+        redisTemplate.connectionFactory?.connection?.use { connection ->
+            connection.serverCommands().flushAll()
+        }
     }
 
     companion object {
@@ -50,6 +53,25 @@ class RedisTokenStore(
             }
         }
         return null
+    }
+    
+    override fun findAll(): List<WaitingToken> {
+        val keys = redisTemplate.keys("$TOKEN_PREFIX*")
+        val tokens = mutableListOf<WaitingToken>()
+        
+        keys?.forEach { key ->
+            val value = redisTemplate.opsForValue().get(key)
+            if (value != null) {
+                try {
+                    val token = objectMapper.readValue(value, WaitingToken::class.java)
+                    tokens.add(token)
+                } catch (e: Exception) {
+                    // 파싱 실패 시 무시
+                }
+            }
+        }
+        
+        return tokens
     }
 
     override fun delete(token: String) {

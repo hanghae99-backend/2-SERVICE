@@ -46,7 +46,7 @@ class ConcertController(
         val concerts = concertService.getAvailableConcerts(start, end)
 
         return ResponseEntity.ok(
-            CommonApiResponse.success(
+            CommonApiResponse.success<List<ConcertScheduleWithInfoDto>>(
                 data = concerts,
                 message = "예약 가능한 콘서트 목록 조회 완료"
             )
@@ -65,9 +65,9 @@ class ConcertController(
         concertId: Long
     ): ResponseEntity<CommonApiResponse<ConcertDto>> {
         val concert = concertService.getConcertById(concertId)
-        
+
         return ResponseEntity.ok(
-            CommonApiResponse.success(
+            CommonApiResponse.success<ConcertDto>(
                 data = concert,
                 message = "콘서트 정보 조회 완료"
             )
@@ -88,7 +88,7 @@ class ConcertController(
         val schedules = concertService.getSchedulesByConcertId(concertId)
         
         return ResponseEntity.ok(
-            CommonApiResponse.success(
+            CommonApiResponse.success<List<ConcertWithScheduleDto>>(
                 data = schedules,
                 message = "콘서트 스케줄 조회 완료"
             )

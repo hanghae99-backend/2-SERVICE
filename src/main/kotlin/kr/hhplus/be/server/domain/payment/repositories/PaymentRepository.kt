@@ -10,4 +10,5 @@ interface PaymentRepository {
     fun findAll(): List<Payment>
     fun delete(payment: Payment)
     fun deleteAll() // 테스트용 - 모든 결제 데이터 삭제
+    fun flush() // 추가
 }

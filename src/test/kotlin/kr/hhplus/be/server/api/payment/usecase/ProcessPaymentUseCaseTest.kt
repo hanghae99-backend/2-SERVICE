@@ -10,6 +10,7 @@ import io.mockk.verify
 import kr.hhplus.be.server.api.balance.usecase.DeductBalanceUseCase
 import kr.hhplus.be.server.api.concert.dto.SeatDto
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
+import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
@@ -55,7 +56,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 val mockWaitingToken = mockk<WaitingToken>()
                 val mockTokenStatus = mockk<TokenStatus>()
                 val mockReservation = mockk<Reservation> {
-                    every { userId } returns userId
+                    every { this@mockk.userId } returns userId
                     every { status.code } returns "TEMPORARY"
                     every { isExpired() } returns false
                 }
@@ -65,14 +66,24 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 val mockConfirmedSeat = mockk<SeatDto>()
                 val mockConfirmedReservation = mockk<Reservation>()
                 val mockPoint = mockk<Point>()
-                val mockInitialPayment = mockk<PaymentDto> {
-                    every { paymentId } returns 1L
-                    every { amount } returns amount
-                }
-                val mockCompletedPayment = mockk<PaymentDto> {
-                    every { paymentId } returns 1L
-                    every { amount } returns amount
-                }
+                val mockInitialPayment = PaymentDto(
+                    paymentId = 1L,
+                    userId = userId,
+                    reservationId = reservationId,
+                    amount = amount,
+                    paymentMethod = "POINT",
+                    statusCode = "PENDING",
+                    paidAt = null
+                )
+                val mockCompletedPayment = PaymentDto(
+                    paymentId = 1L,
+                    userId = userId,
+                    reservationId = reservationId,
+                    amount = amount,
+                    paymentMethod = "POINT",
+                    statusCode = "COMPLETED",
+                    paidAt = LocalDateTime.now()
+                )
 
                 every { tokenLifecycleManager.findToken(token) } returns mockWaitingToken
                 every { tokenLifecycleManager.getTokenStatus(token) } returns mockTokenStatus
@@ -80,7 +91,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { reservationService.getReservationById(reservationId) } returns mockReservation
                 every { seatService.getSeatById(seatId) } returns mockSeat
                 every { paymentService.createReservationPayment(userId, reservationId, amount) } returns mockInitialPayment
-                every { deductBalanceUseCase.execute(userId, amount, any()) } returns mockPoint
+                every { deductBalanceUseCase.execute(userId, amount) } returns mockPoint
                 every { reservationService.confirmReservation(reservationId, 1L) } returns mockConfirmedReservation
                 every { seatService.confirmSeat(seatId) } returns mockConfirmedSeat
                 every { paymentService.completePayment(1L, reservationId, seatId, token) } returns mockCompletedPayment
@@ -98,7 +109,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 verify { reservationService.getReservationById(reservationId) }
                 verify { seatService.getSeatById(seatId) }
                 verify { paymentService.createReservationPayment(userId, reservationId, amount) }
-                verify { deductBalanceUseCase.execute(userId, amount, any()) }
+                verify { deductBalanceUseCase.execute(userId, amount) }
                 verify { reservationService.confirmReservation(reservationId, 1L) }
                 verify { seatService.confirmSeat(seatId) }
                 verify { paymentService.completePayment(1L, reservationId, seatId, token) }
@@ -116,7 +127,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 val mockWaitingToken = mockk<WaitingToken>()
                 val mockTokenStatus = mockk<TokenStatus>()
                 val mockReservation = mockk<Reservation> {
-                    every { userId } returns userId
+                    every { this@mockk.userId } returns userId
                     every { status.code } returns "TEMPORARY"
                     every { isExpired() } returns true
                 }
@@ -127,7 +138,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { reservationService.getReservationById(reservationId) } returns mockReservation
                 
                 // when & then
-                shouldThrow<Exception> {
+                shouldThrow<PaymentProcessException> {
                     processPaymentUseCase.execute(userId, reservationId, seatId, token)
                 }
             }
@@ -144,7 +155,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 val mockWaitingToken = mockk<WaitingToken>()
                 val mockTokenStatus = mockk<TokenStatus>()
                 val mockReservation = mockk<Reservation> {
-                    every { userId } returns 2L // 다른 사용자
+                    every { this@mockk.userId } returns 2L // 다른 사용자
                     every { status.code } returns "TEMPORARY"
                     every { isExpired() } returns false
                 }
@@ -155,7 +166,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { reservationService.getReservationById(reservationId) } returns mockReservation
                 
                 // when & then
-                shouldThrow<Exception> {
+                shouldThrow<PaymentProcessException> {
                     processPaymentUseCase.execute(userId, reservationId, seatId, token)
                 }
             }

@@ -23,4 +23,7 @@ interface SeatStatusTypePojoRepository {
     // ========== 비즈니스 로직 메서드들 ==========
     fun getAllActiveStatuses(): List<SeatStatusType>
     fun isValidStatus(code: String): Boolean
+    
+    // ========== JPA 연동 메서드 ==========
+    fun flush()
 }

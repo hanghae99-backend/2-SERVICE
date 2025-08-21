@@ -89,33 +89,37 @@ class Payment(
         }
     }
 
-    fun complete(completedStatus: PaymentStatusType) {
+    fun complete() {
         if (status.code != STATUS_PENDING) {
             throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
-        this.status = completedStatus
+        // 상태 변경은 서비스 레이어에서 처리
         this.paidAt = LocalDateTime.now()
     }
 
-    fun fail(failedStatus: PaymentStatusType) {
+    fun updateStatus(newStatus: PaymentStatusType) {
+        this.status = newStatus
+    }
+
+    fun fail() {
         if (status.code != STATUS_PENDING) {
             throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
-        this.status = failedStatus
+        // 상태 변경은 서비스 레이어에서 처리
     }
 
-    fun cancel(cancelledStatus: PaymentStatusType) {
+    fun cancel() {
         if (status.code == STATUS_COMPLETED) {
             throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
-        this.status = cancelledStatus
+        // 상태 변경은 서비스 레이어에서 처리
     }
 
-    fun refund(refundedStatus: PaymentStatusType) {
+    fun refund() {
         if (status.code != STATUS_COMPLETED) {
             throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
-        this.status = refundedStatus
+        // 상태 변경은 서비스 레이어에서 처리
     }
 
     fun isCompleted(): Boolean = status.code == STATUS_COMPLETED

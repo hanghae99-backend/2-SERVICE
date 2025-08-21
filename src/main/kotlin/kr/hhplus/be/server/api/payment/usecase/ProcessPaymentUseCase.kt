@@ -32,8 +32,9 @@ class ProcessPaymentUseCase(
         private val logger = LoggerFactory.getLogger(ProcessPaymentUseCase::class.java)
     }
 
+
     @LockGuard(
-        keys = ["'balance:' + #userId", "'reservation:' + #reservationId"],
+        keys = ["'balance:' + #userId", "'reservation:' + #reservationId", "'payment:' + #userId + ':' + #reservationId"],
         strategy = LockStrategy.PUB_SUB,
         waitTimeoutMs = 20000L
     )
@@ -49,7 +50,8 @@ class ProcessPaymentUseCase(
         val payment = paymentService.createReservationPayment(userId, reservationId, seat.price)
         
         return try {
-            deductBalanceUseCase.execute(userId, payment.amount)
+            // 모든 락을 UseCase에서 획득했으므로 서비스는 락 없이 처리
+            deductBalanceUseCase.executeInternal(userId, payment.amount)
             
             reservationService.confirmReservation(reservationId, payment.paymentId)
             seatService.confirmSeat(seatId)

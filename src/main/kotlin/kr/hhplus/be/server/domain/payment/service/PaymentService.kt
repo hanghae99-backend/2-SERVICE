@@ -10,7 +10,6 @@ import kr.hhplus.be.server.domain.payment.exception.PaymentNotFoundException
 import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
 import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
-import kr.hhplus.be.server.global.lock.LockGuard
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -43,17 +42,19 @@ class PaymentService(
         return PaymentDto.fromEntity(savedPayment)
     }
 
-    @LockGuard(key = "payment:#paymentId")
     @Transactional
     fun completePayment(paymentId: Long, reservationId: Long, seatId: Long, token: String): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
             .orElseThrow { PaymentNotFoundException(paymentId) }
 
-
+        // 비즈니스 로직 검증
+        payment.complete()
+        
+        // 상태 업데이트
         val completedStatus = paymentStatusTypeRepository.getCompletedStatus()
-        payment.complete(completedStatus)
+        payment.updateStatus(completedStatus)
+        
         val finalPayment = paymentRepository.save(payment)
-
 
         val paymentCompletedEvent = PaymentCompletedEvent(
             paymentId = finalPayment.paymentId,
@@ -68,17 +69,19 @@ class PaymentService(
         return PaymentDto.fromEntity(finalPayment)
     }
 
-    @LockGuard(key = "payment:#paymentId")
     @Transactional
     fun failPayment(paymentId: Long, reservationId: Long, reason: String, token: String): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
             .orElseThrow { PaymentNotFoundException(paymentId) }
 
-
+        // 비즈니스 로직 검증
+        payment.fail()
+        
+        // 상태 업데이트
         val failedStatus = paymentStatusTypeRepository.getFailedStatus()
-        payment.fail(failedStatus)
+        payment.updateStatus(failedStatus)
+        
         val finalPayment = paymentRepository.save(payment)
-
 
         val paymentFailedEvent = PaymentFailedEvent(
             paymentId = finalPayment.paymentId,

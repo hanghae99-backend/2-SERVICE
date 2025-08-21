@@ -61,7 +61,7 @@ class ConcertStatsService(
     
     @Async
     fun incrementViewCount(concertId: Long) {
-        redisTemplate.opsForHash<String, String>()
+        redisTemplate.opsForHash<String, Long>()
             .increment(VIEW_COUNT_KEY, concertId.toString(), 1)
         updatePopularityScore(concertId)
         updateTrendingScore(concertId, 1.0)
@@ -73,12 +73,19 @@ class ConcertStatsService(
         val concerts = concertRepository.findAll().filter { it.concertId in concertIds }
         val concertMap = concerts.associateBy { it.concertId }
         
-        val viewCounts = redisTemplate.opsForHash<String, String>()
+        val viewCounts = redisTemplate.opsForHash<String, Any>()
             .multiGet(VIEW_COUNT_KEY, concertIds.map { it.toString() })
         
         return concertIds.mapIndexed { index, concertId ->
             val concert = concertMap[concertId]
-            val viewCount = viewCounts.getOrNull(index)?.toLongOrNull() ?: 0
+            val viewCount = viewCounts.getOrNull(index)?.let {
+                when (it) {
+                    is Long -> it
+                    is Int -> it.toLong()
+                    is String -> it.toLongOrNull() ?: 0L
+                    else -> 0L
+                }
+            } ?: 0L
             
             if (concert != null) {
                 PopularConcertDto(
@@ -95,8 +102,14 @@ class ConcertStatsService(
     }
     
     private fun updatePopularityScore(concertId: Long) {
-        val viewCount = redisTemplate.opsForHash<String, String>()
-            .get(VIEW_COUNT_KEY, concertId.toString())?.toDoubleOrNull() ?: 0.0
+        val viewCount = redisTemplate.opsForHash<String, Any>()
+            .get(VIEW_COUNT_KEY, concertId.toString())?.let {
+                when (it) {
+                    is Number -> it.toDouble()
+                    is String -> it.toDoubleOrNull() ?: 0.0
+                    else -> 0.0
+                }
+            } ?: 0.0
         redisTemplate.opsForZSet().add(POPULAR_CONCERTS_KEY, concertId, viewCount)
     }
     
@@ -121,7 +134,7 @@ class ConcertStatsService(
         inactiveIds.forEach { concertId ->
             redisTemplate.opsForZSet().remove(POPULAR_CONCERTS_KEY, concertId)
             redisTemplate.opsForZSet().remove(TRENDING_KEY, concertId)
-            redisTemplate.opsForHash<String, String>().delete(VIEW_COUNT_KEY, concertId.toString())
+            redisTemplate.opsForHash<String, Any>().delete(VIEW_COUNT_KEY, concertId.toString())
         }
     }
 }

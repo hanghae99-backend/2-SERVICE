@@ -36,4 +36,8 @@ class PaymentRepositoryImpl(
     override fun deleteAll() {
         paymentJpaRepository.deleteAll()
     }
+    
+    override fun flush() {
+        paymentJpaRepository.flush()
+    }
 }

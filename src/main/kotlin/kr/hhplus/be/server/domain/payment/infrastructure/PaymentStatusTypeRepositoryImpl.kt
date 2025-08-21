@@ -43,28 +43,28 @@ class PaymentStatusTypeRepositoryImpl(
     
     // ========== 상태 조회 with 예외 처리 ==========
     override fun getPendingStatus(): PaymentStatusType {
-        return findByCodeAndIsActiveTrue("PENDING")
-            ?: throw IllegalStateException("PENDING 상태를 찾을 수 없습니다")
+        return findByCodeAndIsActiveTrue("PEND")
+            ?: throw IllegalStateException("PEND 상태를 찾을 수 없습니다")
     }
     
     override fun getCompletedStatus(): PaymentStatusType {
-        return findByCodeAndIsActiveTrue("COMPLETED")
-            ?: throw IllegalStateException("COMPLETED 상태를 찾을 수 없습니다")
+        return findByCodeAndIsActiveTrue("COMP")
+            ?: throw IllegalStateException("COMP 상태를 찾을 수 없습니다")
     }
     
     override fun getFailedStatus(): PaymentStatusType {
-        return findByCodeAndIsActiveTrue("FAILED")
-            ?: throw IllegalStateException("FAILED 상태를 찾을 수 없습니다")
+        return findByCodeAndIsActiveTrue("FAIL")
+            ?: throw IllegalStateException("FAIL 상태를 찾을 수 없습니다")
     }
     
     override fun getCancelledStatus(): PaymentStatusType {
-        return findByCodeAndIsActiveTrue("CANCELLED")
-            ?: throw IllegalStateException("CANCELLED 상태를 찾을 수 없습니다")
+        return findByCodeAndIsActiveTrue("CANC")
+            ?: throw IllegalStateException("CANC 상태를 찾을 수 없습니다")
     }
     
     override fun getRefundedStatus(): PaymentStatusType {
-        return findByCodeAndIsActiveTrue("REFUNDED")
-            ?: throw IllegalStateException("REFUNDED 상태를 찾을 수 없습니다")
+        return findByCodeAndIsActiveTrue("REFD")
+            ?: throw IllegalStateException("REFD 상태를 찾을 수 없습니다")
     }
     
     override fun getStatusByCodeOrThrow(code: String): PaymentStatusType {

@@ -19,6 +19,7 @@ class RedisTokenStoreFailureTest : DescribeSpec({
         lateinit var valueOperations: ValueOperations<String, String>
         lateinit var setOperations: SetOperations<String, String>
         lateinit var zSetOperations: ZSetOperations<String, String>
+        lateinit var hashOperations: HashOperations<String, String, String>
         lateinit var objectMapper: com.fasterxml.jackson.databind.ObjectMapper
         lateinit var redisTokenStore: RedisTokenStore
         
@@ -27,11 +28,13 @@ class RedisTokenStoreFailureTest : DescribeSpec({
             valueOperations = mockk(relaxed = true)
             setOperations = mockk(relaxed = true)
             zSetOperations = mockk(relaxed = true)
+            hashOperations = mockk(relaxed = true)
             objectMapper = mockk(relaxed = true)
             
             every { redisTemplate.opsForValue() } returns valueOperations
             every { redisTemplate.opsForSet() } returns setOperations
             every { redisTemplate.opsForZSet() } returns zSetOperations
+            every { redisTemplate.opsForHash<String, String>() } returns hashOperations
             
             redisTokenStore = RedisTokenStore(redisTemplate, objectMapper)
         }
@@ -66,7 +69,7 @@ class RedisTokenStoreFailureTest : DescribeSpec({
             it("토큰 상태 조회 시 RedisConnectionFailureException이 발생해야 한다") {
                 // given
                 val token = "test-token"
-                every { setOperations.isMember(any(), any()) } throws RedisConnectionFailureException("Redis 연결 실패")
+                every { hashOperations.hasKey(any(), any()) } throws RedisConnectionFailureException("Redis 연결 실패")
                 
                 // when & then
                 shouldThrow<RedisConnectionFailureException> {
@@ -104,6 +107,17 @@ class RedisTokenStoreFailureTest : DescribeSpec({
                     redisTokenStore.getQueueSize()
                 }
             }
+            
+            it("활성 토큰 수 조회 시 타임아웃 예외가 발생해야 한다") {
+                // given
+                every { hashOperations.size(any()) } throws 
+                    QueryTimeoutException("Redis query timeout")
+                
+                // when & then
+                shouldThrow<QueryTimeoutException> {
+                    redisTokenStore.countActiveTokens()
+                }
+            }
         }
         
         context("데이터 직렬화/역직렬화 실패 시") {
@@ -138,7 +152,7 @@ class RedisTokenStoreFailureTest : DescribeSpec({
         }
         
         context("Redis 명령어 실행 실패 시") {
-            it("LIST 명령어 실패 시 예외가 발생해야 한다") {
+            it("ZADD 명령어 실패 시 예외가 발생해야 한다") {
                 // given
                 every { valueOperations.increment(any()) } returns 1L
                 every { zSetOperations.add(any(), any(), any()) } throws RuntimeException("ZADD 명령어 실행 실패")
@@ -149,13 +163,37 @@ class RedisTokenStoreFailureTest : DescribeSpec({
                 }
             }
             
-            it("LPOP 명령어 실패 시 예외가 발생해야 한다") {
+            it("ZRANGE 명령어 실패 시 예외가 발생해야 한다") {
                 // given
                 every { zSetOperations.range(any(), any(), any()) } throws RuntimeException("ZRANGE 명령어 실행 실패")
                 
                 // when & then
                 shouldThrow<RuntimeException> {
                     redisTokenStore.getNextTokensFromQueue(1)
+                }
+            }
+            
+            it("HSET 명령어 실패 시 예외가 발생해야 한다") {
+                // given
+                val token = "test-token"
+                every { zSetOperations.remove(any(), any()) } returns 1L
+                every { hashOperations.put(any(), any(), any()) } throws RuntimeException("HSET 명령어 실행 실패")
+                
+                // when & then
+                shouldThrow<RuntimeException> {
+                    redisTokenStore.activateToken(token)
+                }
+            }
+            
+            it("HDEL 명령어 실패 시 예외가 발생해야 한다") {
+                // given
+                val token = "test-token"
+                every { zSetOperations.remove(any(), any()) } returns 1L
+                every { hashOperations.delete(any(), any()) } throws RuntimeException("HDEL 명령어 실행 실패")
+                
+                // when & then
+                shouldThrow<RuntimeException> {
+                    redisTokenStore.expireToken(token)
                 }
             }
         }
@@ -175,6 +213,18 @@ class RedisTokenStoreFailureTest : DescribeSpec({
                 result shouldContain "token1"
                 result shouldContain "token2"
                 result shouldContain "token3"
+            }
+            
+            it("Hash 읽기는 실패하지만 ZSet 읽기는 성공할 수 있어야 한다") {
+                // given
+                val token = "test-token"
+                every { hashOperations.hasKey(any(), any()) } throws RuntimeException("Hash 읽기 실패")
+                every { zSetOperations.rank(any(), any()) } returns 5L
+                
+                // when & then
+                shouldThrow<RuntimeException> {
+                    redisTokenStore.getTokenStatus(token)
+                }
             }
         }
         
@@ -206,6 +256,59 @@ class RedisTokenStoreFailureTest : DescribeSpec({
                 
                 val result = redisTokenStore.findByToken(token)
                 result?.token shouldBe token
+            }
+            
+            it("Hash 작업 실패 후 재시도가 가능해야 한다") {
+                // given
+                val token = "hash-recovery-token"
+                var callCount = 0
+                
+                // 첫 번째 호출: 실패, 두 번째 호출: 성공
+                every { hashOperations.hasKey("active_tokens_hash", token) } answers {
+                    if (callCount++ == 0) {
+                        throw RedisConnectionFailureException("Hash 연결 실패")
+                    } else {
+                        true
+                    }
+                }
+                
+                // when & then - 첫 번째 호출은 실패
+                shouldThrow<RedisConnectionFailureException> {
+                    redisTokenStore.isTokenActive(token)
+                }
+                
+                // when & then - 두 번째 호출은 성공
+                val result = redisTokenStore.isTokenActive(token)
+                result shouldBe true
+            }
+        }
+        
+        context("Hash 만료 시간 처리 실패") {
+            it("만료된 활성 토큰 조회 시 Hash 읽기 실패가 발생해야 한다") {
+                // given
+                every { hashOperations.entries(any()) } throws RuntimeException("Hash entries 읽기 실패")
+                
+                // when & then
+                shouldThrow<RuntimeException> {
+                    redisTokenStore.findExpiredActiveTokens()
+                }
+            }
+            
+            it("잘못된 만료 시간 형식에 대해 안전하게 처리해야 한다") {
+                // given
+                val entries = mapOf(
+                    "token1" to "invalid-time",
+                    "token2" to "not-a-number"
+                )
+                every { hashOperations.entries("active_tokens_hash") } returns entries
+                
+                // when
+                val result = redisTokenStore.findExpiredActiveTokens()
+                
+                // then - 잘못된 시간 형식의 토큰들은 만료된 것으로 처리
+                result.size shouldBe 2
+                result shouldContain "token1"
+                result shouldContain "token2"
             }
         }
     }

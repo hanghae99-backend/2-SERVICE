@@ -10,6 +10,7 @@ import io.kotest.matchers.collections.shouldNotContain
 import io.mockk.*
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
+import org.springframework.data.redis.core.HashOperations
 import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
@@ -22,6 +23,7 @@ class RedisTokenStoreTest : DescribeSpec({
     lateinit var valueOperations: ValueOperations<String, String>
     lateinit var setOperations: SetOperations<String, String>
     lateinit var zSetOperations: ZSetOperations<String, String>
+    lateinit var hashOperations: HashOperations<String, String, String>
     lateinit var objectMapper: ObjectMapper
     lateinit var redisTokenStore: RedisTokenStore
     
@@ -30,11 +32,13 @@ class RedisTokenStoreTest : DescribeSpec({
         valueOperations = mockk(relaxed = true)
         setOperations = mockk(relaxed = true)
         zSetOperations = mockk(relaxed = true)
+        hashOperations = mockk(relaxed = true)
         objectMapper = mockk(relaxed = true)
         
         every { redisTemplate.opsForValue() } returns valueOperations
         every { redisTemplate.opsForSet() } returns setOperations
         every { redisTemplate.opsForZSet() } returns zSetOperations
+        every { redisTemplate.opsForHash<String, String>() } returns hashOperations
         
         redisTokenStore = RedisTokenStore(redisTemplate, objectMapper)
     }
@@ -117,7 +121,7 @@ class RedisTokenStoreTest : DescribeSpec({
             it("ACTIVE 상태를 반환해야 한다") {
                 // given
                 val token = "active-token"
-                every { setOperations.isMember("active_tokens", token) } returns true
+                every { hashOperations.hasKey("active_tokens_hash", token) } returns true
                 
                 // when
                 val result = redisTokenStore.getTokenStatus(token)
@@ -131,7 +135,7 @@ class RedisTokenStoreTest : DescribeSpec({
             it("WAITING 상태를 반환해야 한다") {
                 // given
                 val token = "waiting-token"
-                every { setOperations.isMember("active_tokens", token) } returns false
+                every { hashOperations.hasKey("active_tokens_hash", token) } returns false
                 every { zSetOperations.rank("waiting_queue_zset", token) } returns 5L
                 
                 // when
@@ -146,7 +150,7 @@ class RedisTokenStoreTest : DescribeSpec({
             it("EXPIRED 상태를 반환해야 한다") {
                 // given
                 val token = "expired-token"
-                every { setOperations.isMember("active_tokens", token) } returns false
+                every { hashOperations.hasKey("active_tokens_hash", token) } returns false
                 every { zSetOperations.rank("waiting_queue_zset", token) } returns null
                 
                 // when
@@ -160,25 +164,19 @@ class RedisTokenStoreTest : DescribeSpec({
     
     describe("activateToken") {
         context("토큰을 활성화할 때") {
-            it("대기열에서 제거하고 활성 토큰 Set에 추가하며 타임스탬프를 기록해야 한다") {
+            it("대기열에서 제거하고 활성 토큰 Hash에 추가해야 한다") {
                 // given
                 val token = "token-to-activate"
                 every { zSetOperations.remove("waiting_queue_zset", token) } returns 1L
-                every { setOperations.add("active_tokens", token) } returns 1L
-                every { valueOperations.set(any(), any(), any<Duration>()) } just Runs
+                every { hashOperations.put("active_tokens_hash", token, any()) } just Runs
                 
                 // when
                 redisTokenStore.activateToken(token)
                 
                 // then
                 verify(exactly = 1) { zSetOperations.remove("waiting_queue_zset", token) }
-                verify(exactly = 1) { setOperations.add("active_tokens", token) }
                 verify(exactly = 1) { 
-                    valueOperations.set(
-                        "active_timestamp:token-to-activate",
-                        any(),
-                        Duration.ofMinutes(10)
-                    )
+                    hashOperations.put("active_tokens_hash", token, any())
                 }
             }
         }
@@ -186,20 +184,18 @@ class RedisTokenStoreTest : DescribeSpec({
     
     describe("expireToken") {
         context("토큰을 만료시킬 때") {
-            it("대기열과 활성 토큰에서 모두 제거하고 타임스탬프도 삭제해야 한다") {
+            it("대기열과 활성 토큰 Hash에서 모두 제거해야 한다") {
                 // given
                 val token = "token-to-expire"
                 every { zSetOperations.remove("waiting_queue_zset", token) } returns 1L
-                every { setOperations.remove("active_tokens", token) } returns 1L
-                every { redisTemplate.delete("active_timestamp:token-to-expire") } returns true
+                every { hashOperations.delete("active_tokens_hash", token) } returns 1L
                 
                 // when
                 redisTokenStore.expireToken(token)
                 
                 // then
                 verify(exactly = 1) { zSetOperations.remove("waiting_queue_zset", token) }
-                verify(exactly = 1) { setOperations.remove("active_tokens", token) }
-                verify(exactly = 1) { redisTemplate.delete("active_timestamp:token-to-expire") }
+                verify(exactly = 1) { hashOperations.delete("active_tokens_hash", token) }
             }
         }
     }
@@ -298,69 +294,73 @@ class RedisTokenStoreTest : DescribeSpec({
     
     describe("countActiveTokens") {
         context("활성 토큰 수를 조회할 때") {
-            it("Set의 크기를 반환해야 한다") {
+            it("Hash의 크기를 반환해야 한다") {
                 // given
-                every { setOperations.size("active_tokens") } returns 42L
+                every { hashOperations.size("active_tokens_hash") } returns 42L
                 
                 // when
                 val result = redisTokenStore.countActiveTokens()
                 
                 // then
                 result shouldBe 42L
-                verify(exactly = 1) { setOperations.size("active_tokens") }
+                verify(exactly = 1) { hashOperations.size("active_tokens_hash") }
             }
         }
         
         context("활성 토큰이 없을 때") {
             it("0을 반환해야 한다") {
                 // given
-                every { setOperations.size("active_tokens") } returns null
+                every { hashOperations.size("active_tokens_hash") } returns 0L
                 
                 // when
                 val result = redisTokenStore.countActiveTokens()
                 
                 // then
                 result shouldBe 0L
-                verify(exactly = 1) { setOperations.size("active_tokens") }
+                verify(exactly = 1) { hashOperations.size("active_tokens_hash") }
             }
         }
     }
     
     describe("findExpiredActiveTokens") {
         context("만료된 활성 토큰이 있을 때") {
-            it("TTL을 초과한 토큰들을 반환해야 한다") {
+            it("만료 시간을 초과한 토큰들을 반환해야 한다") {
                 // given
                 val currentTime = System.currentTimeMillis()
-                val expiredTime = (currentTime - Duration.ofMinutes(15).toMillis()).toString() // 15분 전 (10분 TTL 초과)
-                val validTime = (currentTime - Duration.ofMinutes(5).toMillis()).toString()   // 5분 전 (유효)
+                val expiredTime = (currentTime - Duration.ofMinutes(15).toMillis()).toString() // 15분 전 (만료)
+                val validTime = (currentTime + Duration.ofMinutes(5).toMillis()).toString()   // 5분 후 (유효)
                 
-                every { setOperations.members("active_tokens") } returns setOf("token1", "token2", "token3")
-                every { valueOperations.get("active_timestamp:token1") } returns expiredTime
-                every { valueOperations.get("active_timestamp:token2") } returns validTime
-                every { valueOperations.get("active_timestamp:token3") } returns null // 타임스탬프 없음
+                val entries = mapOf(
+                    "token1" to expiredTime,
+                    "token2" to validTime,
+                    "token3" to "invalid-time"
+                )
+                
+                every { hashOperations.entries("active_tokens_hash") } returns entries
                 
                 // when
                 val result = redisTokenStore.findExpiredActiveTokens()
                 
                 // then
                 result shouldHaveSize 2
-                result shouldContain "token1" // 15분 전 (만료)
-                result shouldNotContain "token2" // 5분 전 (유효)
-                result shouldContain "token3" // 타임스탬프 없음 (만료)
+                result shouldContain "token1" // 만료됨
+                result shouldNotContain "token2" // 유효함
+                result shouldContain "token3" // 유효하지 않은 시간 형식 (만료로 처리)
+                verify(exactly = 1) { hashOperations.entries("active_tokens_hash") }
             }
         }
         
         context("만료된 활성 토큰이 없을 때") {
             it("빈 리스트를 반환해야 한다") {
                 // given
-                every { setOperations.members("active_tokens") } returns emptySet()
+                every { hashOperations.entries("active_tokens_hash") } returns emptyMap()
                 
                 // when
                 val result = redisTokenStore.findExpiredActiveTokens()
                 
                 // then
                 result shouldHaveSize 0
-                verify(exactly = 1) { setOperations.members("active_tokens") }
+                verify(exactly = 1) { hashOperations.entries("active_tokens_hash") }
             }
         }
     }
@@ -413,8 +413,7 @@ class RedisTokenStoreTest : DescribeSpec({
                 every { redisTemplate.delete("waiting_token:token-to-delete") } returns true
                 every { setOperations.remove("user_tokens:123", token) } returns 1L
                 every { zSetOperations.remove("waiting_queue_zset", token) } returns 1L
-                every { setOperations.remove("active_tokens", token) } returns 1L
-                every { redisTemplate.delete("active_timestamp:token-to-delete") } returns true
+                every { hashOperations.delete("active_tokens_hash", token) } returns 1L
                 
                 // when
                 redisTokenStore.delete(token)
@@ -423,8 +422,177 @@ class RedisTokenStoreTest : DescribeSpec({
                 verify(exactly = 1) { redisTemplate.delete("waiting_token:token-to-delete") }
                 verify(exactly = 1) { setOperations.remove("user_tokens:123", token) }
                 verify(exactly = 1) { zSetOperations.remove("waiting_queue_zset", token) }
-                verify(exactly = 1) { setOperations.remove("active_tokens", token) }
-                verify(exactly = 1) { redisTemplate.delete("active_timestamp:token-to-delete") }
+                verify(exactly = 1) { hashOperations.delete("active_tokens_hash", token) }
+            }
+        }
+    }
+    
+    describe("findActiveTokenByUserId") {
+        context("사용자의 활성 토큰이 있을 때") {
+            it("활성 토큰을 반환해야 한다") {
+                // given
+                val userId = 123L
+                val activeToken = "active-token"
+                val inactiveToken = "inactive-token"
+                val userTokens = setOf(activeToken, inactiveToken)
+                val waitingToken = WaitingToken(token = activeToken, userId = userId)
+                val tokenJson = """{"token":"active-token","userId":123}"""
+                
+                every { setOperations.members("user_tokens:123") } returns userTokens
+                every { hashOperations.hasKey("active_tokens_hash", activeToken) } returns true
+                every { hashOperations.hasKey("active_tokens_hash", inactiveToken) } returns false
+                every { valueOperations.get("waiting_token:active-token") } returns tokenJson
+                every { objectMapper.readValue(tokenJson, WaitingToken::class.java) } returns waitingToken
+                
+                // when
+                val result = redisTokenStore.findActiveTokenByUserId(userId)
+                
+                // then
+                result shouldBe waitingToken
+                verify(exactly = 1) { setOperations.members("user_tokens:123") }
+                verify(exactly = 1) { hashOperations.hasKey("active_tokens_hash", activeToken) }
+            }
+        }
+        
+        context("사용자의 활성 토큰이 없을 때") {
+            it("null을 반환해야 한다") {
+                // given
+                val userId = 123L
+                every { setOperations.members("user_tokens:123") } returns null
+                
+                // when
+                val result = redisTokenStore.findActiveTokenByUserId(userId)
+                
+                // then
+                result shouldBe null
+                verify(exactly = 1) { setOperations.members("user_tokens:123") }
+            }
+        }
+    }
+    
+    describe("isTokenActive") {
+        context("활성 토큰인 경우") {
+            it("true를 반환해야 한다") {
+                // given
+                val token = "active-token"
+                every { hashOperations.hasKey("active_tokens_hash", token) } returns true
+                
+                // when
+                val result = redisTokenStore.isTokenActive(token)
+                
+                // then
+                result shouldBe true
+                verify(exactly = 1) { hashOperations.hasKey("active_tokens_hash", token) }
+            }
+        }
+        
+        context("비활성 토큰인 경우") {
+            it("false를 반환해야 한다") {
+                // given
+                val token = "inactive-token"
+                every { hashOperations.hasKey("active_tokens_hash", token) } returns false
+                
+                // when
+                val result = redisTokenStore.isTokenActive(token)
+                
+                // then
+                result shouldBe false
+                verify(exactly = 1) { hashOperations.hasKey("active_tokens_hash", token) }
+            }
+        }
+    }
+    
+    describe("isTokenInQueue") {
+        context("대기열에 있는 토큰인 경우") {
+            it("true를 반환해야 한다") {
+                // given
+                val token = "queued-token"
+                every { zSetOperations.rank("waiting_queue_zset", token) } returns 5L
+                
+                // when
+                val result = redisTokenStore.isTokenInQueue(token)
+                
+                // then
+                result shouldBe true
+                verify(exactly = 1) { zSetOperations.rank("waiting_queue_zset", token) }
+            }
+        }
+        
+        context("대기열에 없는 토큰인 경우") {
+            it("false를 반환해야 한다") {
+                // given
+                val token = "not-queued-token"
+                every { zSetOperations.rank("waiting_queue_zset", token) } returns null
+                
+                // when
+                val result = redisTokenStore.isTokenInQueue(token)
+                
+                // then
+                result shouldBe false
+                verify(exactly = 1) { zSetOperations.rank("waiting_queue_zset", token) }
+            }
+        }
+    }
+    
+    describe("getQueueSize") {
+        context("대기열 크기를 조회할 때") {
+            it("ZSet의 크기를 반환해야 한다") {
+                // given
+                every { zSetOperations.zCard("waiting_queue_zset") } returns 10L
+                
+                // when
+                val result = redisTokenStore.getQueueSize()
+                
+                // then
+                result shouldBe 10L
+                verify(exactly = 1) { zSetOperations.zCard("waiting_queue_zset") }
+            }
+        }
+        
+        context("대기열이 비어있을 때") {
+            it("0을 반환해야 한다") {
+                // given
+                every { zSetOperations.zCard("waiting_queue_zset") } returns null
+                
+                // when
+                val result = redisTokenStore.getQueueSize()
+                
+                // then
+                result shouldBe 0L
+                verify(exactly = 1) { zSetOperations.zCard("waiting_queue_zset") }
+            }
+        }
+    }
+    
+    describe("getTokenStatusAndPosition") {
+        context("대기 중인 토큰인 경우") {
+            it("WAITING 상태와 위치를 반환해야 한다") {
+                // given
+                val token = "waiting-token"
+                every { hashOperations.hasKey("active_tokens_hash", token) } returns false
+                every { zSetOperations.rank("waiting_queue_zset", token) } returns 5L
+                
+                // when
+                val (status, position) = redisTokenStore.getTokenStatusAndPosition(token)
+                
+                // then
+                status shouldBe TokenStatus.WAITING
+                position shouldBe 5
+            }
+        }
+        
+        context("활성 토큰인 경우") {
+            it("ACTIVE 상태와 null 위치를 반환해야 한다") {
+                // given
+                val token = "active-token"
+                every { hashOperations.hasKey("active_tokens_hash", token) } returns true
+                
+                // when
+                val (status, position) = redisTokenStore.getTokenStatusAndPosition(token)
+                
+                // then
+                status shouldBe TokenStatus.ACTIVE
+                position shouldBe null
             }
         }
     }

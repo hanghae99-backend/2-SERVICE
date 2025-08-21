@@ -2,16 +2,14 @@ package kr.hhplus.be.server.domain.auth.infrastructure
 
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.assertions.throwables.shouldThrow
 import io.mockk.*
 import org.springframework.dao.QueryTimeoutException
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import org.springframework.data.redis.RedisConnectionFailureException
-import org.springframework.data.redis.core.ListOperations
-import org.springframework.data.redis.core.SetOperations
-import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.data.redis.core.ValueOperations
+import org.springframework.data.redis.core.*
 
 class RedisTokenStoreFailureTest : DescribeSpec({
     
@@ -20,7 +18,7 @@ class RedisTokenStoreFailureTest : DescribeSpec({
         lateinit var redisTemplate: StringRedisTemplate
         lateinit var valueOperations: ValueOperations<String, String>
         lateinit var setOperations: SetOperations<String, String>
-        lateinit var listOperations: ListOperations<String, String>
+        lateinit var zSetOperations: ZSetOperations<String, String>
         lateinit var objectMapper: com.fasterxml.jackson.databind.ObjectMapper
         lateinit var redisTokenStore: RedisTokenStore
         
@@ -28,12 +26,12 @@ class RedisTokenStoreFailureTest : DescribeSpec({
             redisTemplate = mockk(relaxed = true)
             valueOperations = mockk(relaxed = true)
             setOperations = mockk(relaxed = true)
-            listOperations = mockk(relaxed = true)
+            zSetOperations = mockk(relaxed = true)
             objectMapper = mockk(relaxed = true)
             
             every { redisTemplate.opsForValue() } returns valueOperations
             every { redisTemplate.opsForSet() } returns setOperations
-            every { redisTemplate.opsForList() } returns listOperations
+            every { redisTemplate.opsForZSet() } returns zSetOperations
             
             redisTokenStore = RedisTokenStore(redisTemplate, objectMapper)
         }
@@ -98,7 +96,7 @@ class RedisTokenStoreFailureTest : DescribeSpec({
         context("Redis 타임아웃 시") {
             it("대기열 조회 시 타임아웃 예외가 발생해야 한다") {
                 // given
-                every { listOperations.size(any()) } throws 
+                every { zSetOperations.zCard(any()) } throws 
                     QueryTimeoutException("Redis query timeout")
                 
                 // when & then
@@ -142,7 +140,8 @@ class RedisTokenStoreFailureTest : DescribeSpec({
         context("Redis 명령어 실행 실패 시") {
             it("LIST 명령어 실패 시 예외가 발생해야 한다") {
                 // given
-                every { listOperations.rightPush(any(), any()) } throws RuntimeException("LIST 명령어 실행 실패")
+                every { valueOperations.increment(any()) } returns 1L
+                every { zSetOperations.add(any(), any(), any()) } throws RuntimeException("ZADD 명령어 실행 실패")
                 
                 // when & then
                 shouldThrow<RuntimeException> {
@@ -152,7 +151,7 @@ class RedisTokenStoreFailureTest : DescribeSpec({
             
             it("LPOP 명령어 실패 시 예외가 발생해야 한다") {
                 // given
-                every { listOperations.leftPop(any()) } throws RuntimeException("LPOP 명령어 실행 실패")
+                every { zSetOperations.range(any(), any(), any()) } throws RuntimeException("ZRANGE 명령어 실행 실패")
                 
                 // when & then
                 shouldThrow<RuntimeException> {
@@ -164,20 +163,18 @@ class RedisTokenStoreFailureTest : DescribeSpec({
         context("부분적 Redis 실패 시") {
             it("일부 작업은 성공하고 일부는 실패할 수 있어야 한다") {
                 // given
-                var callCount = 0
-                every { listOperations.leftPop("waiting_queue") } answers {
-                    when (callCount++) {
-                        0 -> "token1"  // 첫 번째는 성공
-                        else -> null    // 나머지는 null (빈 큐)
-                    }
-                }
+                val tokens = mutableSetOf("token1", "token2", "token3")
+                every { zSetOperations.range(any(), any(), any()) } returns tokens
+                every { zSetOperations.remove(any(), any()) } returns 1L
                 
                 // when
                 val result = redisTokenStore.getNextTokensFromQueue(3)
                 
-                // then - 첫 번째 토큰만 성공적으로 가져와야 함
-                result.size shouldBe 1
-                result[0] shouldBe "token1"
+                // then - 모든 토큰을 성공적으로 가져와야 함
+                result.size shouldBe 3
+                result shouldContain "token1"
+                result shouldContain "token2"
+                result shouldContain "token3"
             }
         }
         

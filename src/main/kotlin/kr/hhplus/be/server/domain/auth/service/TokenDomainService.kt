@@ -61,6 +61,7 @@ class TokenDomainService {
             TokenStatus.WAITING -> "대기 중입니다"
             TokenStatus.ACTIVE -> "서비스 이용 가능합니다"
             TokenStatus.EXPIRED -> "토큰이 만료되었습니다"
+            TokenStatus.USED -> "토큰이 사용되었습니다"
         }
     }
 
@@ -70,6 +71,7 @@ class TokenDomainService {
             TokenStatus.WAITING -> "대기 중입니다"
             TokenStatus.ACTIVE -> "서비스 이용 가능합니다"
             TokenStatus.EXPIRED -> "토큰이 만료되었습니다"
+            TokenStatus.USED -> "토큰이 사용되었습니다"
         }
     }
 }

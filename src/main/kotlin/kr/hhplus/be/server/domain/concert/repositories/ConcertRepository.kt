@@ -9,4 +9,5 @@ interface ConcertRepository {
     fun findAll(): List<Concert>
     fun delete(concert: Concert)
     fun deleteAll() // 테스트용 - 모든 콘서트 데이터 삭제
+    fun flush() // 추가
 }

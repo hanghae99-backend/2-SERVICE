@@ -15,7 +15,7 @@ import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.global.event.DomainEventPublisher
-import kr.hhplus.be.server.domain.balance.exception.InvalidPointAmountException
+import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
 import kr.hhplus.be.server.domain.balance.exception.InsufficientBalanceException
 import kr.hhplus.be.server.domain.balance.exception.PointNotFoundException
 import java.math.BigDecimal
@@ -41,10 +41,10 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val expectedFinalAmount = BigDecimal("5000")
                 
                 val expectedResultPoint = Point.create(userId, BigDecimal("5000"))
-                val useType = PointHistoryType("USE", "사용", "포인트 사용", true, LocalDateTime.now())
+                val useType = PointHistoryType("USE", "사용", "포인트 사용")
                 val history = PointHistory.use(userId, deductAmount, useType, "포인트 사용")
                 
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns Point.create(userId, BigDecimal("10000"))
+                every { pointRepository.findByUserId(userId) } returns Point.create(userId, BigDecimal("10000"))
                 every { pointRepository.save(any()) } returns expectedResultPoint
                 every { pointHistoryTypeRepository.getUseType() } returns useType
                 every { pointHistoryRepository.save(any()) } returns history
@@ -72,10 +72,10 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val negativeAmount = BigDecimal("-1000")
                 val currentPoint = Point.create(userId, BigDecimal("10000"))
                 
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns currentPoint
+                every { pointRepository.findByUserId(userId) } returns currentPoint
                 
                 // when & then
-                shouldThrow<InvalidPointAmountException> {
+                shouldThrow<IllegalArgumentException> {
                     deductBalanceUseCase.execute(userId, negativeAmount)
                 }
             }
@@ -96,7 +96,7 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val userId = 1L
                 val deductAmount = BigDecimal("5000")
                 
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns null
+                every { pointRepository.findByUserId(userId) } returns null
                 
                 // when & then
                 shouldThrow<PointNotFoundException> {
@@ -120,7 +120,7 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val deductAmount = BigDecimal("15000")
                 val currentPoint = Point.create(userId, BigDecimal("10000"))
                 
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns currentPoint
+                every { pointRepository.findByUserId(userId) } returns currentPoint
                 
                 // when & then
                 shouldThrow<InsufficientBalanceException> {
@@ -144,10 +144,10 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val invalidAmount = BigDecimal.ZERO
                 val currentPoint = Point.create(userId, BigDecimal("10000"))
                 
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns currentPoint
+                every { pointRepository.findByUserId(userId) } returns currentPoint
                 
                 // when & then
-                shouldThrow<InvalidPointAmountException> {
+                shouldThrow<IllegalArgumentException> {
                     deductBalanceUseCase.execute(userId, invalidAmount)
                 }
             }

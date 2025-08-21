@@ -1,0 +1,33 @@
+# 테스트 환경 전용 - Redisson 완전 제외
+spring:
+  main:
+    allow-bean-definition-overriding: true
+    
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+    
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: true
+    
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 5000ms
+
+# Redisson 완전 비활성화
+redisson:
+  enabled: false
+
+logging:
+  level:
+    org.redisson: OFF
+    kr.hhplus.be.server: DEBUG

@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.api.reservation.dto
 
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.user.model.User
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.domain.concert.models.Concert
 import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.concert.models.Seat

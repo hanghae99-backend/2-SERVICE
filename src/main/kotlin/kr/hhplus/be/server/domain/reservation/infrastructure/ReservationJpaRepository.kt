@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.domain.reservation.infrastructure
 
-import kr.hhplus.be.server.domain.reservation.model.Reservation
+import kr.hhplus.be.server.domain.reservation.models.Reservation
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
@@ -35,13 +35,16 @@ interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
     // 만료된 예약 조회
     fun findByExpiresAtBeforeAndStatusCode(currentTime: LocalDateTime, statusCode: String): List<Reservation>
     
-    // 상태별 조회 (페이징)
+    // 상태별 조회
+    fun findByStatusCodeInOrderByReservedAtDesc(statusCodes: List<String>): List<Reservation>
     fun findByStatusCodeInOrderByReservedAtDesc(statusCodes: List<String>, pageable: Pageable): Page<Reservation>
     
-    // 사용자 + 상태별 조회 (페이징)
+    // 사용자 + 상태별 조회
+    fun findByUserIdAndStatusCodeInOrderByReservedAtDesc(userId: Long, statusCodes: List<String>): List<Reservation>
     fun findByUserIdAndStatusCodeInOrderByReservedAtDesc(userId: Long, statusCodes: List<String>, pageable: Pageable): Page<Reservation>
     
-    // 콘서트 + 상태별 조회 (페이징)
+    // 콘서트 + 상태별 조회
+    fun findByConcertIdAndStatusCodeInOrderByReservedAtDesc(concertId: Long, statusCodes: List<String>): List<Reservation>
     fun findByConcertIdAndStatusCodeInOrderByReservedAtDesc(concertId: Long, statusCodes: List<String>, pageable: Pageable): Page<Reservation>
     
     // 기간별 조회 (통계용)

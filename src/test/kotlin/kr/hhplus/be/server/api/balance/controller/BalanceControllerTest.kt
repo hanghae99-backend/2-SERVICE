@@ -13,7 +13,7 @@ import kr.hhplus.be.server.domain.balance.service.BalanceService
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistory
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
-import kr.hhplus.be.server.domain.balance.exception.InvalidPointAmountException
+import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
 import kr.hhplus.be.server.global.exception.GlobalExceptionHandler
 import kr.hhplus.be.server.domain.user.exception.UserNotFoundException
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -92,8 +92,7 @@ class BalanceControllerTest : DescribeSpec({
                 val amount = BigDecimal("500") // 최소 금액 미만
                 val request = ChargeBalanceRequest(userId, amount)
                 
-                every { chargeBalanceUseCase.execute(userId, amount) } throws 
-                    InvalidPointAmountException("최소 충전 금액은 1000원입니다: $amount")
+                // 유효성 검사로 인해 UseCase가 호출되지 않으므로 mock 설정 불필요
                 
                 // when & then
                 mockMvc.perform(
@@ -103,7 +102,7 @@ class BalanceControllerTest : DescribeSpec({
                 )
                     .andExpect(status().isBadRequest)
                 
-                verify { chargeBalanceUseCase.execute(userId, amount) }
+                // UseCase가 호출되지 않으므로 verify 제거
             }
         }
     }
@@ -152,11 +151,11 @@ class BalanceControllerTest : DescribeSpec({
             it("포인트 이력을 반환하고 200 상태코드를 반환해야 한다") {
                 // given
                 val userId = 1L
-                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
-                val useType = PointHistoryType("USE", "사용", "포인트 사용", true, LocalDateTime.now())
+                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전")
+                val useType = PointHistoryType("USE", "사용", "포인트 사용")
                 val histories = listOf(
-                    PointHistory.charge(userId, BigDecimal("10000"), chargeType, "포인트 충전"),
-                    PointHistory.use(userId, BigDecimal("5000"), useType, "포인트 사용")
+                    PointHistory.charge(userId, BigDecimal("10000"), chargeType, "포인트 충전", BigDecimal("15000")),
+                    PointHistory.use(userId, BigDecimal("5000"), useType, "포인트 사용", BigDecimal("10000"))
                 )
                 
                 every { balanceService.getPointHistory(userId) } returns histories

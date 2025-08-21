@@ -1,324 +1,360 @@
 package kr.hhplus.be.server.global.exception
 
-import kr.hhplus.be.server.domain.auth.exception.InvalidTokenException
-import kr.hhplus.be.server.domain.auth.exception.QueueFullException
-import kr.hhplus.be.server.domain.auth.exception.TokenExpiredException
-import kr.hhplus.be.server.domain.auth.exception.TokenIssuanceException
-import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
-import kr.hhplus.be.server.domain.balance.exception.InsufficientBalanceException
-import kr.hhplus.be.server.domain.balance.exception.InvalidPointAmountException
-import kr.hhplus.be.server.domain.balance.exception.PointNotFoundException
-import kr.hhplus.be.server.domain.concert.exception.ConcertNotFoundException
-import kr.hhplus.be.server.domain.concert.exception.ConcertScheduleNotFoundException
-import kr.hhplus.be.server.domain.concert.exception.InvalidSeatStatusException
-import kr.hhplus.be.server.domain.concert.exception.SeatAlreadyReservedException
-import kr.hhplus.be.server.domain.concert.exception.SeatNotFoundException
-import kr.hhplus.be.server.domain.payment.exception.PaymentAlreadyProcessedException
-import kr.hhplus.be.server.domain.payment.exception.PaymentNotFoundException
-import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
-import kr.hhplus.be.server.domain.reservation.exception.InvalidReservationStatusException
-import kr.hhplus.be.server.domain.reservation.exception.ReservationAlreadyCancelledException
-import kr.hhplus.be.server.domain.reservation.exception.ReservationExpiredException
-import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
-import kr.hhplus.be.server.domain.user.exception.UserAlreadyExistsException
-import kr.hhplus.be.server.domain.user.exception.UserNotFoundException
+import kr.hhplus.be.server.domain.common.DomainExceptionFactory
 import kr.hhplus.be.server.global.lock.ConcurrentAccessException
 import kr.hhplus.be.server.global.response.CommonApiResponse
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
-import org.springframework.http.converter.HttpMessageNotReadableException
-import org.springframework.web.HttpMediaTypeNotSupportedException
-import org.springframework.web.bind.MissingServletRequestParameterException
+import org.springframework.web.context.request.RequestContextHolder
+import org.springframework.web.context.request.ServletRequestAttributes
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import jakarta.validation.ConstraintViolationException
-import com.fasterxml.jackson.core.JsonParseException
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.OptimisticLockingFailureException
+import org.springframework.web.HttpRequestMethodNotSupportedException
+import org.springframework.web.servlet.NoHandlerFoundException
+import org.springframework.data.redis.RedisConnectionFailureException
 import java.time.LocalDateTime
+import java.util.concurrent.TimeoutException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
-    // ===== Validation 관련 예외 처리 =====
-
-    @ExceptionHandler(MethodArgumentNotValidException::class)
-    fun handleMethodArgumentNotValid(ex: MethodArgumentNotValidException): ResponseEntity<CommonApiResponse<Any>> {
-        val errorMessage = ex.bindingResult.fieldErrors.joinToString(", ") { it.defaultMessage ?: "잘못된 값입니다" }
-        return createCommonErrorResponse(
-            errorMessage,
-            CommonErrorCode.BadRequest.code,
-            CommonErrorCode.BadRequest.httpStatus
-        )
+    companion object {
+        private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
+        
+        // 에러 코드 체계
+        private const val BUSINESS_PREFIX = "BIZ"
+        private const val VALIDATION_PREFIX = "VAL"
+        private const val SYSTEM_PREFIX = "SYS"
+        private const val INFRASTRUCTURE_PREFIX = "INF"
+        private const val SECURITY_PREFIX = "SEC"
     }
 
-    @ExceptionHandler(ParameterValidationException::class)
-    fun handleParameterValidationException(ex: ParameterValidationException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(ex.message ?: "파라미터 검증 오류가 발생했습니다", ex.errorCode, ex.status)
+    // === 비즈니스 예외 처리 ===
+    @ExceptionHandler(BusinessException::class)
+    fun handleBusinessException(e: BusinessException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 비즈니스 예외: {}", requestInfo, e.message, e)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "비즈니스 로직 오류가 발생했습니다",
+            errorCode = e.getFullErrorCode()
+        )
+        
+        return ResponseEntity.status(e.httpStatus).body(errorResponse)
+    }
+
+    // === 동시성 및 락 관련 예외 ===
+    @ExceptionHandler(ConcurrentAccessException::class)
+    fun handleConcurrentAccessException(e: ConcurrentAccessException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 동시 접근 예외: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "요청이 집중되어 처리할 수 없습니다. 잠시 후 다시 시도해주세요",
+            errorCode = "$SYSTEM_PREFIX.CONCURRENT_ACCESS"
+        )
+        
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse)
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException::class)
+    fun handleOptimisticLockingFailureException(e: OptimisticLockingFailureException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 낙관적 락 충돌: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "데이터가 다른 사용자에 의해 수정되었습니다. 새로고침 후 다시 시도해주세요",
+            errorCode = "$SYSTEM_PREFIX.OPTIMISTIC_LOCK_FAILURE"
+        )
+        
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse)
+    }
+
+    @ExceptionHandler(TimeoutException::class)
+    fun handleTimeoutException(e: TimeoutException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 타임아웃 예외: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "처리 시간이 초과되었습니다. 잠시 후 다시 시도해주세요",
+            errorCode = "$SYSTEM_PREFIX.TIMEOUT"
+        )
+        
+        return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).body(errorResponse)
+    }
+
+    // === 데이터 검증 관련 예외 ===
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleValidationException(e: MethodArgumentNotValidException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        val fieldErrors = e.bindingResult.fieldErrors
+        
+        logger.warn("[{}] 유효성 검사 실패: {}", requestInfo, 
+            fieldErrors.joinToString(", ") { "${it.field}: ${it.defaultMessage}" })
+        
+        val errorMessage = fieldErrors.firstOrNull()?.defaultMessage 
+            ?: "유효하지 않은 요청 데이터입니다"
+        
+        val errorDetails = fieldErrors.associate { it.field to (it.defaultMessage ?: "유효하지 않은 값") }
+        logger.debug("검증 오류 상세: {}", errorDetails)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = errorMessage,
+            errorCode = "$VALIDATION_PREFIX.INVALID_INPUT"
+        )
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse)
     }
 
     @ExceptionHandler(ConstraintViolationException::class)
-    fun handleConstraintViolationException(ex: ConstraintViolationException): ResponseEntity<CommonApiResponse<Any>> {
-        val errorMessage = ex.constraintViolations.joinToString(", ") { it.message }
-        return createCommonErrorResponse(
-            errorMessage,
-            CommonErrorCode.BadRequest.code,
-            CommonErrorCode.BadRequest.httpStatus
+    fun handleConstraintViolationException(e: ConstraintViolationException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 제약 조건 위반: {}", requestInfo, e.message)
+        
+        val errorMessage = e.constraintViolations.firstOrNull()?.message 
+            ?: "제약 조건 위반"
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = errorMessage,
+            errorCode = "$VALIDATION_PREFIX.CONSTRAINT_VIOLATION"
         )
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse)
     }
 
-    // ===== HTTP 관련 예외 처리 =====
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleTypeMismatchException(e: MethodArgumentTypeMismatchException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 타입 불일치: {} = {} (expected: {})", 
+            requestInfo, e.name, e.value, e.requiredType?.simpleName)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "올바른 형식의 값을 입력해주세요: ${e.name}",
+            errorCode = "$VALIDATION_PREFIX.TYPE_MISMATCH"
+        )
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse)
+    }
 
-    @ExceptionHandler(HttpMessageNotReadableException::class)
-    fun handleHttpMessageNotReadable(ex: HttpMessageNotReadableException): ResponseEntity<CommonApiResponse<Any>> {
+    // === 데이터베이스 관련 예외 ===
+    @ExceptionHandler(DataIntegrityViolationException::class)
+    fun handleDataIntegrityViolationException(e: DataIntegrityViolationException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.error("[{}] 데이터 무결성 위반: {}", requestInfo, e.message, e)
+        
         val message = when {
-            ex.cause is JsonParseException -> "잘못된 JSON 형식입니다"
-            ex.message?.contains("Required request body is missing") == true -> "요청 본문이 필요합니다"
-            else -> "요청 형식이 올바르지 않습니다"
+            e.message?.contains("unique", ignoreCase = true) == true -> "이미 존재하는 데이터입니다"
+            e.message?.contains("foreign key", ignoreCase = true) == true -> "참조 무결성 위반입니다"
+            e.message?.contains("not null", ignoreCase = true) == true -> "필수 값이 누락되었습니다"
+            else -> "데이터 처리 중 오류가 발생했습니다"
         }
-        return createCommonErrorResponse(
-            message,
-            CommonErrorCode.BadRequest.code,
-            CommonErrorCode.BadRequest.httpStatus
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = message,
+            errorCode = "$INFRASTRUCTURE_PREFIX.DATA_INTEGRITY_VIOLATION"
         )
+        
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse)
     }
 
-    @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
-    fun handleHttpMediaTypeNotSupported(ex: HttpMediaTypeNotSupportedException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(
-            "지원하지 않는 미디어 타입입니다: ${ex.contentType}",
-            "UNSUPPORTED_MEDIA_TYPE",
-            HttpStatus.UNSUPPORTED_MEDIA_TYPE
+    // === 인프라스트럭처 관련 예외 ===
+    @ExceptionHandler(RedisConnectionFailureException::class)
+    fun handleRedisConnectionFailureException(e: RedisConnectionFailureException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.error("[{}] Redis 연결 실패: {}", requestInfo, e.message, e)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "캐시 서비스 연결에 실패했습니다. 잠시 후 다시 시도해주세요",
+            errorCode = "$INFRASTRUCTURE_PREFIX.REDIS_CONNECTION_FAILURE"
         )
+        
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse)
     }
 
-    @ExceptionHandler(MissingServletRequestParameterException::class)
-    fun handleMissingServletRequestParameter(ex: MissingServletRequestParameterException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(
-            "필수 파라미터가 누락되었습니다: ${ex.parameterName}",
-            CommonErrorCode.BadRequest.code,
-            CommonErrorCode.BadRequest.httpStatus
+    // === HTTP 관련 예외 ===
+    @ExceptionHandler(HttpRequestMethodNotSupportedException::class)
+    fun handleMethodNotSupportedException(e: HttpRequestMethodNotSupportedException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 지원하지 않는 HTTP 메서드: {}", requestInfo, e.method)
+        
+        val supportedMethods = e.supportedHttpMethods?.joinToString(", ") ?: "알 수 없음"
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "지원하지 않는 HTTP 메서드입니다. 지원되는 메서드: $supportedMethods",
+            errorCode = "$VALIDATION_PREFIX.METHOD_NOT_SUPPORTED"
         )
+        
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(errorResponse)
     }
 
-    // ===== 도메인별 예외 처리 =====
-
-    @ExceptionHandler(
-        ConcertNotFoundException::class,
-        SeatNotFoundException::class,
-        ConcertScheduleNotFoundException::class
-    )
-    fun handleNotFoundExceptions(ex: RuntimeException): ResponseEntity<CommonApiResponse<Any>> {
-        val (errorCode, status) = when (ex) {
-            is ConcertNotFoundException -> ex.errorCode to ex.status
-            is SeatNotFoundException -> ex.errorCode to ex.status
-            is ConcertScheduleNotFoundException -> ex.errorCode to ex.status
-            else -> "RESOURCE_NOT_FOUND" to HttpStatus.NOT_FOUND
-        }
-
-        return createCommonErrorResponse(ex.message ?: "리소스를 찾을 수 없습니다", errorCode, status)
-    }
-
-    @ExceptionHandler(
-        InvalidSeatStatusException::class,
-        SeatAlreadyReservedException::class
-    )
-    fun handleConcertBusinessExceptions(ex: RuntimeException): ResponseEntity<CommonApiResponse<Any>> {
-        val (errorCode, status) = when (ex) {
-            is InvalidSeatStatusException -> ex.errorCode to ex.status
-            is SeatAlreadyReservedException -> ex.errorCode to ex.status
-            else -> CommonErrorCode.BadRequest.code to CommonErrorCode.BadRequest.httpStatus
-        }
-
-        return createCommonErrorResponse(ex.message ?: "비즈니스 규칙을 위반했습니다", errorCode, status)
-    }
-
-    @ExceptionHandler(
-        InsufficientBalanceException::class,
-        InvalidPointAmountException::class
-    )
-    fun handleBalanceExceptions(ex: RuntimeException): ResponseEntity<CommonApiResponse<Any>> {
-        val (errorCode, status) = when (ex) {
-            is InsufficientBalanceException -> ex.errorCode to ex.status
-            is InvalidPointAmountException -> ex.errorCode to ex.status
-            else -> CommonErrorCode.BadRequest.code to CommonErrorCode.BadRequest.httpStatus
-        }
-
-        return createCommonErrorResponse(ex.message ?: "잔액 관련 오류가 발생했습니다", errorCode, status)
-    }
-
-    @ExceptionHandler(PointNotFoundException::class)
-    fun handlePointNotFoundException(ex: PointNotFoundException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(ex.message ?: "포인트 정보를 찾을 수 없습니다", ex.errorCode, ex.status)
-    }
-
-    @ExceptionHandler(PaymentNotFoundException::class)
-    fun handlePaymentNotFoundException(ex: PaymentNotFoundException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(ex.message ?: "결제 정보를 찾을 수 없습니다", ex.errorCode, ex.status)
-    }
-
-    @ExceptionHandler(
-        PaymentAlreadyProcessedException::class,
-        PaymentProcessException::class
-    )
-    fun handlePaymentExceptions(ex: RuntimeException): ResponseEntity<CommonApiResponse<Any>> {
-        val (errorCode, status) = when (ex) {
-            is PaymentAlreadyProcessedException -> ex.errorCode to ex.status
-            is PaymentProcessException -> ex.errorCode to ex.status
-            else -> CommonErrorCode.BadRequest.code to CommonErrorCode.BadRequest.httpStatus
-        }
-
-        return createCommonErrorResponse(ex.message ?: "결제 관련 오류가 발생했습니다", errorCode, status)
-    }
-
-    @ExceptionHandler(ReservationNotFoundException::class)
-    fun handleReservationNotFoundException(ex: ReservationNotFoundException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(ex.message ?: "예약 정보를 찾을 수 없습니다", ex.errorCode, ex.status)
-    }
-
-    @ExceptionHandler(ReservationExpiredException::class)
-    fun handleReservationExpiredException(ex: ReservationExpiredException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(ex.message ?: "예약이 만료되었습니다", ex.errorCode, ex.status)
-    }
-
-    @ExceptionHandler(
-        InvalidReservationStatusException::class,
-        ReservationAlreadyCancelledException::class
-    )
-    fun handleReservationBusinessExceptions(ex: RuntimeException): ResponseEntity<CommonApiResponse<Any>> {
-        val (errorCode, status) = when (ex) {
-            is InvalidReservationStatusException -> ex.errorCode to ex.status
-            is ReservationAlreadyCancelledException -> ex.errorCode to ex.status
-            else -> CommonErrorCode.BadRequest.code to CommonErrorCode.BadRequest.httpStatus
-        }
-
-        return createCommonErrorResponse(ex.message ?: "예약 관련 오류가 발생했습니다", errorCode, status)
-    }
-
-    @ExceptionHandler(UserNotFoundException::class)
-    fun handleUserNotFoundException(ex: UserNotFoundException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(ex.message ?: "사용자를 찾을 수 없습니다", ex.errorCode, ex.status)
-    }
-
-    @ExceptionHandler(UserAlreadyExistsException::class)
-    fun handleUserAlreadyExistsException(ex: UserAlreadyExistsException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(ex.message ?: "이미 존재하는 사용자입니다", ex.errorCode, ex.status)
-    }
-
-    // 분산락 실패: 동시 접근으로 인한 충돌
-    @ExceptionHandler(ConcurrentAccessException::class)
-    fun handleConcurrentAccessException(ex: ConcurrentAccessException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(
-            ex.message ?: "동시 접근으로 인한 처리 실패입니다. 잠시 후 다시 시도해주세요.",
-            "CONCURRENT_ACCESS_DENIED",
-            HttpStatus.CONFLICT
+    @ExceptionHandler(NoHandlerFoundException::class)
+    fun handleNoHandlerFoundException(e: NoHandlerFoundException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 핸들러를 찾을 수 없음: {}", requestInfo, e.requestURL)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "요청한 리소스를 찾을 수 없습니다: ${e.requestURL}",
+            errorCode = "$VALIDATION_PREFIX.RESOURCE_NOT_FOUND"
         )
+        
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse)
     }
 
-    @ExceptionHandler(
-        TokenNotFoundException::class,
-        TokenExpiredException::class,
-        InvalidTokenException::class
-    )
-    fun handleAuthExceptions(ex: RuntimeException): ResponseEntity<CommonApiResponse<Any>> {
-        val (errorCode, status) = when (ex) {
-            is TokenNotFoundException -> ex.errorCode to ex.status
-            is TokenExpiredException -> ex.errorCode to ex.status
-            is InvalidTokenException -> ex.errorCode to ex.status
-            else -> "AUTH_ERROR" to HttpStatus.UNAUTHORIZED
-        }
-
-        return createCommonErrorResponse(ex.message ?: "인증 관련 오류가 발생했습니다", errorCode, status)
-    }
-
-    @ExceptionHandler(TokenIssuanceException::class)
-    fun handleTokenIssuanceException(ex: TokenIssuanceException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(ex.message ?: "토큰 발급에 실패했습니다", ex.errorCode, ex.status)
-    }
-
-    @ExceptionHandler(QueueFullException::class)
-    fun handleQueueFullException(ex: QueueFullException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(ex.message ?: "대기열이 가득 찼습니다", ex.errorCode, ex.status)
-    }
-
-    // ===== 일반적인 예외 처리 =====
-
-    // 비즈니스 상태 충돌: 이미 예약된 좌석 등
-    @ExceptionHandler(IllegalStateException::class)
-    fun handleIllegalStateException(ex: IllegalStateException): ResponseEntity<CommonApiResponse<Any>> {
-        // 이미 예약된 좌석의 경우 409 Conflict 반환
-        val status = if (ex.message?.contains("이미 예약된") == true) {
-            HttpStatus.CONFLICT
-        } else {
-            HttpStatus.BAD_REQUEST
-        }
-
-        return createCommonErrorResponse(
-            ex.message ?: "잘못된 상태입니다",
-            if (status == HttpStatus.CONFLICT) "ALREADY_RESERVED" else CommonErrorCode.BadRequest.code,
-            status
+    // === 도메인 특정 예외 ===
+    @ExceptionHandler(kr.hhplus.be.server.domain.user.exception.UserNotFoundException::class)
+    fun handleUserNotFoundException(e: kr.hhplus.be.server.domain.user.exception.UserNotFoundException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 사용자 없음: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "사용자를 찾을 수 없습니다",
+            errorCode = e.errorCode
         )
+        
+        return ResponseEntity.status(e.status).body(errorResponse)
     }
 
-    // 권한 및 매개변수 검증 예외
+    @ExceptionHandler(kr.hhplus.be.server.domain.user.exception.UserAlreadyExistsException::class)
+    fun handleUserAlreadyExistsException(e: kr.hhplus.be.server.domain.user.exception.UserAlreadyExistsException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 사용자 이미 존재: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "이미 존재하는 사용자입니다",
+            errorCode = e.errorCode
+        )
+        
+        return ResponseEntity.status(e.status).body(errorResponse)
+    }
+
+    @ExceptionHandler(kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException::class)
+    fun handleTokenNotFoundException(e: kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 토큰 없음: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message,
+            errorCode = e.errorCode
+        )
+        
+        return ResponseEntity.status(e.status).body(errorResponse)
+    }
+
+    // === 보안 관련 예외 ===
+    @ExceptionHandler(AccessDeniedException::class)
+    fun handleAccessDeniedException(e: AccessDeniedException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 접근 권한 없음: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "접근 권한이 없습니다",
+            errorCode = "$SECURITY_PREFIX.ACCESS_DENIED"
+        )
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse)
+    }
+
+    // === 일반적인 예외 처리 ===
     @ExceptionHandler(IllegalArgumentException::class)
-    fun handleIllegalArgumentException(ex: IllegalArgumentException): ResponseEntity<CommonApiResponse<Any>> {
-        // 권한 관련 에러의 경우 403 Forbidden 반환
-        val status = if (ex.message?.contains("소유자가 아닙니다") == true ||
-            ex.message?.contains("권한이 없습니다") == true ||
-            ex.message?.contains("예약 소유자가 아닙니다") == true) {
-            HttpStatus.FORBIDDEN
-        } else {
-            HttpStatus.BAD_REQUEST
-        }
-
-        return createCommonErrorResponse(
-            ex.message ?: "잘못된 요청입니다",
-            if (status == HttpStatus.FORBIDDEN) "ACCESS_DENIED" else CommonErrorCode.BadRequest.code,
-            status
+    fun handleIllegalArgumentException(e: IllegalArgumentException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 잘못된 인수: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "잘못된 요청 파라미터입니다",
+            errorCode = "$VALIDATION_PREFIX.INVALID_ARGUMENT"
         )
+        
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse)
+    }
+
+    @ExceptionHandler(IllegalStateException::class)
+    fun handleIllegalStateException(e: IllegalStateException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 잘못된 상태: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "현재 상태에서는 해당 작업을 수행할 수 없습니다",
+            errorCode = "$SYSTEM_PREFIX.INVALID_STATE"
+        )
+        
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse)
     }
 
     @ExceptionHandler(RuntimeException::class)
-    fun handleRuntimeException(ex: RuntimeException): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(
-            ex.message ?: "런타임 오류가 발생했습니다",
-            CommonErrorCode.RuntimeError.code,
-            CommonErrorCode.RuntimeError.httpStatus
+    fun handleRuntimeException(e: RuntimeException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        val errorId = generateErrorId()
+        logger.error("[{}] 런타임 예외 [ErrorID: {}]: {}", requestInfo, errorId, e.message, e)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "처리 중 오류가 발생했습니다. 에러 ID: $errorId",
+            errorCode = "$SYSTEM_PREFIX.RUNTIME_ERROR"
         )
+        
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse)
     }
 
     @ExceptionHandler(Exception::class)
-    fun handleGenericException(ex: Exception): ResponseEntity<CommonApiResponse<Any>> {
-        return createCommonErrorResponse(
-            "서버 내부 오류가 발생했습니다",
-            CommonErrorCode.InternalServerError.code,
-            CommonErrorCode.InternalServerError.httpStatus
+    fun handleGeneralException(e: Exception): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        val errorId = generateErrorId()
+        logger.error("[{}] 예상치 못한 예외 [ErrorID: {}]: {}", requestInfo, errorId, e.message, e)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = "서버 내부 오류가 발생했습니다. 에러 ID: $errorId",
+            errorCode = "$SYSTEM_PREFIX.INTERNAL_ERROR"
         )
+        
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse)
     }
 
-    // ===== 헬퍼 메서드 =====
-
-    private fun createCommonErrorResponse(
-        message: String,
-        errorCode: String,
-        status: HttpStatus
-    ): ResponseEntity<CommonApiResponse<Any>> {
-        val response = CommonApiResponse.error<Any>(message, errorCode)
-        return ResponseEntity.status(status).body(response)
+    // === 유틸리티 메서드 ===
+    private fun getCurrentRequestInfo(): String {
+        return try {
+            val request = (RequestContextHolder.currentRequestAttributes() as ServletRequestAttributes).request
+            val userAgent = request.getHeader("User-Agent")?.take(50) ?: "unknown"
+            val clientIp = getClientIpAddress(request)
+            "${request.method} ${request.requestURI} [IP: $clientIp] [UA: $userAgent]"
+        } catch (e: Exception) {
+            "UNKNOWN REQUEST"
+        }
     }
-
-    private fun createErrorResponse(
-        message: String,
-        errorCode: String,
-        status: HttpStatus
-    ): ResponseEntity<ErrorResponse> {
-        val errorResponse = ErrorResponse(
-            timestamp = LocalDateTime.now(),
-            status = status.value(),
-            error = errorCode,
-            message = message,
-            path = "" // 필요시 HttpServletRequest에서 path 추출 가능
+    
+    private fun getClientIpAddress(request: jakarta.servlet.http.HttpServletRequest): String {
+        val headers = listOf(
+            "X-Forwarded-For",
+            "X-Real-IP", 
+            "Proxy-Client-IP",
+            "WL-Proxy-Client-IP",
+            "HTTP_X_FORWARDED_FOR",
+            "HTTP_X_FORWARDED",
+            "HTTP_X_CLUSTER_CLIENT_IP",
+            "HTTP_CLIENT_IP",
+            "HTTP_FORWARDED_FOR",
+            "HTTP_FORWARDED",
+            "HTTP_VIA",
+            "REMOTE_ADDR"
         )
-        return ResponseEntity.status(status).body(errorResponse)
+        
+        for (header in headers) {
+            val ip = request.getHeader(header)
+            if (!ip.isNullOrBlank() && !ip.equals("unknown", ignoreCase = true)) {
+                return ip.split(",")[0].trim()
+            }
+        }
+        
+        return request.remoteAddr ?: "unknown"
+    }
+    
+    private fun generateErrorId(): String {
+        return System.currentTimeMillis().toString(36).uppercase() + 
+               (1000..9999).random().toString()
     }
 }

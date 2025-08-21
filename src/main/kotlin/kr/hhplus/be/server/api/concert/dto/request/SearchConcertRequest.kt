@@ -22,8 +22,15 @@ data class SearchConcertRequest(
     @Schema(description = "아티스트 필터", example = "아이유")
     val artist: String? = null,
     
+    @Schema(description = "장르 필터", example = "POP")
+    val genre: String? = null,
+    
     @Schema(description = "예약 가능한 콘서트만 조회", example = "true")
-    val availableOnly: Boolean = false
+    val availableOnly: Boolean = false,
+    
+    @Min(1) @Max(100)
+    @Schema(description = "조회할 개수", example = "20")
+    val limit: Int = 20
 ) {
     init {
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {

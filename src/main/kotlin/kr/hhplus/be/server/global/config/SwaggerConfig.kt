@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 class SwaggerConfig {
-    
+
     @Bean
     fun openAPI(): OpenAPI {
         return OpenAPI()
@@ -32,14 +32,6 @@ class SwaggerConfig {
         return GroupedOpenApi.builder()
             .group("web-api")
             .pathsToMatch("/api/**")
-            .build()
-    }
-
-    @Bean
-    fun mockApi(): GroupedOpenApi {
-        return GroupedOpenApi.builder()
-            .group("mock-api")
-            .pathsToMatch("/mock/**")
             .build()
     }
 }

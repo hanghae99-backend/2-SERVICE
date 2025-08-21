@@ -173,7 +173,7 @@ class TokenLifecycleManagerTest : DescribeSpec({
                 val token = "complete-token"
                 
                 every { tokenStore.expireToken(token) } just Runs
-                every { queueManager.processQueueAutomatically() } just Runs
+                every { queueManager.processQueueAutomatically() } returns 2
                 
                 // when
                 tokenLifecycleManager.completeToken(token)

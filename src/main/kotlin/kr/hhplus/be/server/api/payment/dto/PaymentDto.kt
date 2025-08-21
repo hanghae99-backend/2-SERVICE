@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.api.payment.dto
 
 import kr.hhplus.be.server.domain.payment.models.Payment
-import kr.hhplus.be.server.domain.reservation.model.Reservation
+import kr.hhplus.be.server.domain.reservation.models.Reservation
 import java.math.BigDecimal
 import java.time.LocalDateTime
 

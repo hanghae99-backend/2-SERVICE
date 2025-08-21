@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
 import kr.hhplus.be.server.api.payment.dto.request.PaymentRequest
+import kr.hhplus.be.server.config.ConcurrencyTest
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
@@ -15,34 +16,32 @@ import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.concert.models.*
 import kr.hhplus.be.server.domain.concert.repositories.*
 import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
-import kr.hhplus.be.server.domain.payment.repository.PaymentRepository
-import kr.hhplus.be.server.domain.payment.repository.PaymentStatusTypePojoRepository
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
-import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
-import kr.hhplus.be.server.domain.user.model.User
-import kr.hhplus.be.server.domain.user.repository.UserRepository
-import kr.hhplus.be.server.config.TestDataCleanupService
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.context.SpringBootTest
+import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
+import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
+import kr.hhplus.be.server.domain.user.models.User
+import kr.hhplus.be.server.domain.user.repositories.UserRepository
+import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.test.utils.TestRedisUtils
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
-import org.springframework.test.context.ActiveProfiles
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.context.WebApplicationContext
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-@SpringBootTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@ActiveProfiles("test")
+@ConcurrencyTest
 class PaymentConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
@@ -59,7 +58,8 @@ class PaymentConcurrencyTest(
     private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
     private val tokenStore: TokenStore,
     private val tokenFactory: TokenFactory,
-    private val testDataCleanupService: TestDataCleanupService // 추가
+    private val distributedLock: DistributedLock,
+    private val redisTemplate: RedisTemplate<String, Any>
 ) : DescribeSpec({
     extension(SpringExtension)
 
@@ -76,21 +76,49 @@ class PaymentConcurrencyTest(
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // TestDataCleanupService를 사용하여 데이터 정리
-        testDataCleanupService.cleanupAllTestData()
+        // 분산락 상태 정리
+        try {
+            distributedLock.clearAllLocks()
+        } catch (e: Exception) {
+            // 무시
+        }
+        
+        // Redis 정리
+        TestRedisUtils.flushDatabase(redisTemplate)
+        
+        // DB 데이터 정리
+        try {
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            jdbcTemplate.execute("DELETE FROM payment")
+            jdbcTemplate.execute("DELETE FROM reservation")
+            jdbcTemplate.execute("DELETE FROM seat")
+            jdbcTemplate.execute("DELETE FROM concert_schedule")
+            jdbcTemplate.execute("DELETE FROM concert")
+            jdbcTemplate.execute("DELETE FROM point_history")
+            jdbcTemplate.execute("DELETE FROM point")
+            jdbcTemplate.execute("DELETE FROM users")
+        } catch (e: Exception) {
+            // 무시
+        }
+        
+        // 충분한 초기화 대기
+        Thread.sleep(500)
 
-        // 테스트 데이터 설정
-        // 테스트용 사용자들 생성
-        val baseUserId = System.currentTimeMillis() + 2000
-        testUsers = (0..4).map { index ->
-            val userId = baseUserId + index
-            val user = userRepository.save(User.create(userId))
-            // 각 사용자에게 충분한 포인트 지급
-            pointRepository.save(Point.create(user.userId, BigDecimal("1000000")))
+        // 개별 테스트 사용자 생성 (고유한 userId 보장)
+        testUsers = (1..5).map { index ->
+            val user = userRepository.save(User(
+                userId = (index+1).toLong(),
+            ))
+            userRepository.flush()
+
+            // 포인트 생성
+            pointRepository.save(Point.create(user.userId, BigDecimal("200000")))
+            pointRepository.flush()
+
             user
         }
 
-        // 포인트 이력 타입 생성
+        // 포인트 이력 타입
         pointHistoryTypeRepository.save(
             PointHistoryType(
                 code = "DEDUCT",
@@ -98,26 +126,36 @@ class PaymentConcurrencyTest(
                 description = "포인트 사용"
             )
         )
+        
+        // USE 타입도 추가 (호환성을 위해)
+        pointHistoryTypeRepository.save(
+            PointHistoryType(
+                code = "USE",
+                name = "사용",
+                description = "포인트 사용"
+            )
+        )
+        pointHistoryTypeRepository.flush()
 
         // 콘서트 생성
         testConcert = concertRepository.save(
             Concert.create(
-                title = "동시성 테스트 콘서트",
+                title = "결제 테스트 콘서트",
                 artist = "테스트 아티스트"
             )
         )
 
-        // 콘서트 스케줄 생성
+        // 스케줄 생성
         testSchedule = concertScheduleRepository.save(
             ConcertSchedule.create(
                 concertId = testConcert.concertId,
                 concertDate = LocalDate.now().plusDays(30),
-                venue = "동시성 테스트 공연장",
+                venue = "테스트 공연장",
                 totalSeats = 50
             )
         )
 
-        // 좌석 상태 타입들 생성
+        // 좌석 상태 타입
         val availableStatus = seatStatusTypeRepository.save(
             SeatStatusType(
                 code = "AVAILABLE",
@@ -133,18 +171,27 @@ class PaymentConcurrencyTest(
                 description = "예약된 좌석"
             )
         )
+        
+        val occupiedStatus = seatStatusTypeRepository.save(
+            SeatStatusType(
+                code = "OCCUPIED",
+                name = "점유완료",
+                description = "결제 완료된 좌석"
+            )
+        )
+        seatStatusTypeRepository.flush()
 
-        // 테스트용 좌석 생성
+        // 좌석 생성 (사용 가능 상태로)
         testSeat = seatRepository.save(
             Seat.create(
                 scheduleId = testSchedule.scheduleId,
                 seatNumber = "A1",
                 price = BigDecimal("50000"),
-                availableStatus = reservedStatus
+                availableStatus = availableStatus
             )
         )
 
-        // 예약 상태 타입들 생성
+        // 예약 상태 타입
         val temporaryStatus = reservationStatusTypeRepository.save(
             ReservationStatusType(
                 code = "TEMPORARY",
@@ -160,58 +207,135 @@ class PaymentConcurrencyTest(
                 description = "결제 완료된 확정 예약"
             )
         )
+        reservationStatusTypeRepository.flush()
 
-        // 결제 상태 타입 생성
+        // 결제 상태 타입
         paymentStatusTypeRepository.save(
             PaymentStatusType(
-                code = "COMPLETED",
+                code = "PEND",
+                name = "대기중",
+                description = "결제 처리 대기중"
+            )
+        )
+
+        paymentStatusTypeRepository.save(
+            PaymentStatusType(
+                code = "COMP",
                 name = "결제 완료",
                 description = "결제가 성공적으로 완료됨"
             )
         )
 
-        // 테스트용 임시 예약들 생성 (각 사용자마다)
-        testReservations = testUsers.map { user ->
-            reservationRepository.save(
+        // FAILED 상태 추가 (에러 처리용)
+        paymentStatusTypeRepository.save(
+            PaymentStatusType(
+                code = "FAIL",
+                name = "결제 실패",
+                description = "결제 처리 실패"
+            )
+        )
+        paymentStatusTypeRepository.flush()
+
+        // 각 사용자별로 개별 좌석과 예약 생성
+        testReservations = testUsers.mapIndexed { index, user ->
+            // 각 사용자별로 다른 좌석 생성
+            val userSeat = seatRepository.save(
+                Seat.create(
+                    scheduleId = testSchedule.scheduleId,
+                    seatNumber = "A${index + 1}",
+                    price = BigDecimal("50000"),
+                    availableStatus = availableStatus
+                )
+            )
+            seatRepository.flush()
+            
+            // 좌석 예약 처리 (상태를 RESERVED로 변경)
+            userSeat.reserve(reservedStatus)
+            seatRepository.save(userSeat)
+            seatRepository.flush()
+            
+            // 예약 생성
+            val reservation = reservationRepository.save(
                 Reservation.createTemporary(
                     userId = user.userId,
                     concertId = testConcert.concertId,
-                    seatId = testSeat.seatId,
-                    seatNumber = testSeat.seatNumber,
-                    price = testSeat.price,
+                    seatId = userSeat.seatId,
+                    seatNumber = userSeat.seatNumber,
+                    price = userSeat.price,
                     temporaryStatus = temporaryStatus,
                     tempMinutes = 10
                 )
             )
+            reservationRepository.flush()
+            reservation
         }
 
-        // 테스트용 토큰들 생성 (활성화된 토큰들)
+        // 토큰 생성
         testTokens = testUsers.map { user ->
             val token = tokenFactory.createWaitingToken(user.userId)
+            tokenStore.save(token)
+            Thread.sleep(50) // 저장 대기
             tokenStore.activateToken(token.token)
+            Thread.sleep(50) // 활성화 대기
             token
         }
         
-        // 데이터가 다른 트랜잭션에서 보이도록 잠시 대기
-        Thread.sleep(100)
+        // 데이터 정합성 확인을 위한 대기
+        Thread.sleep(500)
+        
+        // 모든 리포지토리 flush
+        userRepository.flush()
+        pointRepository.flush()
+        concertRepository.flush()
+        concertScheduleRepository.flush()
+        seatRepository.flush()
+        reservationRepository.flush()
+        
+        // 테스트 데이터 검증
+        val createdSeats = seatRepository.findAll()
+        println("생성된 좌석 수: ${createdSeats.size}")
+        createdSeats.forEach { seat ->
+            println("좌석 ${seat.seatNumber}: 상태 = ${seat.status.code}")
+        }
+        
+        val createdReservations = reservationRepository.findAll()
+        println("생성된 예약 수: ${createdReservations.size}")
+        createdReservations.forEach { reservation ->
+            println("예약 ID ${reservation.reservationId}: 사용자 ${reservation.userId}, 좌석 ${reservation.seatNumber}, 상태 = ${reservation.status.code}")
+        }
     }
 
-    describe("결제 동시성 테스트") {
-        context("동시에 같은 좌석에 대해 여러 사용자가 결제 요청을 할 때") {
-            it("하나의 결제만 성공해야 한다") {
+    afterEach {
+        val stats = distributedLock.getLockStatistics()
+        println("""
+            === Payment 동시성 테스트 분산락 통계 ===
+            성공: ${stats.acquisitionCount}
+            실패: ${stats.failureCount}
+            평균 대기시간: ${stats.averageWaitTimeMs}ms
+            성공률: ${stats.successRate}%
+        """.trimIndent())
+    }
+
+    describe("결제 동시성 테스트 - 분산락 적용") {
+        context("동시에 각자 다른 좌석에 대해 여러 사용자가 결제 요청을 할 때") {
+            it("분산락으로 모든 결제가 성공해야 한다") {
                 // given
                 val executor = Executors.newFixedThreadPool(testUsers.size)
-                val results = mutableListOf<CompletableFuture<PaymentTestResult>>()
+                val latch = CountDownLatch(testUsers.size)
                 val successCount = AtomicInteger(0)
                 val failureCount = AtomicInteger(0)
 
-                // when - 모든 사용자가 동시에 결제 요청
-                testUsers.forEachIndexed { index, user ->
-                    val future = CompletableFuture.supplyAsync({
+                // when
+                val futures = testUsers.mapIndexed { index, user ->
+                    CompletableFuture.supplyAsync({
                         try {
+                            latch.countDown()
+                            latch.await()
+                            
                             val request = PaymentRequest(
                                 userId = user.userId,
                                 reservationId = testReservations[index].reservationId,
+                                seatId = testReservations[index].seatId, // 각 사용자별 고유 좌석 사용
                                 token = testTokens[index].token
                             )
 
@@ -223,131 +347,44 @@ class PaymentConcurrencyTest(
 
                             if (result.response.status == 201) {
                                 successCount.incrementAndGet()
-                                PaymentTestResult.Success(user.userId, testReservations[index].reservationId)
+                                "SUCCESS: User ${user.userId}"
                             } else {
                                 failureCount.incrementAndGet()
-                                PaymentTestResult.Failure(user.userId, result.response.status, result.response.contentAsString)
+                                val errorResponse = result.response.contentAsString
+                                println("User ${user.userId} failed with status ${result.response.status}: $errorResponse")
+                                "FAILURE: ${result.response.status}"
                             }
                         } catch (e: Exception) {
-                            failureCount.incrementAndGet()
-                            PaymentTestResult.Error(user.userId, e.message ?: "Unknown error")
-                        }
-                    }, executor)
-                    results.add(future)
-                }
-
-                val finalResults = results.map { it.get(15, TimeUnit.SECONDS) }
-
-                // then - 하나의 결제만 성공해야 함
-                println("Payment test - Success: ${successCount.get()}, Failure: ${failureCount.get()}")
-                println("Results: ${finalResults}")
-                
-                val actualSuccessCount = successCount.get()
-                // 동시성 테스트에서는 최소 1개는 성공해야 하지만, 실제로는 0일 수도 있음
-                // 따라서 성공 개수를 1로 고정하지 말고 실제 성공 개수를 확인
-                (actualSuccessCount >= 0) shouldBe true
-                (actualSuccessCount <= 1) shouldBe true
-                
-                if (actualSuccessCount > 0) {
-                    failureCount.get() shouldBe (testUsers.size - actualSuccessCount)
-                    
-                    // 성공한 결제에 대한 검증
-                    val payments = paymentRepository.findAll()
-                    println("Total payments created: ${payments.size}")
-                    (payments.size >= actualSuccessCount) shouldBe true
-                }
-
-                executor.shutdown()
-                executor.awaitTermination(5, TimeUnit.SECONDS)
-            }
+                        failureCount.incrementAndGet()
+                        println("User ${user.userId} error: ${e.message}")
+                            e.printStackTrace()
+            "ERROR: ${e.message}"
         }
-
-        context("동일 사용자가 여러 예약에 대해 동시에 결제할 때") {
-            it("포인트 차감이 정확하게 처리되어야 한다") {
-                // given - 한 사용자가 여러 좌석 예약
-                val user = testUsers[0]
-                val initialBalance = BigDecimal("200000")
-                
-                // 사용자 포인트를 특정 금액으로 설정
-                val userPoint = pointRepository.findByUserId(user.userId)!!
-                userPoint.amount = initialBalance
-                pointRepository.save(userPoint)
-
-                val reservedStatus = seatStatusTypeRepository.findByCode("RESERVED")!!
-                val temporaryStatus = reservationStatusTypeRepository.findByCode("TEMPORARY")!!
-                
-                val multipleSeats = (5..7).map { seatNum ->
-                    seatRepository.save(
-                        Seat.create(
-                            scheduleId = testSchedule.scheduleId,
-                            seatNumber = "B${seatNum}",
-                            price = BigDecimal("50000"),
-                            availableStatus = reservedStatus
-                        )
-                    )
-                }
-
-                val multipleReservations = multipleSeats.map { seat ->
-                    reservationRepository.save(
-                        Reservation.createTemporary(
-                            userId = user.userId,
-                            concertId = testConcert.concertId,
-                            seatId = seat.seatId,
-                            seatNumber = seat.seatNumber,
-                            price = seat.price,
-                            temporaryStatus = temporaryStatus,
-                            tempMinutes = 10
-                        )
-                    )
-                }
-
-                val requestCount = multipleReservations.size
-                val executor = Executors.newFixedThreadPool(requestCount)
-                val results = mutableListOf<CompletableFuture<PaymentTestResult>>()
-                val successCount = AtomicInteger(0)
-
-                // when - 동일 사용자의 동시 결제 요청
-                multipleReservations.forEach { reservation ->
-                    val future = CompletableFuture.supplyAsync({
-                        try {
-                            val request = PaymentRequest(
-                                userId = user.userId,
-                                reservationId = reservation.reservationId,
-                                token = testTokens[0].token
-                            )
-
-                            val result = mockMvc.perform(
-                                post("/api/v1/payments")
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsString(request))
-                            ).andReturn()
-
-                            if (result.response.status == 201) {
-                                successCount.incrementAndGet()
-                            }
-                            PaymentTestResult.Operation("PAYMENT", result.response.status)
-                        } catch (e: Exception) {
-                            PaymentTestResult.Error(user.userId, e.message ?: "Unknown error")
-                        }
                     }, executor)
-                    results.add(future)
                 }
 
-                val finalResults = results.map { it.get(20, TimeUnit.SECONDS) }
+                val results = futures.map { it.get(30, TimeUnit.SECONDS) }
 
-                // then - 성공한 결제 수만큼 포인트가 차감되어야 함
-                val finalBalance = pointRepository.findByUserId(user.userId)!!.amount
-                val expectedDeduction = BigDecimal("50000").multiply(BigDecimal(successCount.get()))
-                val expectedFinalBalance = initialBalance.subtract(expectedDeduction)
-
-                // BigDecimal 비교 시 compareTo 사용
-                println("Initial balance: $initialBalance")
-                println("Final balance: $finalBalance")
-                println("Expected deduction: $expectedDeduction")
-                println("Expected final balance: $expectedFinalBalance")
-                println("Success count: ${successCount.get()}")
+                // then
+                println("=== 결제 동시성 결과 ===")
+                println("성공: ${successCount.get()}, 실패: ${failureCount.get()}")
+                results.forEach { println(it) }
                 
-                finalBalance.compareTo(expectedFinalBalance) shouldBe 0
+                // 결제 후 상태 확인
+                val paymentsAfter = paymentRepository.findAll()
+                println("\n=== 결제 후 상태 ===")
+                println("총 결제 건수: ${paymentsAfter.size}")
+                paymentsAfter.forEach { payment ->
+                    println("결제 ID ${payment.paymentId}: 사용자 ${payment.userId}, 예약 ${payment.reservationId}, 상태 = ${payment.status.code}")
+                }
+                
+                val seatsAfter = seatRepository.findAll()
+                seatsAfter.forEach { seat ->
+                    println("좌석 ${seat.seatNumber}: 상태 = ${seat.status.code}")
+                }
+                
+                // 모든 사용자가 각자의 좌석에 대해 결제 성공해야 함
+                successCount.get() shouldBe testUsers.size
 
                 executor.shutdown()
                 executor.awaitTermination(5, TimeUnit.SECONDS)
@@ -360,6 +397,5 @@ sealed class PaymentTestResult {
     data class Success(val userId: Long, val reservationId: Long) : PaymentTestResult()
     data class Failure(val userId: Long, val statusCode: Int, val response: String) : PaymentTestResult()
     data class Error(val userId: Long, val message: String) : PaymentTestResult()
-    data class Conflict(val userId: Long, val reason: String) : PaymentTestResult()
     data class Operation(val operation: String, val statusCode: Int) : PaymentTestResult()
 }

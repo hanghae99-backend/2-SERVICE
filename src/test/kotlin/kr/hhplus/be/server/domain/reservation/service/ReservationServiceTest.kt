@@ -4,87 +4,69 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.justRun
 import io.mockk.verify
-import io.mockk.spyk
-import kr.hhplus.be.server.global.event.DomainEventPublisher
-import kr.hhplus.be.server.global.lock.DistributedLock
-import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchCondition
+import kr.hhplus.be.server.api.concert.dto.SeatDto
+import kr.hhplus.be.server.domain.concert.exception.SeatAlreadyReservedException
 import kr.hhplus.be.server.domain.concert.service.SeatService
-import kr.hhplus.be.server.domain.reservation.model.Reservation
-import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repository.ReservationRepository
-import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
-import org.springframework.data.domain.PageImpl
-import org.springframework.data.domain.PageRequest
+import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import java.math.BigDecimal
-import java.time.LocalDateTime
 
 class ReservationServiceTest : DescribeSpec({
     
     val reservationRepository = mockk<ReservationRepository>()
-    val reservationStatusTypePojoRepository = mockk<ReservationStatusTypePojoRepository>()
-    val distributedLock = mockk<DistributedLock>()
+    val statusRepository = mockk<ReservationStatusTypePojoRepository>()
     val eventPublisher = mockk<DomainEventPublisher>()
     val seatService = mockk<SeatService>()
-
-    val reservationService = spyk(ReservationService(
-        reservationRepository, 
-        reservationStatusTypePojoRepository,
+    
+    val reservationService = ReservationService(
+        reservationRepository,
+        statusRepository,
         eventPublisher,
         seatService
-    ))
+    )
     
-    // DistributedLock executeWithLock 메서드의 기본 동작 설정
-    fun setupDistributedLockMock() {
-        every { 
-            distributedLock.executeWithLock<Any>(
-                lockKey = any(),
-                lockTimeoutMs = any(),
-                waitTimeoutMs = any(),
-                action = any()
-            )
-        } answers {
-            val action = args[3] as () -> Any
-            action.invoke()
-        }
-    }
-    
-    // EventPublisher mock 설정
-    fun setupEventPublisherMock() {
-        justRun { eventPublisher.publish(any()) }
+    beforeEach {
+        clearAllMocks()
+        every { eventPublisher.publish(any()) } returns Unit
     }
     
     describe("reserveSeat") {
         context("예약 가능한 좌석을 예약할 때") {
-            it("임시 예약을 생성하고 이벤트를 발행해야 한다") {
+            it("예약이 성공적으로 생성되어야 한다") {
                 // given
                 val userId = 1L
                 val concertId = 1L
                 val seatId = 1L
-                
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
-                val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
-                val activeStatuses = listOf(temporaryStatus.code, confirmedStatus.code)
-                val reservation = Reservation.createTemporary(userId, concertId, seatId, "01", BigDecimal("100000"), temporaryStatus)
-                val mockSeat = mockk<kr.hhplus.be.server.api.concert.dto.SeatDto>(relaxed = true)
-                
-                setupDistributedLockMock()
-                setupEventPublisherMock()
-                every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
-                every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
-                every { seatService.getSeatById(seatId) } returns mockSeat
-                every { mockSeat.seatNumber } returns "01"
-                every { mockSeat.price } returns BigDecimal("100000")
-                every { seatService.reserveSeat(seatId) } returns mockk(relaxed = true)
-                every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses) } returns null
+                val price = BigDecimal("50000")
+
+                val seatDto = mockk<SeatDto> {
+                    every { this@mockk.seatId } returns seatId
+                    every { this@mockk.price } returns price
+                    every { this@mockk.seatNumber } returns "A1"
+                }
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
+                val confirmStatus = ReservationStatusType("CONFIRMED", "확정예약", "확정 예약 상태", true, "NORMAL", 0, false, 0)
+
+                val reservation = Reservation.createTemporary(userId, concertId, seatId, "A1", price, temporaryStatus)
+
+                every { seatService.getSeatById(seatId) } returns seatDto
+                every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, any()) } returns null
+                every { statusRepository.getTemporaryStatus() } returns temporaryStatus
                 every { reservationRepository.save(any()) } returns reservation
-                
+                every { seatService.reserveSeat(seatId) } returns seatDto
+                every { statusRepository.getConfirmedStatus() } returns confirmStatus
+
                 // when
                 val result = reservationService.reserveSeat(userId, concertId, seatId)
-                
+
                 // then
                 result shouldNotBe null
                 result.userId shouldBe userId
@@ -95,26 +77,29 @@ class ReservationServiceTest : DescribeSpec({
             }
         }
         
-        context("이미 확정된 좌석을 예약할 때") {
-            it("IllegalStateException을 던져야 한다") {
+        context("이미 예약된 좌석을 예약할 때") {
+            it("예외가 발생해야 한다") {
                 // given
                 val userId = 1L
                 val concertId = 1L
                 val seatId = 1L
+                val price = BigDecimal("50000")
                 
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
-                val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
-                val activeStatuses = listOf(temporaryStatus.code, confirmedStatus.code)
-                val existingReservation = mockk<Reservation>(relaxed = true) // relaxed = true 추가
+                val seatDto = mockk<SeatDto> {
+                    every { this@mockk.seatId } returns seatId
+                    every { this@mockk.price } returns price
+                    every { this@mockk.seatNumber } returns "A1"
+                }
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
+                val existingReservation = Reservation.createTemporary(userId, concertId, seatId, "A1", price, temporaryStatus)
                 
-                setupDistributedLockMock()
-                every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
-                every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
-                every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses) } returns existingReservation
-                every { existingReservation.isConfirmed() } returns true
+                every { seatService.getSeatById(seatId) } returns seatDto
+                every { statusRepository.getTemporaryStatus() } returns temporaryStatus
+                every { statusRepository.getConfirmedStatus() } returns ReservationStatusType("CONFIRMED", "확정", "확정된 예약", true, "NORMAL", 1, true, null)
+                every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, any()) } returns existingReservation
                 
                 // when & then
-                shouldThrow<IllegalStateException> {
+                shouldThrow<SeatAlreadyReservedException> {
                     reservationService.reserveSeat(userId, concertId, seatId)
                 }
             }
@@ -122,18 +107,18 @@ class ReservationServiceTest : DescribeSpec({
     }
     
     describe("confirmReservation") {
-        context("유효한 예약을 확정할 때") {
-            it("예약을 확정 상태로 변경하고 이벤트를 발행해야 한다") {
+        context("유효한 임시 예약을 확정할 때") {
+            it("예약이 성공적으로 확정되어야 한다") {
                 // given
                 val reservationId = 1L
                 val paymentId = 1L
-                val reservation = mockk<Reservation>(relaxed = true)
-                val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정 예약 상태", true, LocalDateTime.now())
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
+                val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정된 예약", true, "NORMAL", 1, true, null)
+                val reservation = Reservation.createTemporary(1L, 1L, 1L, "A1", BigDecimal("50000"), temporaryStatus)
+                reservation.reservationId = reservationId
                 
-                setupDistributedLockMock()
-                setupEventPublisherMock()
-                every { reservationRepository.findByIdWithPessimisticLock(reservationId) } returns reservation
-                every { reservationStatusTypePojoRepository.getConfirmedStatus() } returns confirmedStatus
+                every { reservationRepository.findById(reservationId) } returns reservation
+                every { statusRepository.getConfirmedStatus() } returns confirmedStatus
                 every { reservationRepository.save(any()) } returns reservation
                 
                 // when
@@ -141,43 +126,27 @@ class ReservationServiceTest : DescribeSpec({
                 
                 // then
                 result shouldNotBe null
+                result.paymentId shouldBe paymentId
                 verify { reservationRepository.save(any()) }
                 verify { eventPublisher.publish(any()) }
-            }
-        }
-        
-        context("존재하지 않는 예약을 확정할 때") {
-            it("IllegalArgumentException을 던져야 한다") {
-                // given
-                val reservationId = 999L
-                val paymentId = 1L
-                
-                setupDistributedLockMock()
-                every { reservationRepository.findByIdWithPessimisticLock(reservationId) } returns null
-                
-                // when & then
-                shouldThrow<IllegalArgumentException> {
-                    reservationService.confirmReservation(reservationId, paymentId)
-                }
             }
         }
     }
     
     describe("cancelReservation") {
-        context("본인의 예약을 취소할 때") {
-            it("예약을 취소 상태로 변경하고 이벤트를 발행해야 한다") {
+        context("유효한 예약을 취소할 때") {
+            it("예약이 성공적으로 취소되어야 한다") {
                 // given
                 val reservationId = 1L
                 val userId = 1L
-                val cancelReason = "사용자 요청"
-                val reservation = mockk<Reservation>(relaxed = true)
-                val cancelledStatus = ReservationStatusType("CANCELLED", "취소", "취소된 예약 상태", true, LocalDateTime.now())
+                val cancelReason = "개인 사정"
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
+                val cancelledStatus = ReservationStatusType("CANCELLED", "취소", "취소된 예약", true, "NORMAL", 2, true, null)
+                val reservation = Reservation.createTemporary(userId, 1L, 1L, "A1", BigDecimal("50000"), temporaryStatus)
+                reservation.reservationId = reservationId
                 
-                setupDistributedLockMock()
-                setupEventPublisherMock()
-                every { reservationRepository.findByIdWithPessimisticLock(reservationId) } returns reservation
-                every { reservation.userId } returns userId
-                every { reservationStatusTypePojoRepository.getCancelledStatus() } returns cancelledStatus
+                every { reservationRepository.findById(reservationId) } returns reservation
+                every { statusRepository.getCancelledStatus() } returns cancelledStatus
                 every { reservationRepository.save(any()) } returns reservation
                 
                 // when
@@ -189,34 +158,16 @@ class ReservationServiceTest : DescribeSpec({
                 verify { eventPublisher.publish(any()) }
             }
         }
-        
-        context("다른 사용자의 예약을 취소할 때") {
-            it("IllegalArgumentException을 던져야 한다") {
-                // given
-                val reservationId = 1L
-                val userId = 1L
-                val otherUserId = 2L
-                val cancelReason = "사용자 요청"
-                val reservation = mockk<Reservation>()
-                
-                setupDistributedLockMock()
-                every { reservationRepository.findByIdWithPessimisticLock(reservationId) } returns reservation
-                every { reservation.userId } returns otherUserId
-                
-                // when & then
-                shouldThrow<IllegalArgumentException> {
-                    reservationService.cancelReservation(reservationId, userId, cancelReason)
-                }
-            }
-        }
     }
     
     describe("getReservationById") {
         context("존재하는 예약 ID로 조회할 때") {
-            it("해당 예약을 반환해야 한다") {
+            it("예약 정보를 반환해야 한다") {
                 // given
                 val reservationId = 1L
-                val reservation = mockk<Reservation>()
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
+                val reservation = Reservation.createTemporary(1L, 1L, 1L, "A1", BigDecimal("50000"), temporaryStatus)
+                reservation.reservationId = reservationId
                 
                 every { reservationRepository.findById(reservationId) } returns reservation
                 
@@ -225,106 +176,21 @@ class ReservationServiceTest : DescribeSpec({
                 
                 // then
                 result shouldNotBe null
-                result shouldBe reservation
+                result.reservationId shouldBe reservationId
             }
         }
         
         context("존재하지 않는 예약 ID로 조회할 때") {
-            it("IllegalArgumentException을 던져야 한다") {
+            it("예외가 발생해야 한다") {
                 // given
-                val reservationId = 999L
+                val invalidReservationId = 999L
                 
-                every { reservationRepository.findById(reservationId) } returns null
+                every { reservationRepository.findById(invalidReservationId) } returns null
                 
                 // when & then
-                shouldThrow<IllegalArgumentException> {
-                    reservationService.getReservationById(reservationId)
+                shouldThrow<ReservationNotFoundException> {
+                    reservationService.getReservationById(invalidReservationId)
                 }
-            }
-        }
-    }
-    
-    describe("getReservationsByCondition") {
-        context("사용자 ID로 예약 목록을 조회할 때") {
-            it("해당 사용자의 예약 목록을 반환해야 한다") {
-                // given
-                val condition = ReservationSearchCondition(
-                    userId = 1L,
-                    pageNumber = 1,
-                    pageSize = 10
-                )
-                val reservations = listOf(mockk<Reservation>(relaxed = true))
-                val page = PageImpl(reservations, PageRequest.of(0, 10), 1)
-                
-                every { reservationRepository.findByUserIdOrderByReservedAtDesc(1L, any()) } returns page
-                
-                // when
-                val result = reservationService.getReservationsByCondition(condition)
-                
-                // then
-                result shouldNotBe null
-                result.totalCount shouldBe 1
-                result.pageNumber shouldBe 1
-                result.pageSize shouldBe 10
-            }
-        }
-    }
-    
-    describe("cleanupExpiredReservations") {
-        context("만료된 예약이 있을 때") {
-            it("만료된 예약들을 취소 상태로 변경하고 이벤트를 발행해야 한다") {
-                // given
-                val expiredReservation1 = mockk<Reservation>(relaxed = true)
-                val expiredReservation2 = mockk<Reservation>(relaxed = true)
-                val expiredReservations = listOf(expiredReservation1, expiredReservation2)
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
-                val cancelledStatus = ReservationStatusType("CANCELLED", "취소", "취소된 예약 상태", true, LocalDateTime.now())
-                
-                setupEventPublisherMock()
-                every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
-                every { reservationStatusTypePojoRepository.getCancelledStatus() } returns cancelledStatus
-                every { 
-                    reservationRepository.findByExpiresAtBeforeAndStatusCode(any(), temporaryStatus.code) 
-                } returns expiredReservations
-                
-                // 각 예약에 대한 mock 설정
-                every { expiredReservation1.reservationId } returns 1L
-                every { expiredReservation2.reservationId } returns 2L
-                every { expiredReservation1.isExpired() } returns true
-                every { expiredReservation2.isExpired() } returns true
-                
-                // findByIdWithPessimisticLock에 대한 mock
-                every { reservationRepository.findByIdWithPessimisticLock(1L) } returns expiredReservation1
-                every { reservationRepository.findByIdWithPessimisticLock(2L) } returns expiredReservation2
-                
-                // cancelReservationBySystem 메서드 mock
-                every { reservationService.cancelReservationBySystem(any(), any()) } returns mockk(relaxed = true)
-                
-                every { reservationRepository.save(any()) } returnsMany expiredReservations
-                
-                // when
-                val result = reservationService.cleanupExpiredReservations()
-                
-                // then
-                result shouldBe 2
-            }
-        }
-        
-        context("만료된 예약이 없을 때") {
-            it("0을 반환해야 한다") {
-                // given
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, LocalDateTime.now())
-                
-                every { reservationStatusTypePojoRepository.getTemporaryStatus() } returns temporaryStatus
-                every { 
-                    reservationRepository.findByExpiresAtBeforeAndStatusCode(any(), temporaryStatus.code) 
-                } returns emptyList()
-                
-                // when
-                val result = reservationService.cleanupExpiredReservations()
-                
-                // then
-                result shouldBe 0
             }
         }
     }

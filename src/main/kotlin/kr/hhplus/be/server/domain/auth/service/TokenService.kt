@@ -10,6 +10,7 @@ import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.user.service.UserService
 import kr.hhplus.be.server.domain.user.exception.UserNotFoundException
+import kr.hhplus.be.server.global.lock.LockGuard
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 
@@ -71,6 +72,7 @@ class TokenService(
             }
             TokenStatus.ACTIVE -> Triple("서비스 이용 가능합니다", null, null)
             TokenStatus.EXPIRED -> Triple("토큰이 만료되었습니다", null, null)
+            TokenStatus.USED -> Triple("토큰이 사용되었습니다", null, null)
         }
         
         return TokenQueueDetail.fromTokenWithQueue(
@@ -96,6 +98,7 @@ class TokenService(
             TokenStatus.WAITING -> "대기 중입니다"
             TokenStatus.ACTIVE -> "서비스 이용 가능합니다"
             TokenStatus.EXPIRED -> "토큰이 만료되었습니다"
+            TokenStatus.USED -> "토큰이 사용되었습니다"
         }
         
         return TokenDto.create(
@@ -136,6 +139,7 @@ class TokenService(
     }
     
     // 자동 큐 처리 플로우 (스케줄러용)
+    @LockGuard(key = "queue:process:global")
     fun processQueueAutomatically() {
         // 1. 만료된 활성 토큰들 정리
         tokenLifecycleManager.cleanupExpiredTokens()

@@ -18,6 +18,9 @@ interface ConcertScheduleJpaRepository : JpaRepository<ConcertSchedule, Long> {
     // 예약 가능한 스케줄 조회 (예약 가능 좌석이 있는 것)
     fun findByAvailableSeatsGreaterThan(availableSeats: Int): List<ConcertSchedule>
     
+    // 특정 콘서트의 예약 가능한 스케줄 조회 (추가)
+    fun findByConcertIdAndAvailableSeatsGreaterThan(concertId: Long, availableSeats: Int): List<ConcertSchedule>
+    
     // 날짜 범위 + 예약 가능한 스케줄 조회
     fun findByConcertDateBetweenAndAvailableSeatsGreaterThanOrderByConcertDateAsc(
         startDate: LocalDate, 

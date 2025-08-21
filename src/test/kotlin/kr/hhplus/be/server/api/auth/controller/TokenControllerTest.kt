@@ -99,14 +99,10 @@ class TokenControllerTest : DescribeSpec({
 
         context("잘못된 형식의 요청이 들어올 때") {
             it("400 상태코드를 반환해야 한다") {
-                // given
+                // given - @Positive 검증으로 인해 Spring validation에서 400을 반환
                 val invalidRequest = """{"userId": -1}"""
 
-                // 음수 userId에 대해 예외 발생하도록 설정
-                every { tokenIssueUseCase.execute(-1) } throws
-                        IllegalArgumentException("유효하지 않은 사용자 ID입니다")
-
-                // when & then
+                // when & then - validation이 먼저 동작해서 UseCase가 호출되지 않음
                 mockMvc.perform(
                     post("/api/v1/tokens")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -115,7 +111,7 @@ class TokenControllerTest : DescribeSpec({
                     .andExpect(status().isBadRequest)
                     .andDo(print())
 
-                verify { tokenIssueUseCase.execute(-1) }
+                // UseCase는 호출되지 않아야 함 (validation에서 걸러짐)
             }
         }
     }

@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.domain.payment.repository
+package kr.hhplus.be.server.domain.payment.repositories
 
 import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
 
@@ -24,4 +24,7 @@ interface PaymentStatusTypePojoRepository {
     // ========== 비즈니스 로직 메서드들 ==========
     fun getAllActiveStatuses(): List<PaymentStatusType>
     fun isValidStatus(code: String): Boolean
+    
+    // ========== JPA 연동 메서드 ==========
+    fun flush()
 }

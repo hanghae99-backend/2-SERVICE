@@ -6,6 +6,9 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
+import kr.hhplus.be.server.global.lock.LockGuard
+import kr.hhplus.be.server.global.lock.LockStrategy
+
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -20,32 +23,40 @@ class ChargeBalanceUseCase(
 ) {
     
     private val logger = LoggerFactory.getLogger(ChargeBalanceUseCase::class.java)
-
+    
+    @LockGuard(
+        key = "'balance:' + #userId",
+        strategy = LockStrategy.SPIN,
+        lockTimeoutMs = 3000L,   // 락 보유 시간을 3초로 제한
+        waitTimeoutMs = 15000L,  // 대기 시간은 15초로 증가
+        retryIntervalMs = 30L,   // 더 빠른 재시도
+        maxRetryCount = 200      // 충분한 재시도 횟수
+    )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun execute(userId: Long, amount: BigDecimal): Point {
-        // 비관적 락을 사용하여 동시성 문제 방지 (차감과 동일한 전략 사용)
-        val currentPoint = pointRepository.findByUserIdWithPessimisticLock(userId)
-            ?: run {
-                // 포인트가 없는 경우 새로 생성 (동시성 안전하게)
-                try {
-                    val newPoint = Point.create(userId, BigDecimal.ZERO)
-                    pointRepository.save(newPoint)
-                } catch (e: Exception) {
-                    // 다른 스레드에서 이미 생성한 경우, 다시 조회
-                    logger.info("Point already created by another thread for user: $userId")
-                    pointRepository.findByUserIdWithPessimisticLock(userId)
-                        ?: throw IllegalStateException("포인트 생성 실패: $userId")
-                }
-            }
-
-        val chargedPoint = currentPoint.charge(amount)
-        val savedPoint = pointRepository.save(chargedPoint)
-
+        logger.info("포인트 충전 시작 - userId: $userId, amount: $amount")
+        val currentPoint = getOrCreatePoint(userId)
+        
+        currentPoint.charge(amount)
+        val savedPoint = pointRepository.save(currentPoint)
+        
+        saveChargeHistory(userId, amount)
+        
+        logger.info("포인트 충전 완료 - userId: $userId, 충전 후 잔액: ${savedPoint.amount}")
+        return savedPoint
+    }
+    
+    private fun getOrCreatePoint(userId: Long): Point {
+        return pointRepository.findByUserId(userId) ?: run {
+            val newPoint = Point.create(userId, BigDecimal.ZERO)
+            newPoint
+        }
+    }
+    
+    private fun saveChargeHistory(userId: Long, amount: BigDecimal) {
         val chargeType = pointHistoryTypeRepository.getChargeType()
         val history = PointHistory.charge(userId, amount, chargeType, "포인트 충전")
         pointHistoryRepository.save(history)
-        
-        return savedPoint
     }
 }

@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.api.user.dto
 
-import kr.hhplus.be.server.domain.user.model.User
+import kr.hhplus.be.server.domain.user.models.User
 
 /**
  * User Domain DTOs

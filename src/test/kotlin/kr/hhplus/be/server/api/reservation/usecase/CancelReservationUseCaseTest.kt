@@ -10,8 +10,12 @@ import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
-import kr.hhplus.be.server.domain.reservation.model.Reservation
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
+import kr.hhplus.be.server.domain.reservation.exception.ReservationCancelFailedException
+import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
+import java.math.BigDecimal
 
 class CancelReservationUseCaseTest : DescribeSpec({
 
@@ -31,15 +35,18 @@ class CancelReservationUseCaseTest : DescribeSpec({
                 // given
                 val reservationId = 1L
                 val userId = 10L
-                val token = "valid-token"
+                val token = "valid-token-12345"
                 val cancelReason = "변경된 일정"
                 val waitingToken = WaitingToken.create(token, userId)
                 val tokenStatus = TokenStatus.ACTIVE
 
-                val reservation = mockk<Reservation>()
+                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
+                val reservation = Reservation.createTemporary(userId, 1L, 1L, "A1", BigDecimal("50000"), temporaryStatus)
+                reservation.reservationId = reservationId
 
                 every { tokenLifecycleManager.findToken(token) } returns waitingToken
                 every { tokenLifecycleManager.getTokenStatus(token) } returns tokenStatus
+                every { reservationService.getReservationById(reservationId) } returns reservation
                 every {
                     reservationService.cancelReservation(reservationId, userId, cancelReason)
                 } returns reservation
@@ -52,35 +59,34 @@ class CancelReservationUseCaseTest : DescribeSpec({
                 verify { tokenLifecycleManager.findToken(token) }
                 verify { tokenLifecycleManager.getTokenStatus(token) }
                 verify { tokenDomainService.validateActiveToken(waitingToken, tokenStatus) }
+                verify { reservationService.getReservationById(reservationId) }
                 verify { reservationService.cancelReservation(reservationId, userId, cancelReason) }
             }
         }
 
-        context("예약이 이미 확정되어 있어 취소할 수 없는 경우") {
-            it("IllegalStateException을 던진다") {
+        context("비활성화된 토큰으로 요청할 때") {
+            it("ReservationCancelFailedException을 던진다") {
                 // given
                 val reservationId = 1L
                 val userId = 10L
-                val token = "valid-token"
+                val token = "expired-token-12345"
                 val cancelReason = "변경된 일정"
                 val waitingToken = WaitingToken.create(token, userId)
                 val tokenStatus = TokenStatus.EXPIRED
 
                 every { tokenLifecycleManager.findToken(token) } returns waitingToken
                 every { tokenLifecycleManager.getTokenStatus(token) } returns tokenStatus
-                every {
-                    reservationService.cancelReservation(reservationId, userId, cancelReason)
-                } throws IllegalStateException("확정된 예약은 취소할 수 없습니다")
+                every { tokenDomainService.validateActiveToken(waitingToken, tokenStatus) } throws 
+                    TokenActivationException("활성화된 토큰이 아닙니다")
 
                 // when & then
-                shouldThrow<IllegalStateException> {
+                shouldThrow<ReservationCancelFailedException> {
                     cancelReservationUseCase.execute(reservationId, userId, cancelReason, token)
                 }
 
                 verify { tokenLifecycleManager.findToken(token) }
                 verify { tokenLifecycleManager.getTokenStatus(token) }
                 verify { tokenDomainService.validateActiveToken(waitingToken, tokenStatus) }
-                verify { reservationService.cancelReservation(reservationId, userId, cancelReason) }
             }
         }
     }

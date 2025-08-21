@@ -1,7 +1,7 @@
-package kr.hhplus.be.server.domain.reservation.model
+package kr.hhplus.be.server.domain.reservation.models
 
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.global.common.BaseEntity
-
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import jakarta.persistence.*
 import java.math.BigDecimal
@@ -21,57 +21,48 @@ class Reservation(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    val reservationId: Long = 0,
+    var  reservationId: Long = 0,
 
     @Column(name = "user_id", nullable = false)
-    val userId: Long,
+    var userId: Long,
 
     @Column(name = "concert_id", nullable = false)
-    val concertId: Long,
+    var concertId: Long,
 
     @Column(name = "seat_id", nullable = false)
-    val seatId: Long,
+    var seatId: Long,
 
     @Column(name = "payment_id", nullable = true)
     var paymentId: Long? = null,
 
     @Column(name = "seat_number", nullable = false, length = 10)
-    val seatNumber: String,
+    var seatNumber: String,
 
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
-    val price: BigDecimal,
+    var price: BigDecimal,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "status_code", referencedColumnName = "code")
     var status: ReservationStatusType,
 
     @Column(name = "reserved_at", nullable = false)
-    val reservedAt: LocalDateTime = LocalDateTime.now(),
+    var reservedAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "expires_at", nullable = true)
-    val expiresAt: LocalDateTime? = null,
+    var expiresAt: LocalDateTime? = null,
 
     @Column(name = "confirmed_at", nullable = true)
     var confirmedAt: LocalDateTime? = null,
-    
-    @Version
-    @Column(name = "version")
-    var version: Long? = null
+
 ) : BaseEntity() {
     
-    // 상태 명칭 계산 프로퍼티
     val statusName: String
         get() = status.name
     
-    // 상태 설명 계산 프로퍼티
     val statusDescription: String
         get() = status.description ?: ""
 
-    // 연관관계 제거 - JPA 연관관계로 인한 트랜잭션 문제를 방지
-    // 필요한 경우 각 ID로 직접 조회하도록 변경
-
     companion object {
-    // 상태 코드 상수
         const val STATUS_TEMPORARY = "TEMPORARY"
         const val STATUS_CONFIRMED = "CONFIRMED"
         const val STATUS_CANCELLED = "CANCELLED"
@@ -85,7 +76,26 @@ class Reservation(
             temporaryStatus: ReservationStatusType,
             tempMinutes: Long = 5
         ): Reservation {
-            // 입력값 검증
+            validateCreateParameters(userId, concertId, seatId, seatNumber, price)
+
+            return Reservation(
+                userId = userId,
+                concertId = concertId,
+                seatId = seatId,
+                seatNumber = seatNumber,
+                price = price,
+                status = temporaryStatus,
+                expiresAt = LocalDateTime.now().plusMinutes(tempMinutes)
+            )
+        }
+
+        private fun validateCreateParameters(
+            userId: Long,
+            concertId: Long,
+            seatId: Long,
+            seatNumber: String,
+            price: BigDecimal
+        ) {
             if (userId <= 0) {
                 throw ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
             }
@@ -101,45 +111,41 @@ class Reservation(
             if (price <= BigDecimal.ZERO) {
                 throw ParameterValidationException("좌석 가격은 0보다 커야 합니다: $price")
             }
-
-            return Reservation(
-                userId = userId,
-                concertId = concertId,
-                seatId = seatId,
-                seatNumber = seatNumber,
-                price = price,
-                status = temporaryStatus,
-                expiresAt = LocalDateTime.now().plusMinutes(tempMinutes)
-            )
         }
     }
 
     fun confirm(paymentId: Long, confirmedStatus: ReservationStatusType) {
-        if (status.code != STATUS_TEMPORARY) {
-            throw IllegalStateException("임시 예약 상태가 아닙니다. 현재 상태: ${status.code}")
-        }
-        if (isExpired()) {
-            throw IllegalStateException("예약이 만료되었습니다")
-        }
-
+        validateCanConfirm()
+        
         this.paymentId = paymentId
         this.status = confirmedStatus
         this.confirmedAt = LocalDateTime.now()
     }
 
     fun cancel(cancelledStatus: ReservationStatusType) {
+        validateCanCancel()
+        this.status = cancelledStatus
+    }
+
+    private fun validateCanConfirm() {
+        if (status.code != STATUS_TEMPORARY) {
+            throw IllegalStateException("임시 예약 상태가 아닙니다. 현재 상태: ${status.code}")
+        }
+        if (isExpired()) {
+            throw IllegalStateException("예약이 만료되었습니다")
+        }
+    }
+
+    private fun validateCanCancel() {
         if (status.code == STATUS_CANCELLED) {
             throw IllegalStateException("이미 취소된 예약입니다")
         }
-
-        this.status = cancelledStatus
     }
 
     fun isExpired(): Boolean {
         return expiresAt?.isBefore(LocalDateTime.now()) ?: false
     }
 
-    // 상태 체크 메서드들
     fun isTemporary(): Boolean = status.code == STATUS_TEMPORARY
     fun isConfirmed(): Boolean = status.code == STATUS_CONFIRMED
     fun isCancelled(): Boolean = status.code == STATUS_CANCELLED

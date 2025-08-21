@@ -16,23 +16,7 @@ data class InvalidSeatStatusException(
     val status: HttpStatus = ConcertErrorCode.InvalidSeatStatus.httpStatus
 ) : RuntimeException(message)
 
-/**
- * 좌석을 찾을 수 없을 때 발생하는 예외
- */
-data class SeatNotFoundException(
-    override val message: String = ConcertErrorCode.SeatNotFound.defaultMessage,
-    val errorCode: String = ConcertErrorCode.SeatNotFound.code,
-    val status: HttpStatus = ConcertErrorCode.SeatNotFound.httpStatus
-) : RuntimeException(message)
-
-/**
- * 좌석이 이미 예약되어 있을 때 발생하는 예외
- */
-data class SeatAlreadyReservedException(
-    override val message: String = ConcertErrorCode.SeatAlreadyReserved.defaultMessage,
-    val errorCode: String = ConcertErrorCode.SeatAlreadyReserved.code,
-    val status: HttpStatus = ConcertErrorCode.SeatAlreadyReserved.httpStatus
-) : RuntimeException(message)
+// SeatNotFoundException과 SeatAlreadyReservedException은 SeatExceptions.kt에 정의됨
 
 /**
  * 콘서트 스케줄을 찾을 수 없을 때 발생하는 예외

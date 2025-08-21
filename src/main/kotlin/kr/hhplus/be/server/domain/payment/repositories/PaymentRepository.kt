@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.domain.payment.repository
+package kr.hhplus.be.server.domain.payment.repositories
 
 import kr.hhplus.be.server.domain.payment.models.Payment
 
@@ -10,4 +10,5 @@ interface PaymentRepository {
     fun findAll(): List<Payment>
     fun delete(payment: Payment)
     fun deleteAll() // 테스트용 - 모든 결제 데이터 삭제
+    fun flush() // 추가
 }

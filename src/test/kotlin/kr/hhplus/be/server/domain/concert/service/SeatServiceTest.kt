@@ -43,7 +43,7 @@ class SeatServiceTest : DescribeSpec({
                     totalSeats = 100,
                     availableSeats = 50,
                 )
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, LocalDateTime.now())
+                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, 0, null)
                 val seat1 = Seat(1L, scheduleId, "A1", "NORMAL", BigDecimal("100000"), availableStatus)
                 val seat2 = Seat(2L, scheduleId, "A2", "NORMAL", BigDecimal("100000"), availableStatus)
                 val seats = listOf(seat1, seat2)
@@ -91,10 +91,9 @@ class SeatServiceTest : DescribeSpec({
                     totalSeats = 100,
                     availableSeats = 50
                 )
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, LocalDateTime.now())
-                val occupiedStatus = SeatStatusType("OCCUPIED", "점유", "점유된 좌석", true, LocalDateTime.now())
+                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, 0, null)
+                val occupiedStatus = SeatStatusType("OCCUPIED", "점유", "점유된 좌석", true, 1, null)
                 val seats = listOf(
-
                     Seat(1L, scheduleId, "A1", "NORMAL", BigDecimal("100000"), availableStatus),
                     Seat(2L, scheduleId, "A2", "NORMAL", BigDecimal("100000"), occupiedStatus),
                     Seat(3L, scheduleId, "A3", "NORMAL", BigDecimal("100000"), availableStatus)
@@ -132,7 +131,7 @@ class SeatServiceTest : DescribeSpec({
             it("해당 좌석 정보를 반환해야 한다") {
                 // given
                 val seatId = 1L
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, LocalDateTime.now())
+                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, 0, null)
                 val seat = Seat(seatId, 1L, "A1", "NORMAL", BigDecimal("100000"), availableStatus)
                 
                 every { seatRepository.findById(seatId) } returns seat
@@ -166,7 +165,6 @@ class SeatServiceTest : DescribeSpec({
             it("true를 반환해야 한다") {
                 // given
                 val seatId = 1L
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, LocalDateTime.now())
                 val seat = mockk<Seat>()
                 
                 every { seatRepository.findById(seatId) } returns seat
@@ -217,22 +215,22 @@ class SeatServiceTest : DescribeSpec({
             it("좌석을 확정 상태로 변경해야 한다") {
                 // given
                 val seatId = 1L
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, LocalDateTime.now())
-                val reservedStatus = SeatStatusType("RESERVED", "임시예약", "임시 예약된 좌석", true, LocalDateTime.now())
-                val occupiedStatus = SeatStatusType("OCCUPIED", "점유", "점유된 좌석", true, LocalDateTime.now())
-                val seat = Seat(seatId, 1L, "A1", "NORMAL", BigDecimal("100000"), reservedStatus)
-                val confirmedSeat = seat.confirm(occupiedStatus)
-                
-                every { seatRepository.findByIdWithPessimisticLock(seatId) } returns seat
+                val reservedStatus = SeatStatusType("RESERVED", "임시예약", "임시 예약된 좌석", true, 2, null)
+                val occupiedStatus = SeatStatusType("OCCUPIED", "점유", "점유된 좌석", true, 1, null)
+                val seat = mockk<Seat>(relaxed = true)
+
+                every { seatRepository.findById(seatId) } returns seat
                 every { seatStatusTypePojoRepository.getOccupiedStatus() } returns occupiedStatus
-                every { seatRepository.save(any()) } returns confirmedSeat
-                
+                every { seat.confirm(occupiedStatus) } returns Unit
+                every { seatRepository.save(seat) } returns seat
+
                 // when
                 val result = seatService.confirmSeat(seatId)
-                
+
                 // then
                 result shouldNotBe null
-                verify { seatRepository.save(any()) }
+                verify { seat.confirm(occupiedStatus) }
+                verify { seatRepository.save(seat) }
             }
         }
         
@@ -241,7 +239,7 @@ class SeatServiceTest : DescribeSpec({
                 // given
                 val seatId = 999L
                 
-                every { seatRepository.findByIdWithPessimisticLock(seatId) } returns null
+                every { seatRepository.findById(seatId) } returns null
                 
                 // when & then
                 shouldThrow<SeatNotFoundException> {

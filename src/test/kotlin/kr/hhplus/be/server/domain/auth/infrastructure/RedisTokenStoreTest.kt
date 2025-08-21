@@ -10,10 +10,10 @@ import io.kotest.matchers.collections.shouldNotContain
 import io.mockk.*
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
-import org.springframework.data.redis.core.ListOperations
 import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
+import org.springframework.data.redis.core.ZSetOperations
 import java.time.Duration
 
 class RedisTokenStoreTest : DescribeSpec({
@@ -21,7 +21,7 @@ class RedisTokenStoreTest : DescribeSpec({
     lateinit var redisTemplate: StringRedisTemplate
     lateinit var valueOperations: ValueOperations<String, String>
     lateinit var setOperations: SetOperations<String, String>
-    lateinit var listOperations: ListOperations<String, String>
+    lateinit var zSetOperations: ZSetOperations<String, String>
     lateinit var objectMapper: ObjectMapper
     lateinit var redisTokenStore: RedisTokenStore
     
@@ -29,12 +29,12 @@ class RedisTokenStoreTest : DescribeSpec({
         redisTemplate = mockk(relaxed = true)
         valueOperations = mockk(relaxed = true)
         setOperations = mockk(relaxed = true)
-        listOperations = mockk(relaxed = true)
+        zSetOperations = mockk(relaxed = true)
         objectMapper = mockk(relaxed = true)
         
         every { redisTemplate.opsForValue() } returns valueOperations
         every { redisTemplate.opsForSet() } returns setOperations
-        every { redisTemplate.opsForList() } returns listOperations
+        every { redisTemplate.opsForZSet() } returns zSetOperations
         
         redisTokenStore = RedisTokenStore(redisTemplate, objectMapper)
     }
@@ -132,7 +132,7 @@ class RedisTokenStoreTest : DescribeSpec({
                 // given
                 val token = "waiting-token"
                 every { setOperations.isMember("active_tokens", token) } returns false
-                every { listOperations.indexOf("waiting_queue", token) } returns 5L
+                every { zSetOperations.rank("waiting_queue_zset", token) } returns 5L
                 
                 // when
                 val result = redisTokenStore.getTokenStatus(token)
@@ -147,7 +147,7 @@ class RedisTokenStoreTest : DescribeSpec({
                 // given
                 val token = "expired-token"
                 every { setOperations.isMember("active_tokens", token) } returns false
-                every { listOperations.indexOf("waiting_queue", token) } returns null
+                every { zSetOperations.rank("waiting_queue_zset", token) } returns null
                 
                 // when
                 val result = redisTokenStore.getTokenStatus(token)
@@ -163,16 +163,15 @@ class RedisTokenStoreTest : DescribeSpec({
             it("대기열에서 제거하고 활성 토큰 Set에 추가하며 타임스탬프를 기록해야 한다") {
                 // given
                 val token = "token-to-activate"
-                every { listOperations.remove("waiting_queue", 0, token) } returns 1L
+                every { zSetOperations.remove("waiting_queue_zset", token) } returns 1L
                 every { setOperations.add("active_tokens", token) } returns 1L
                 every { valueOperations.set(any(), any(), any<Duration>()) } just Runs
-                every { redisTemplate.expire(any(), any<Duration>()) } returns true
                 
                 // when
                 redisTokenStore.activateToken(token)
                 
                 // then
-                verify(exactly = 1) { listOperations.remove("waiting_queue", 0, token) }
+                verify(exactly = 1) { zSetOperations.remove("waiting_queue_zset", token) }
                 verify(exactly = 1) { setOperations.add("active_tokens", token) }
                 verify(exactly = 1) { 
                     valueOperations.set(
@@ -181,7 +180,6 @@ class RedisTokenStoreTest : DescribeSpec({
                         Duration.ofMinutes(10)
                     )
                 }
-                verify(exactly = 1) { redisTemplate.expire("active_tokens", Duration.ofMinutes(10)) }
             }
         }
     }
@@ -191,7 +189,7 @@ class RedisTokenStoreTest : DescribeSpec({
             it("대기열과 활성 토큰에서 모두 제거하고 타임스탬프도 삭제해야 한다") {
                 // given
                 val token = "token-to-expire"
-                every { listOperations.remove("waiting_queue", 0, token) } returns 1L
+                every { zSetOperations.remove("waiting_queue_zset", token) } returns 1L
                 every { setOperations.remove("active_tokens", token) } returns 1L
                 every { redisTemplate.delete("active_timestamp:token-to-expire") } returns true
                 
@@ -199,7 +197,7 @@ class RedisTokenStoreTest : DescribeSpec({
                 redisTokenStore.expireToken(token)
                 
                 // then
-                verify(exactly = 1) { listOperations.remove("waiting_queue", 0, token) }
+                verify(exactly = 1) { zSetOperations.remove("waiting_queue_zset", token) }
                 verify(exactly = 1) { setOperations.remove("active_tokens", token) }
                 verify(exactly = 1) { redisTemplate.delete("active_timestamp:token-to-expire") }
             }
@@ -208,26 +206,32 @@ class RedisTokenStoreTest : DescribeSpec({
     
     describe("addToWaitingQueue") {
         context("토큰을 대기열에 추가할 때") {
-            it("List의 오른쪽(뒤)에 추가해야 한다") {
+            it("ZSet에 순서대로 추가해야 한다") {
                 // given
                 val token = "new-waiting-token"
-                every { listOperations.rightPush("waiting_queue", token) } returns 1L
+                every { valueOperations.increment("queue_sequence") } returns 5L
+                every { zSetOperations.add("waiting_queue_zset", token, 5.0) } returns true
                 
                 // when
                 redisTokenStore.addToWaitingQueue(token)
                 
                 // then
-                verify(exactly = 1) { listOperations.rightPush("waiting_queue", token) }
+                verify(exactly = 1) { valueOperations.increment("queue_sequence") }
+                verify(exactly = 1) { zSetOperations.add("waiting_queue_zset", token, 5.0) }
             }
         }
     }
     
     describe("getNextTokensFromQueue") {
         context("대기열에서 다음 토큰들을 가져올 때") {
-            it("요청한 개수만큼 List의 왼쪽(앞)에서 제거해서 반환해야 한다") {
+            it("요청한 개수만큼 ZSet의 앞에서 제거해서 반환해야 한다") {
                 // given
                 val count = 3
-                every { listOperations.leftPop("waiting_queue") } returnsMany listOf("token1", "token2", "token3", null)
+                val tokens = setOf("token1", "token2", "token3")
+                every { zSetOperations.range("waiting_queue_zset", 0, 2) } returns tokens
+                every { zSetOperations.remove("waiting_queue_zset", "token1") } returns 1L
+                every { zSetOperations.remove("waiting_queue_zset", "token2") } returns 1L
+                every { zSetOperations.remove("waiting_queue_zset", "token3") } returns 1L
                 
                 // when
                 val result = redisTokenStore.getNextTokensFromQueue(count)
@@ -237,7 +241,10 @@ class RedisTokenStoreTest : DescribeSpec({
                 result shouldContain "token1"
                 result shouldContain "token2"
                 result shouldContain "token3"
-                verify(exactly = 3) { listOperations.leftPop("waiting_queue") }
+                verify(exactly = 1) { zSetOperations.range("waiting_queue_zset", 0, 2) }
+                verify(exactly = 1) { zSetOperations.remove("waiting_queue_zset", "token1") }
+                verify(exactly = 1) { zSetOperations.remove("waiting_queue_zset", "token2") }
+                verify(exactly = 1) { zSetOperations.remove("waiting_queue_zset", "token3") }
             }
         }
         
@@ -245,14 +252,14 @@ class RedisTokenStoreTest : DescribeSpec({
             it("빈 리스트를 반환해야 한다") {
                 // given
                 val count = 3
-                every { listOperations.leftPop("waiting_queue") } returns null
+                every { zSetOperations.range("waiting_queue_zset", 0, 2) } returns emptySet()
 
                 // when
                 val result = redisTokenStore.getNextTokensFromQueue(count)
 
                 // then
                 result shouldHaveSize 0
-                verify(exactly = 3) { listOperations.leftPop("waiting_queue") }
+                verify(exactly = 1) { zSetOperations.range("waiting_queue_zset", 0, 2) }
             }
         }
     }
@@ -262,14 +269,14 @@ class RedisTokenStoreTest : DescribeSpec({
             it("올바른 위치를 반환해야 한다") {
                 // given
                 val token = "waiting-token"
-                every { listOperations.indexOf("waiting_queue", token) } returns 5L
+                every { zSetOperations.rank("waiting_queue_zset", token) } returns 5L
                 
                 // when
                 val result = redisTokenStore.getQueuePosition(token)
                 
                 // then
                 result shouldBe 5
-                verify(exactly = 1) { listOperations.indexOf("waiting_queue", token) }
+                verify(exactly = 1) { zSetOperations.rank("waiting_queue_zset", token) }
             }
         }
         
@@ -277,14 +284,14 @@ class RedisTokenStoreTest : DescribeSpec({
             it("-1을 반환해야 한다") {
                 // given
                 val token = "non-waiting-token"
-                every { listOperations.indexOf("waiting_queue", token) } returns null
+                every { zSetOperations.rank("waiting_queue_zset", token) } returns null
                 
                 // when
                 val result = redisTokenStore.getQueuePosition(token)
                 
                 // then
                 result shouldBe -1
-                verify(exactly = 1) { listOperations.indexOf("waiting_queue", token) }
+                verify(exactly = 1) { zSetOperations.rank("waiting_queue_zset", token) }
             }
         }
     }
@@ -405,7 +412,7 @@ class RedisTokenStoreTest : DescribeSpec({
                 every { objectMapper.readValue(tokenJson, WaitingToken::class.java) } returns waitingToken
                 every { redisTemplate.delete("waiting_token:token-to-delete") } returns true
                 every { setOperations.remove("user_tokens:123", token) } returns 1L
-                every { listOperations.remove("waiting_queue", 0, token) } returns 1L
+                every { zSetOperations.remove("waiting_queue_zset", token) } returns 1L
                 every { setOperations.remove("active_tokens", token) } returns 1L
                 every { redisTemplate.delete("active_timestamp:token-to-delete") } returns true
                 
@@ -415,7 +422,7 @@ class RedisTokenStoreTest : DescribeSpec({
                 // then
                 verify(exactly = 1) { redisTemplate.delete("waiting_token:token-to-delete") }
                 verify(exactly = 1) { setOperations.remove("user_tokens:123", token) }
-                verify(exactly = 1) { listOperations.remove("waiting_queue", 0, token) }
+                verify(exactly = 1) { zSetOperations.remove("waiting_queue_zset", token) }
                 verify(exactly = 1) { setOperations.remove("active_tokens", token) }
                 verify(exactly = 1) { redisTemplate.delete("active_timestamp:token-to-delete") }
             }

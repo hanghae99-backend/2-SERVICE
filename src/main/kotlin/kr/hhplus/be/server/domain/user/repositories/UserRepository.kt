@@ -1,6 +1,6 @@
-package kr.hhplus.be.server.domain.user.repository
+package kr.hhplus.be.server.domain.user.repositories
 
-import kr.hhplus.be.server.domain.user.model.User
+import kr.hhplus.be.server.domain.user.models.User
 
 interface UserRepository {
     fun save(user: User): User

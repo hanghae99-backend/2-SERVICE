@@ -25,7 +25,7 @@ data class ReservationCreateRequest(
     
     @field:NotBlank(message = "토큰은 필수입니다")
     @field:Size(min = 10, max = 200, message = "토큰 길이는 10-200자 사이여야 합니다")
-    @Schema(description = "대기열 토큰", example = "abc123def456", required = true)
+    @Schema(description = "대기열 토큰", example = "AT_1234567890ABCDEF", required = true)
     val token: String
 )
 
@@ -45,7 +45,7 @@ data class ReservationCancelRequest(
     
     @field:NotBlank(message = "토큰은 필수입니다")
     @field:Size(min = 10, max = 200, message = "토큰 길이는 10-200자 사이여야 합니다")
-    @Schema(description = "대기열 토큰", example = "abc123def456", required = true)
+    @Schema(description = "대기열 토큰", example = "AT_1234567890ABCDEF", required = true)
     val token: String
 )
 
@@ -70,20 +70,10 @@ data class ReservationConfirmRequest(
  */
 @Schema(description = "목록 조회 요청")
 data class ReservationListRequest(
-    @field:Min(value = 1, message = "페이지 번호는 1 이상이어야 합니다")
-    @Schema(description = "페이지 번호", example = "1", defaultValue = "1")
-    val pageNumber: Int = 1,
-    
-    @field:Min(value = 1, message = "페이지 크기는 1 이상이어야 합니다")
-    @field:Max(value = 100, message = "페이지 크기는 100 이하여야 합니다")
-    @Schema(description = "페이지 크기", example = "20", defaultValue = "20")
-    val pageSize: Int = 20,
-    
-    @Schema(description = "정렬 기준", example = "reservedAt", defaultValue = "reservedAt")
-    val sortBy: String = "reservedAt",
-    
-    @Schema(description = "정렬 방향", example = "DESC", defaultValue = "DESC")
-    val sortDirection: String = "DESC"
+    @field:Min(value = 1, message = "조회할 개수는 1 이상이어야 합니다")
+    @field:Max(value = 100, message = "조회할 개수는 100 이하여야 합니다")
+    @Schema(description = "조회할 개수", example = "20", defaultValue = "20")
+    val limit: Int = 20
 )
 
 /**
@@ -94,20 +84,10 @@ data class ReservationConcertListRequest(
     @Schema(description = "예약 상태 필터", example = "[\"CONFIRMED\", \"TEMPORARY\"]")
     val statusList: List<String>? = null,
     
-    @field:Min(value = 1, message = "페이지 번호는 1 이상이어야 합니다")
-    @Schema(description = "페이지 번호", example = "1", defaultValue = "1")
-    val pageNumber: Int = 1,
-    
-    @field:Min(value = 1, message = "페이지 크기는 1 이상이어야 합니다")
-    @field:Max(value = 100, message = "페이지 크기는 100 이하여야 합니다")
-    @Schema(description = "페이지 크기", example = "20", defaultValue = "20")
-    val pageSize: Int = 20,
-    
-    @Schema(description = "정렬 기준", example = "reservedAt", defaultValue = "reservedAt")
-    val sortBy: String = "reservedAt",
-    
-    @Schema(description = "정렬 방향", example = "DESC", defaultValue = "DESC")
-    val sortDirection: String = "DESC"
+    @field:Min(value = 1, message = "조회할 개수는 1 이상이어야 합니다")
+    @field:Max(value = 100, message = "조회할 개수는 100 이하여야 합니다")
+    @Schema(description = "조회할 개수", example = "20", defaultValue = "20")
+    val limit: Int = 20
 )
 
 /**
@@ -130,20 +110,10 @@ data class ReservationSearchRequest(
     @Schema(description = "검색 종료일 (yyyy-MM-dd)", example = "2024-12-31")
     val endDate: String? = null,
     
-    @field:Min(value = 1, message = "페이지 번호는 1 이상이어야 합니다")
-    @Schema(description = "페이지 번호", example = "1", defaultValue = "1")
-    val pageNumber: Int = 1,
-    
-    @field:Min(value = 1, message = "페이지 크기는 1 이상이어야 합니다")
-    @field:Max(value = 100, message = "페이지 크기는 100 이하여야 합니다")
-    @Schema(description = "페이지 크기", example = "20", defaultValue = "20")
-    val pageSize: Int = 20,
-    
-    @Schema(description = "정렬 기준", example = "reservedAt", defaultValue = "reservedAt")
-    val sortBy: String = "reservedAt",
-    
-    @Schema(description = "정렬 방향", example = "DESC", defaultValue = "DESC")
-    val sortDirection: String = "DESC"
+    @field:Min(value = 1, message = "조회할 개수는 1 이상이어야 합니다")
+    @field:Max(value = 100, message = "조회할 개수는 100 이하여야 합니다")
+    @Schema(description = "조회할 개수", example = "20", defaultValue = "20")
+    val limit: Int = 20
 ) {
     fun toSearchCondition(): ReservationSearchCondition {
         return ReservationSearchCondition(
@@ -152,10 +122,7 @@ data class ReservationSearchRequest(
             statusList = statusList,
             startDate = startDate,
             endDate = endDate,
-            pageNumber = pageNumber,
-            pageSize = pageSize,
-            sortBy = sortBy,
-            sortDirection = sortDirection
+            limit = limit
         )
     }
 }
@@ -184,10 +151,5 @@ data class ReservationSearchCondition(
     val statusList: List<String>? = null,
     val startDate: String? = null,
     val endDate: String? = null,
-    val pageNumber: Int = 1,
-    val pageSize: Int = 20,
-    val sortBy: String = "reservedAt",
-    val sortDirection: String = "DESC"
-) {
-    fun getOffset(): Int = (pageNumber - 1) * pageSize
-}
+    val limit: Int = 20
+)

@@ -7,16 +7,16 @@ import io.mockk.every
 import io.mockk.mockk
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.api.payment.dto.request.PaymentRequest
-import kr.hhplus.be.server.api.payment.usecase.ProcessPaymentUserCase
+import kr.hhplus.be.server.api.payment.usecase.ProcessPaymentUseCase
 import kr.hhplus.be.server.domain.payment.service.PaymentService
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 class PaymentControllerTest : DescribeSpec({
     
-    val processPaymentUserCase = mockk<ProcessPaymentUserCase>()
+    val processPaymentUseCase = mockk<ProcessPaymentUseCase>()
     val paymentService = mockk<PaymentService>()
-    val paymentController = PaymentController(processPaymentUserCase, paymentService)
+    val paymentController = PaymentController(processPaymentUseCase, paymentService)
     
     describe("processPayment") {
         context("유효한 결제 요청이 들어올 때") {
@@ -24,8 +24,9 @@ class PaymentControllerTest : DescribeSpec({
                 // given
                 val userId = 1L
                 val reservationId = 1L
+                val seatId = 1L
                 val token = "valid-token"
-                val request = PaymentRequest(userId, reservationId, token)
+                val request = PaymentRequest(userId, reservationId, seatId, token)
                 val paymentDto = PaymentDto(
                     paymentId = 1L,
                     userId = userId,
@@ -35,7 +36,7 @@ class PaymentControllerTest : DescribeSpec({
                     paidAt = LocalDateTime.now(),
                 )
                 
-                every { processPaymentUserCase.execute(userId, reservationId, token) } returns paymentDto
+                every { processPaymentUseCase.execute(userId, reservationId, seatId, token) } returns paymentDto
                 
                 // when
                 val response = paymentController.processPayment(request)

@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.reservation.infrastructure
 
-import kr.hhplus.be.server.domain.reservation.model.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repository.ReservationStatusTypePojoRepository
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
 import org.springframework.stereotype.Repository
 
 @Repository
@@ -69,5 +69,10 @@ class ReservationStatusTypeRepositoryImpl(
     
     override fun isValidStatus(code: String): Boolean {
         return existsByCodeAndIsActiveTrue(code)
+    }
+    
+    // ========== JPA 연동 메서드 ==========
+    override fun flush() {
+        jpaRepository.flush()
     }
 }

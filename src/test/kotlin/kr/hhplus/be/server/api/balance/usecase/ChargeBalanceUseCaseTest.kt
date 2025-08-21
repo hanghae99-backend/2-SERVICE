@@ -15,7 +15,8 @@ import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.global.event.DomainEventPublisher
-import kr.hhplus.be.server.domain.balance.exception.InvalidPointAmountException
+import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
+import kr.hhplus.be.server.domain.common.BusinessRuleViolationException
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -39,10 +40,10 @@ class ChargeBalanceUseCaseTest : DescribeSpec({
                 val expectedFinalAmount = BigDecimal("25000")
                 
                 val expectedResultPoint = Point.create(userId, BigDecimal("25000"))
-                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
+                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전")
                 val history = PointHistory.charge(userId, chargeAmount, chargeType, "포인트 충전")
                 
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns Point.create(userId, BigDecimal("10000"))
+                every { pointRepository.findByUserId(userId) } returns Point.create(userId, BigDecimal("10000"))
                 every { pointRepository.save(any()) } returns expectedResultPoint
                 every { pointHistoryTypeRepository.getChargeType() } returns chargeType
                 every { pointHistoryRepository.save(any()) } returns history
@@ -72,10 +73,10 @@ class ChargeBalanceUseCaseTest : DescribeSpec({
                 val invalidAmount = BigDecimal("500") // 최소 1000원 미만
                 val currentPoint = Point.create(userId, BigDecimal("5000"))
                 
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns currentPoint
+                every { pointRepository.findByUserId(userId) } returns currentPoint
                 
                 // when & then
-                shouldThrow<InvalidPointAmountException> {
+                shouldThrow<BusinessRuleViolationException> {
                     chargeBalanceUseCase.execute(userId, invalidAmount)
                 }
             }
@@ -97,10 +98,10 @@ class ChargeBalanceUseCaseTest : DescribeSpec({
                 val currentPoint = Point.create(userId, BigDecimal("49000000")) // 최대 5000만원 근처
                 val chargeAmount = BigDecimal("2000000") // 한도 초과하는 충전
                 
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns currentPoint
+                every { pointRepository.findByUserId(userId) } returns currentPoint
                 
                 // when & then
-                shouldThrow<InvalidPointAmountException> {
+                shouldThrow<BusinessRuleViolationException> {
                     chargeBalanceUseCase.execute(userId, chargeAmount)
                 }
             }
@@ -123,11 +124,11 @@ class ChargeBalanceUseCaseTest : DescribeSpec({
                 val chargeAmount = BigDecimal("5000")
                 val existingPoint = Point.create(userId, BigDecimal.ZERO) // 0원으로 시작
                 val chargedPoint = mockk<Point>()
-                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전", true, LocalDateTime.now())
+                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전")
                 val history = PointHistory.charge(userId, chargeAmount, chargeType, "포인트 충전")
                 
                 // 기존 포인트가 있는 것처럼 설정
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns existingPoint
+                every { pointRepository.findByUserId(userId) } returns existingPoint
                 every { pointRepository.save(any()) } returns chargedPoint
                 every { chargedPoint.amount } returns BigDecimal("5000")
                 every { pointHistoryTypeRepository.getChargeType() } returns chargeType
@@ -157,10 +158,10 @@ class ChargeBalanceUseCaseTest : DescribeSpec({
                 val invalidAmount = BigDecimal.ZERO
                 val currentPoint = Point.create(userId, BigDecimal("5000"))
                 
-                every { pointRepository.findByUserIdWithPessimisticLock(userId) } returns currentPoint
+                every { pointRepository.findByUserId(userId) } returns currentPoint
                 
                 // when & then
-                shouldThrow<InvalidPointAmountException> {
+                shouldThrow<BusinessRuleViolationException> {
                     chargeBalanceUseCase.execute(userId, invalidAmount)
                 }
             }

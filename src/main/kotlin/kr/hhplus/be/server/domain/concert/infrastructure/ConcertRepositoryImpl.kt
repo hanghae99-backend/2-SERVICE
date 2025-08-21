@@ -32,4 +32,8 @@ class ConcertRepositoryImpl(
     override fun deleteAll() {
         concertRepository.deleteAll()
     }
+    
+    override fun flush() {
+        concertRepository.flush()
+    }
 }

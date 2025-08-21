@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.domain.user.model
+package kr.hhplus.be.server.domain.user.models
 
 import kr.hhplus.be.server.global.common.BaseEntity
 import jakarta.persistence.*
@@ -13,15 +13,19 @@ import jakarta.persistence.*
 class User(
     @Id
     @Column(name = "user_id")
-    val userId: Long
+    var userId: Long = 0
 ) : BaseEntity() {
 
     companion object {
-        fun create(userId: Long): User {
+        fun create(userId: Long = 1): User {
+            return User(userId = userId)
+        }
+        
+        fun createWithId(userId: Long): User {
             if (userId <= 0) {
                 throw kr.hhplus.be.server.global.exception.ParameterValidationException("사용자 ID는 0보다 커야 합니다: $userId")
             }
-
+            
             return User(userId = userId)
         }
     }

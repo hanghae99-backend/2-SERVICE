@@ -40,19 +40,22 @@ class QueueManager(
     }
 
     // 가용 슬롯만큼 대기열에서 토큰 활성화
-    fun processQueueAutomatically() {
+    fun processQueueAutomatically(): Int {
         val availableSlots = calculateAvailableSlots()
+        var activatedCount = 0
         if (availableSlots > 0) {
             val tokensToActivate = getNextTokensFromQueue(availableSlots)
             tokensToActivate.forEach { tokenString ->
                 try {
                     activateToken(tokenString)
+                    activatedCount++
                     println("토큰 자동 활성화: $tokenString")
                 } catch (e: Exception) {
                     println("토큰 활성화 실패: $tokenString, 오류: ${e.message}")
                 }
             }
         }
+        return activatedCount
     }
 
 

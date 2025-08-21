@@ -8,8 +8,8 @@ import kr.hhplus.be.server.domain.payment.event.PaymentCompletedEvent
 import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
 import kr.hhplus.be.server.domain.payment.exception.PaymentNotFoundException
 import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
-import kr.hhplus.be.server.domain.payment.repository.PaymentRepository
-import kr.hhplus.be.server.domain.payment.repository.PaymentStatusTypePojoRepository
+import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
+import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -45,13 +45,16 @@ class PaymentService(
     @Transactional
     fun completePayment(paymentId: Long, reservationId: Long, seatId: Long, token: String): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
-            .orElseThrow { PaymentNotFoundException("결제를 찾을 수 없습니다: $paymentId") }
+            .orElseThrow { PaymentNotFoundException(paymentId) }
 
-
+        // 비즈니스 로직 검증
+        payment.complete()
+        
+        // 상태 업데이트
         val completedStatus = paymentStatusTypeRepository.getCompletedStatus()
-        val completedPayment = payment.complete(completedStatus)
-        val finalPayment = paymentRepository.save(completedPayment)
-
+        payment.updateStatus(completedStatus)
+        
+        val finalPayment = paymentRepository.save(payment)
 
         val paymentCompletedEvent = PaymentCompletedEvent(
             paymentId = finalPayment.paymentId,
@@ -69,13 +72,16 @@ class PaymentService(
     @Transactional
     fun failPayment(paymentId: Long, reservationId: Long, reason: String, token: String): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
-            .orElseThrow { PaymentNotFoundException("결제를 찾을 수 없습니다: $paymentId") }
+            .orElseThrow { PaymentNotFoundException(paymentId) }
 
-
+        // 비즈니스 로직 검증
+        payment.fail()
+        
+        // 상태 업데이트
         val failedStatus = paymentStatusTypeRepository.getFailedStatus()
-        val failedPayment = payment.fail(failedStatus)
-        val finalPayment = paymentRepository.save(failedPayment)
-
+        payment.updateStatus(failedStatus)
+        
+        val finalPayment = paymentRepository.save(payment)
 
         val paymentFailedEvent = PaymentFailedEvent(
             paymentId = finalPayment.paymentId,
@@ -95,7 +101,7 @@ class PaymentService(
     
     fun getPaymentById(paymentId: Long): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
-            .orElseThrow { PaymentNotFoundException("결제를 찾을 수 없습니다: $paymentId") }
+            .orElseThrow { PaymentNotFoundException(paymentId) }
 
         return PaymentDto.fromEntity(payment)
     }

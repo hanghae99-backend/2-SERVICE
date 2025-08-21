@@ -146,4 +146,121 @@ class ConcertIntegrationTest(
             }
         }
     }
+
+    describe("매진 랭킹 조회 API") {
+        context("정상적인 limit 값으로 조회할 때") {
+            it("매진 랭킹 목록이 성공적으로 반환되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/concerts/sellout-ranking")
+                        .param("limit", "10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                    .andDo(print())
+                    .andExpect(status().isOk)
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.message").value("매진 랭킹 조회 완료"))
+                    .andExpect(jsonPath("$.data").isArray)
+            }
+        }
+        
+        context("기본값으로 조회할 때") {
+            it("limit=10으로 조회되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/concerts/sellout-ranking")
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                    .andExpect(status().isOk)
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data").isArray)
+            }
+        }
+        
+        context("잘못된 limit 값으로 조회할 때") {
+            it("limit=0일 때 400 Bad Request가 반환되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/concerts/sellout-ranking")
+                        .param("limit", "0")
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                    .andDo(print())
+                    .andExpect(status().isBadRequest)
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.errorCode").value("VAL.CONSTRAINT_VIOLATION"))
+            }
+            
+            it("limit=-1일 때 400 Bad Request가 반환되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/concerts/sellout-ranking")
+                        .param("limit", "-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                    .andExpect(status().isBadRequest)
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.errorCode").value("VAL.CONSTRAINT_VIOLATION"))
+            }
+            
+            it("limit=51일 때 400 Bad Request가 반환되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/concerts/sellout-ranking")
+                        .param("limit", "51")
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                    .andExpect(status().isBadRequest)
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.errorCode").value("VAL.CONSTRAINT_VIOLATION"))
+            }
+            
+            it("limit=100일 때 400 Bad Request가 반환되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/concerts/sellout-ranking")
+                        .param("limit", "100")
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                    .andExpect(status().isBadRequest)
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.errorCode").value("VAL.CONSTRAINT_VIOLATION"))
+            }
+            
+            it("숫자가 아닌 값일 때 400 Bad Request가 반환되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/concerts/sellout-ranking")
+                        .param("limit", "abc")
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                    .andExpect(status().isBadRequest)
+                    .andExpect(jsonPath("$.success").value(false))
+            }
+        }
+        
+        context("경계값 테스트") {
+            it("limit=1일 때 정상 처리되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/concerts/sellout-ranking")
+                        .param("limit", "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                    .andExpect(status().isOk)
+                    .andExpect(jsonPath("$.success").value(true))
+            }
+            
+            it("limit=50일 때 정상 처리되어야 한다") {
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/concerts/sellout-ranking")
+                        .param("limit", "50")
+                        .contentType(MediaType.APPLICATION_JSON)
+                )
+                    .andExpect(status().isOk)
+                    .andExpect(jsonPath("$.success").value(true))
+            }
+        }
+    }
 })

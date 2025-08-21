@@ -71,6 +71,10 @@ class RedisConfig {
             registerModule(JavaTimeModule())
             registerModule(KotlinModule.Builder().build())
             disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+            // null 값 처리 개선
+            configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, false)
             // WRAPPER_ARRAY 대신 PROPERTY 사용하여 직렬화 문제 해결
             activateDefaultTyping(
                 LaissezFaireSubTypeValidator.instance,
@@ -82,8 +86,8 @@ class RedisConfig {
 
     @Bean
     fun redisSerializer(): GenericJackson2JsonRedisSerializer {
-        // 타입 정보를 자동으로 처리하는 GenericJackson2JsonRedisSerializer 사용
-        return GenericJackson2JsonRedisSerializer()
+        // 커스텀 ObjectMapper를 사용하는 GenericJackson2JsonRedisSerializer 생성
+        return GenericJackson2JsonRedisSerializer(redisObjectMapper())
     }
 
     @Bean

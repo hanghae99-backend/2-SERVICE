@@ -17,6 +17,8 @@ import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
 import kr.hhplus.be.server.global.event.DomainEventPublisher
+import io.mockk.just
+import io.mockk.Runs
 import java.math.BigDecimal
 
 class ReservationServiceTest : DescribeSpec({
@@ -25,17 +27,21 @@ class ReservationServiceTest : DescribeSpec({
     val statusRepository = mockk<ReservationStatusTypePojoRepository>()
     val eventPublisher = mockk<DomainEventPublisher>()
     val seatService = mockk<SeatService>()
+    val selloutRankingService = mockk<SelloutRankingService>()
     
     val reservationService = ReservationService(
         reservationRepository,
         statusRepository,
         eventPublisher,
-        seatService
+        seatService,
+        selloutRankingService
     )
     
     beforeEach {
         clearAllMocks()
         every { eventPublisher.publish(any()) } returns Unit
+        every { selloutRankingService.incrementReservationCount(any()) } just Runs
+        every { selloutRankingService.decrementReservationCount(any()) } just Runs
     }
     
     describe("reserveSeat") {

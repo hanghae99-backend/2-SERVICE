@@ -3,6 +3,8 @@ package kr.hhplus.be.server.global.config
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import org.springframework.beans.factory.annotation.Qualifier
@@ -65,21 +67,23 @@ class RedisConfig {
     @Bean
     @Qualifier("redis")
     fun redisObjectMapper(): ObjectMapper {
-        val polymorphicTypeValidator = BasicPolymorphicTypeValidator.builder()
-            .allowIfBaseType(Any::class.java)
-            .build()
-
         return ObjectMapper().apply {
             registerModule(JavaTimeModule())
             registerModule(KotlinModule.Builder().build())
             disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            activateDefaultTyping(polymorphicTypeValidator, ObjectMapper.DefaultTyping.NON_FINAL)
+            // WRAPPER_ARRAY 대신 PROPERTY 사용하여 직렬화 문제 해결
+            activateDefaultTyping(
+                LaissezFaireSubTypeValidator.instance,
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                JsonTypeInfo.As.PROPERTY
+            )
         }
     }
 
     @Bean
     fun redisSerializer(): GenericJackson2JsonRedisSerializer {
-        return GenericJackson2JsonRedisSerializer(redisObjectMapper())
+        // 타입 정보를 자동으로 처리하는 GenericJackson2JsonRedisSerializer 사용
+        return GenericJackson2JsonRedisSerializer()
     }
 
     @Bean

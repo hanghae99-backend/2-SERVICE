@@ -85,11 +85,19 @@ class ReservationConcurrencyTest(
             // 무시
         }
         
-        // Redis 캐시 정리 - 다른 테스트들처럼 전체 삭제
+        // Redis 캐시 정리 - 안전한 방법으로 초기화
         try {
-            redisTemplate.connectionFactory?.connection?.flushAll()
+            redisTemplate.connectionFactory?.connection?.use { connection ->
+                connection.serverCommands().flushDb()
+            }
         } catch (e: Exception) {
             println("Redis 캐시 정리 실패: ${e.message}")
+            // fallback: 개별 키 삭제 시도
+            try {
+                redisTemplate.delete(redisTemplate.keys("*") ?: emptySet())
+            } catch (fallbackError: Exception) {
+                println("Redis 개별 키 삭제도 실패: ${fallbackError.message}")
+            }
         }
         
         // 분산락 통계 초기화

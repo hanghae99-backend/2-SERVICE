@@ -31,15 +31,19 @@ class ReservationStatusType @JsonCreator constructor(
     @Column(name = "is_active", nullable = false)
     var isActive: Boolean = true,
     
+    @JsonProperty("category")
     @Column(name = "category", nullable = false, length = 20)
     var category: String = "NORMAL",
     
+    @JsonProperty("sortOrder")
     @Column(name = "sort_order", nullable = false)
     var sortOrder: Int = 0,
     
+    @JsonProperty("isFinal")
     @Column(name = "is_final", nullable = false)
     var isFinal: Boolean = false,
     
+    @JsonProperty("autoExpireMinutes")
     @Column(name = "auto_expire_minutes", nullable = true)
     var autoExpireMinutes: Int? = null
 ): BaseEntity() {

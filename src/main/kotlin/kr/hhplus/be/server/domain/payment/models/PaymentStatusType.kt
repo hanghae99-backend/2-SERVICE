@@ -31,15 +31,19 @@ class PaymentStatusType @JsonCreator constructor(
     @Column(name = "is_active", nullable = false)
     var isActive: Boolean = true,
     
+    @JsonProperty("category")
     @Column(name = "category", nullable = false, length = 20)
     var category: String = "NORMAL",
     
+    @JsonProperty("sortOrder")
     @Column(name = "sort_order", nullable = false)
     var sortOrder: Int = 0,
     
+    @JsonProperty("isFinal")
     @Column(name = "is_final", nullable = false)
     var isFinal: Boolean = false,
     
+    @JsonProperty("requiresAction")
     @Column(name = "requires_action", nullable = false)
     var requiresAction: Boolean = false
 ): BaseEntity() {

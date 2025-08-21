@@ -31,9 +31,11 @@ class SeatStatusType @JsonCreator constructor(
     @Column(name = "is_active", nullable = false)
     var isActive: Boolean = true,
     
+    @JsonProperty("sortOrder")
     @Column(name = "sort_order", nullable = false)
     var sortOrder: Int = 0,
     
+    @JsonProperty("colorCode")
     @Column(name = "color_code", length = 7)
     var colorCode: String? = null
 ): BaseEntity() {

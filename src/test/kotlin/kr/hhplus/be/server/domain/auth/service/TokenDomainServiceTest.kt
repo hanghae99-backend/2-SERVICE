@@ -9,10 +9,16 @@ import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
 import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
+import kr.hhplus.be.server.global.config.ConcertProperties
 
 class TokenDomainServiceTest : DescribeSpec({
     
-    val tokenDomainService = TokenDomainService()
+    val concertProperties = mockk<ConcertProperties> {
+        io.mockk.every { queue.waitingTimeMultiplier } returns 2
+        io.mockk.every { queue.tokensPerMinute } returns 10
+        io.mockk.every { queue.maxActiveTokens } returns 100L
+    }
+    val tokenDomainService = TokenDomainService(concertProperties)
     
     describe("validateTokenActivation") {
         context("대기 중인 토큰을 활성화할 때") {

@@ -4,17 +4,15 @@ import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
 import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
+import kr.hhplus.be.server.global.config.ConcertProperties
 
 import org.springframework.stereotype.Component
 
 
 @Component
-class TokenDomainService {
-
-    companion object {
-        private const val MAX_ACTIVE_TOKENS = 100L
-        private const val TOKEN_EXPIRY_MINUTES = 5L
-    }
+class TokenDomainService(
+    private val concertProperties: ConcertProperties
+) {
 
 
     fun validateTokenActivation(token: WaitingToken, currentStatus: TokenStatus) {
@@ -34,17 +32,13 @@ class TokenDomainService {
         }
     }
 
-    // 대기 시간 계산: 대기 순서 * 2분
     fun calculateWaitingTime(queuePosition: Int): Int {
-        // 간단한 계산: 대기 순서 * 2분
-        return queuePosition * 2
+        return queuePosition * concertProperties.queue.waitingTimeMultiplier
     }
 
-    // 대기열 예상 대기 시간 계산
     fun calculateEstimatedWaitingTime(queuePosition: Int): Int? {
         return if (queuePosition >= 0) {
-            // 1분에 10명씩 처리 가정
-            ((queuePosition + 1) / 10).coerceAtLeast(1)
+            ((queuePosition + 1) / concertProperties.queue.tokensPerMinute).coerceAtLeast(1)
         } else {
             null
         }
@@ -52,7 +46,7 @@ class TokenDomainService {
 
 
     fun calculateAvailableSlots(currentActiveCount: Long): Int {
-        return (MAX_ACTIVE_TOKENS - currentActiveCount).toInt()
+        return (concertProperties.queue.maxActiveTokens - currentActiveCount).toInt()
     }
 
 

@@ -5,13 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.config.IntegrationTest
-import kr.hhplus.be.server.domain.concert.infrastructure.ConcertJpaRepository
-import kr.hhplus.be.server.domain.concert.infrastructure.ConcertScheduleJpaRepository
-import kr.hhplus.be.server.domain.concert.infrastructure.SeatJpaRepository
-import kr.hhplus.be.server.domain.concert.infrastructure.SeatStatusTypeJpaRepository
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.domain.concert.models.Concert
 import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
-import kr.hhplus.be.server.global.lock.DistributedLock
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -25,10 +23,6 @@ import java.time.LocalDate
 @IntegrationTest
 class ConcertIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
-    private val concertJpaRepository: ConcertJpaRepository,
-    private val concertScheduleJpaRepository: ConcertScheduleJpaRepository,
-    private val seatJpaRepository: SeatJpaRepository,
-    private val seatStatusTypeJpaRepository: SeatStatusTypeJpaRepository,
     private val objectMapper: ObjectMapper,
     private val distributedLock: DistributedLock,
     private val redisTemplate: RedisTemplate<String, Any>
@@ -44,44 +38,26 @@ class ConcertIntegrationTest(
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 데이터 정리
-        try {
-            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-            jdbcTemplate.execute("DELETE FROM seat")
-            jdbcTemplate.execute("DELETE FROM concert_schedule")
-            jdbcTemplate.execute("DELETE FROM concert")
-        } catch (e: Exception) {
-            // 무시
-        }
-
-        // Redis 정리
-        try {
-            redisTemplate.connectionFactory?.connection?.flushAll()
-        } catch (e: Exception) {
-            // 무시
-        }
+        // 테스트 데이터 정리
+        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+        TestDataCleanupHelper.cleanupRedis(redisTemplate)
+        TestDataCleanupHelper.cleanupConcertData(jdbcTemplate)
 
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
 
         Thread.sleep(100)
 
-        // 테스트 데이터 생성
-        testConcert = concertJpaRepository.save(
-            Concert.create("통합테스트 콘서트", "테스트 아티스트")
+        // TestDataFixture를 사용한 테스트 환경 구성
+        val concertEnv = TestDataFixture.createFullConcertEnvironment(
+            context = webApplicationContext,
+            concertTitle = "통합테스트 콘서트",
+            seatCount = 100,
+            daysFromNow = 10L
         )
-
-        testSchedule = concertScheduleJpaRepository.save(
-            ConcertSchedule.create(
-                concertId = testConcert.concertId,
-                concertDate = LocalDate.now().plusDays(10),
-                venue = "테스트 홀",
-                totalSeats = 100
-            )
-        )
-
-        concertJpaRepository.flush()
-        concertScheduleJpaRepository.flush()
+        
+        testConcert = concertEnv.concert
+        testSchedule = concertEnv.schedule
     }
 
     afterEach {

@@ -18,6 +18,7 @@ import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
 import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
 import kr.hhplus.be.server.domain.reservation.models.Reservation
 import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
+import kr.hhplus.be.server.config.TestDataFixture
 import kr.hhplus.be.server.domain.reservation.exception.ReservationFailedException
 import kr.hhplus.be.server.api.concert.dto.SeatDto
 import java.math.BigDecimal
@@ -47,7 +48,7 @@ class ReserveSeatUseCaseTest : DescribeSpec({
                 val token = "valid-token-12345"
                 
                 val waitingToken = WaitingToken.create(token, userId)
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0)
+                val temporaryStatus = TestDataFixture.createReservationStatusType()
                 val reservation = Reservation.createTemporary(userId, concertId, seatId, "A1", BigDecimal("100000"), temporaryStatus)
                 
                 val seatDto = mockk<SeatDto> {

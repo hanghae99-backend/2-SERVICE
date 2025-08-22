@@ -5,14 +5,12 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
 import kr.hhplus.be.server.config.IntegrationTest
-import kr.hhplus.be.server.domain.balance.models.Point
-import kr.hhplus.be.server.domain.balance.models.PointHistoryType
-import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
-import kr.hhplus.be.server.domain.balance.repositories.PointRepository
-import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.domain.user.models.User
-import kr.hhplus.be.server.domain.user.repositories.UserRepository
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
@@ -24,10 +22,7 @@ import java.math.BigDecimal
 class BalanceIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
-    private val userRepository: UserRepository,
-    private val pointRepository: PointRepository,
-    private val pointHistoryRepository: PointHistoryRepository,
-    private val pointHistoryTypeRepository: PointHistoryTypePojoRepository
+    private val redisTemplate: RedisTemplate<String, Any>
 ) : DescribeSpec({
     extension(SpringExtension)
 
@@ -41,46 +36,22 @@ class BalanceIntegrationTest(
     }
     
     beforeEach {
-        // 외래키 제약 조건 순서에 따른 데이터 삭제
-        // 1. point_history가 point_history_type을 참조하므로 먼저 삭제
-        pointHistoryRepository.deleteAll()
-        // 2. point가 user를 참조하므로 point 먼저 삭제
-        pointRepository.deleteAll()
-        // 3. 나머지 삭제
-        pointHistoryTypeRepository.deleteAll()
-        userRepository.deleteAll()
+        // 테스트 데이터 정리
+        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+        TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
         
-        // 새로운 테스트 사용자 생성
-        testUser = userRepository.save(User.create())
-
-        // PointHistoryType 설정
-        pointHistoryTypeRepository.save(
-            PointHistoryType.createDefault(
-                PointHistoryType.CHARGE,
-                "충전",
-                PointHistoryType.CATEGORY_CHARGE,
-                "포인트 충전"
-            )
+        // TestDataFixture를 사용한 테스트 환경 구성
+        testUser = TestDataFixture.createTestUser(
+            context = webApplicationContext,
+            withPoints = true,
+            pointAmount = BigDecimal("50000")
         )
-
-        pointHistoryTypeRepository.save(
-            PointHistoryType(
-                code = "DEDUCT",
-                name = "사용",
-                description = "포인트 사용"
-            )
-        )
-
-        // 초기 포인트 생성
-        pointRepository.save(Point.create(testUser.userId, BigDecimal("50000")))
     }
     
     afterEach {
-        // 외래키 제약 조건 순서에 따른 데이터 삭제
-        pointHistoryRepository.deleteAll()
-        pointRepository.deleteAll()
-        pointHistoryTypeRepository.deleteAll()
-        userRepository.deleteAll()
+        // 테스트 데이터 정리
+        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+        TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
     }
 
     describe("잔액 충전 API") {

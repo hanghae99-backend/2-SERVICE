@@ -9,12 +9,11 @@ import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
 import kr.hhplus.be.server.config.ConcurrencyTest
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
-import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
-import kr.hhplus.be.server.domain.balance.repositories.PointRepository
-import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
 import kr.hhplus.be.server.domain.user.models.User
-import kr.hhplus.be.server.domain.user.repositories.UserRepository
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.config.TestDataCleanupHelper
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -34,11 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger
 class BalanceConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
-    private val userRepository: UserRepository,
-    private val pointRepository: PointRepository,
-    private val userJpaRepository: UserJpaRepository,
-
-    private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
     private val distributedLock: DistributedLock,
     private val redisTemplate: RedisTemplate<String, Any>
 ) : DescribeSpec({
@@ -53,47 +47,26 @@ class BalanceConcurrencyTest(
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        userJpaRepository.deleteAll()
-        userJpaRepository.flush()
-
-        // 데이터 정리
-        try {
-            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-            jdbcTemplate.execute("DELETE FROM point_history")
-            jdbcTemplate.execute("DELETE FROM point")
-            jdbcTemplate.execute("DELETE FROM users")
-            jdbcTemplate.execute("DELETE FROM point_history_type")
-        } catch (e: Exception) {
-            // 무시
-        }
-        
-        // Redis 정리
-        try {
-            redisTemplate.connectionFactory?.connection?.flushAll()
-        } catch (e: Exception) {
-            // 무시
-        }
+        // 테스트 데이터 정리
+        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+        TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
         
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
 
-        // 테스트 데이터 설정 - User.create() 메서드 사용
-        testUser = userRepository.save(User(userId = 1L))
-        userRepository.flush()
-
-        chargeType = pointHistoryTypeRepository.save(
-            PointHistoryType.createDefault(
-                PointHistoryType.CHARGE,
-                "충전",
-                PointHistoryType.CATEGORY_CHARGE,
-                "포인트 충전"
-            )
+        // 테스트 데이터 설정
+        testUser = TestDataFixture.createTestUser(
+            context = webApplicationContext, 
+            userId = 1L, 
+            withPoints = true,
+            pointAmount = BigDecimal("10000")
         )
-        pointHistoryTypeRepository.flush()
 
-        // 초기 포인트 생성
-        pointRepository.save(Point.create(testUser.userId, BigDecimal("10000")))
-        pointRepository.flush()
+        chargeType = TestDataFixture.createPointHistoryType(
+            code = TestDataConstants.PointHistoryType.CHARGE.code,
+            name = TestDataConstants.PointHistoryType.CHARGE.name,
+            description = TestDataConstants.PointHistoryType.CHARGE.description
+        )
     }
 
     afterEach {
@@ -113,15 +86,11 @@ class BalanceConcurrencyTest(
             it("분산락으로 모든 충전이 안전하게 처리되어야 한다") {
                 // given
                 val userCount = 5
-                val users = mutableListOf<User>()
-                
-                repeat(userCount) {
-                    val user = userRepository.save(User(
-                        userId = (it + 1).toLong()
-                    ))
-                    userRepository.flush()
-                    users.add(user)
-                }
+                val users = TestDataFixture.createSimpleUsers(
+                    context = webApplicationContext,
+                    userCount = userCount,
+                    startUserId = 1L
+                )
 
                 val executor = Executors.newFixedThreadPool(userCount)
                 val latch = CountDownLatch(userCount)

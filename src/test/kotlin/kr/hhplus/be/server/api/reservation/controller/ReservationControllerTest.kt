@@ -11,6 +11,9 @@ import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.api.reservation.usecase.ReserveSeatUseCase
 import kr.hhplus.be.server.api.reservation.usecase.CancelReservationUseCase
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
+import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -37,7 +40,7 @@ class ReservationControllerTest : DescribeSpec({
                     paymentId = null,
                     seatNumber = "A1",
                     price = BigDecimal("50000"),
-                    statusCode = "TEMP",
+                    statusCode = TestDataConstants.ReservationStatusType.TEMPORARY.code,
                     statusName = "임시예약",
                     statusDescription = "임시 예약 상태",
                     reservedAt = LocalDateTime.now(),
@@ -45,12 +48,12 @@ class ReservationControllerTest : DescribeSpec({
                     confirmedAt = null
                 )
                 
-                val mockStatus = mockk<kr.hhplus.be.server.domain.reservation.models.ReservationStatusType>()
-                every { mockStatus.code } returns "TEMP"
+                val mockStatus = mockk<ReservationStatusType>()
+                every { mockStatus.code } returns TestDataConstants.ReservationStatusType.TEMPORARY.code
                 every { mockStatus.name } returns "임시예약"
                 every { mockStatus.description } returns "임시 예약 상태"
                 
-                val mockReservation = mockk<kr.hhplus.be.server.domain.reservation.models.Reservation>(relaxed = true)
+                val mockReservation = mockk<Reservation>(relaxed = true)
                 every { mockReservation.reservationId } returns 1L
                 every { mockReservation.userId } returns userId
                 every { mockReservation.concertId } returns concertId
@@ -133,7 +136,7 @@ class ReservationControllerTest : DescribeSpec({
                     paymentId = 1L,
                     seatNumber = "A1",
                     price = BigDecimal("50000"),
-                    statusCode = "CONF",
+                    statusCode = TestDataConstants.ReservationStatusType.CONFIRMED.code,
                     statusName = "확정",
                     statusDescription = "확정된 예약",
                     reservedAt = LocalDateTime.now(),
@@ -141,12 +144,12 @@ class ReservationControllerTest : DescribeSpec({
                     confirmedAt = LocalDateTime.now()
                 )
                 
-                val mockStatus = mockk<kr.hhplus.be.server.domain.reservation.models.ReservationStatusType>()
-                every { mockStatus.code } returns "CONF"
+                val mockStatus = mockk<ReservationStatusType>()
+                every { mockStatus.code } returns TestDataConstants.ReservationStatusType.CONFIRMED.code
                 every { mockStatus.name } returns "확정"
                 every { mockStatus.description } returns "확정된 예약"
                 
-                val mockReservation = mockk<kr.hhplus.be.server.domain.reservation.models.Reservation>(relaxed = true)
+                val mockReservation = mockk<Reservation>(relaxed = true)
                 every { mockReservation.reservationId } returns reservationId
                 every { mockReservation.userId } returns 1L
                 every { mockReservation.concertId } returns 1L

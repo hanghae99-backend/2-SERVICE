@@ -6,7 +6,8 @@ import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.user.dto.request.UserCreateRequest
 import kr.hhplus.be.server.config.IntegrationTest
 import kr.hhplus.be.server.domain.user.models.User
-import kr.hhplus.be.server.domain.user.repositories.UserRepository
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataCleanupHelper
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
@@ -18,8 +19,7 @@ import org.springframework.web.context.WebApplicationContext
 @IntegrationTest
 class UserIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
-    private val objectMapper: ObjectMapper,
-    private val userRepository: UserRepository
+    private val objectMapper: ObjectMapper
 ) : DescribeSpec({
     extension(SpringExtension)
 
@@ -32,18 +32,11 @@ class UserIntegrationTest(
             .build()
 
         // 데이터 정리
-        try {
-            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-            jdbcTemplate.execute("DELETE FROM point_history")
-            jdbcTemplate.execute("DELETE FROM balance")
-            jdbcTemplate.execute("DELETE FROM users")
-        } catch (e: Exception) {
-            // 무시
-        }
+        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+        TestDataCleanupHelper.cleanupUserData(jdbcTemplate)
 
         // 테스트 사용자 생성
-        testUser = userRepository.save(User(userId = 1L))
-        userRepository.flush()
+        testUser = TestDataFixture.createSimpleUser(webApplicationContext, userId = 1L)
     }
 
     describe("사용자 조회 API") {

@@ -15,6 +15,8 @@ import kr.hhplus.be.server.domain.concert.models.Seat
 import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatStatusTypePojoRepository
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -43,7 +45,7 @@ class SeatServiceTest : DescribeSpec({
                     totalSeats = 100,
                     availableSeats = 50,
                 )
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, 0, null)
+                val availableStatus = TestDataFixture.createSeatStatusType()
                 val seat1 = Seat(1L, scheduleId, "A1", "NORMAL", BigDecimal("100000"), availableStatus)
                 val seat2 = Seat(2L, scheduleId, "A2", "NORMAL", BigDecimal("100000"), availableStatus)
                 val seats = listOf(seat1, seat2)
@@ -91,8 +93,12 @@ class SeatServiceTest : DescribeSpec({
                     totalSeats = 100,
                     availableSeats = 50
                 )
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, 0, null)
-                val occupiedStatus = SeatStatusType("OCCUPIED", "점유", "점유된 좌석", true, 1, null)
+                val availableStatus = TestDataFixture.createSeatStatusType()
+                val occupiedStatus = TestDataFixture.createSeatStatusType(
+                    code = TestDataConstants.SeatStatusType.OCCUPIED.code,
+                    name = TestDataConstants.SeatStatusType.OCCUPIED.name,
+                    description = TestDataConstants.SeatStatusType.OCCUPIED.description
+                )
                 val seats = listOf(
                     Seat(1L, scheduleId, "A1", "NORMAL", BigDecimal("100000"), availableStatus),
                     Seat(2L, scheduleId, "A2", "NORMAL", BigDecimal("100000"), occupiedStatus),
@@ -131,7 +137,7 @@ class SeatServiceTest : DescribeSpec({
             it("해당 좌석 정보를 반환해야 한다") {
                 // given
                 val seatId = 1L
-                val availableStatus = SeatStatusType("AVAILABLE", "예약가능", "예약 가능한 좌석", true, 0, null)
+                val availableStatus = TestDataFixture.createSeatStatusType()
                 val seat = Seat(seatId, 1L, "A1", "NORMAL", BigDecimal("100000"), availableStatus)
                 
                 every { seatRepository.findById(seatId) } returns seat
@@ -215,8 +221,16 @@ class SeatServiceTest : DescribeSpec({
             it("좌석을 확정 상태로 변경해야 한다") {
                 // given
                 val seatId = 1L
-                val reservedStatus = SeatStatusType("RESERVED", "임시예약", "임시 예약된 좌석", true, 2, null)
-                val occupiedStatus = SeatStatusType("OCCUPIED", "점유", "점유된 좌석", true, 1, null)
+                val reservedStatus = TestDataFixture.createSeatStatusType(
+                    code = TestDataConstants.SeatStatusType.RESERVED.code,
+                    name = TestDataConstants.SeatStatusType.RESERVED.name,
+                    description = TestDataConstants.SeatStatusType.RESERVED.description
+                )
+                val occupiedStatus = TestDataFixture.createSeatStatusType(
+                    code = TestDataConstants.SeatStatusType.OCCUPIED.code,
+                    name = TestDataConstants.SeatStatusType.OCCUPIED.name,
+                    description = TestDataConstants.SeatStatusType.OCCUPIED.description
+                )
                 val seat = mockk<Seat>(relaxed = true)
 
                 every { seatRepository.findById(seatId) } returns seat

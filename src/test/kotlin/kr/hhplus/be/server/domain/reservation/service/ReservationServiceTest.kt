@@ -16,6 +16,8 @@ import kr.hhplus.be.server.domain.reservation.models.Reservation
 import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import io.mockk.just
 import io.mockk.Runs
@@ -58,8 +60,12 @@ class ReservationServiceTest : DescribeSpec({
                     every { this@mockk.price } returns price
                     every { this@mockk.seatNumber } returns "A1"
                 }
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
-                val confirmStatus = ReservationStatusType("CONFIRMED", "확정예약", "확정 예약 상태", true, "NORMAL", 0, false, 0)
+                val temporaryStatus = TestDataFixture.createReservationStatusType()
+                val confirmStatus = TestDataFixture.createReservationStatusType(
+                    code = TestDataConstants.ReservationStatusType.CONFIRMED.code,
+                    name = TestDataConstants.ReservationStatusType.CONFIRMED.name,
+                    description = TestDataConstants.ReservationStatusType.CONFIRMED.description
+                )
 
                 val reservation = Reservation.createTemporary(userId, concertId, seatId, "A1", price, temporaryStatus)
 
@@ -96,12 +102,16 @@ class ReservationServiceTest : DescribeSpec({
                     every { this@mockk.price } returns price
                     every { this@mockk.seatNumber } returns "A1"
                 }
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
+                val temporaryStatus = TestDataFixture.createReservationStatusType()
                 val existingReservation = Reservation.createTemporary(userId, concertId, seatId, "A1", price, temporaryStatus)
                 
                 every { seatService.getSeatById(seatId) } returns seatDto
                 every { statusRepository.getTemporaryStatus() } returns temporaryStatus
-                every { statusRepository.getConfirmedStatus() } returns ReservationStatusType("CONFIRMED", "확정", "확정된 예약", true, "NORMAL", 1, true, null)
+                every { statusRepository.getConfirmedStatus() } returns TestDataFixture.createReservationStatusType(
+                    code = TestDataConstants.ReservationStatusType.CONFIRMED.code,
+                    name = TestDataConstants.ReservationStatusType.CONFIRMED.name,
+                    description = TestDataConstants.ReservationStatusType.CONFIRMED.description
+                )
                 every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, any()) } returns existingReservation
                 
                 // when & then
@@ -118,8 +128,12 @@ class ReservationServiceTest : DescribeSpec({
                 // given
                 val reservationId = 1L
                 val paymentId = 1L
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
-                val confirmedStatus = ReservationStatusType("CONFIRMED", "확정", "확정된 예약", true, "NORMAL", 1, true, null)
+                val temporaryStatus = TestDataFixture.createReservationStatusType()
+                val confirmedStatus = TestDataFixture.createReservationStatusType(
+                    code = TestDataConstants.ReservationStatusType.CONFIRMED.code,
+                    name = TestDataConstants.ReservationStatusType.CONFIRMED.name,
+                    description = TestDataConstants.ReservationStatusType.CONFIRMED.description
+                )
                 val reservation = Reservation.createTemporary(1L, 1L, 1L, "A1", BigDecimal("50000"), temporaryStatus)
                 reservation.reservationId = reservationId
                 
@@ -146,8 +160,12 @@ class ReservationServiceTest : DescribeSpec({
                 val reservationId = 1L
                 val userId = 1L
                 val cancelReason = "개인 사정"
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
-                val cancelledStatus = ReservationStatusType("CANCELLED", "취소", "취소된 예약", true, "NORMAL", 2, true, null)
+                val temporaryStatus = TestDataFixture.createReservationStatusType()
+                val cancelledStatus = TestDataFixture.createReservationStatusType(
+                    code = TestDataConstants.ReservationStatusType.CANCELLED.code,
+                    name = TestDataConstants.ReservationStatusType.CANCELLED.name,
+                    description = TestDataConstants.ReservationStatusType.CANCELLED.description
+                )
                 val reservation = Reservation.createTemporary(userId, 1L, 1L, "A1", BigDecimal("50000"), temporaryStatus)
                 reservation.reservationId = reservationId
                 
@@ -171,7 +189,7 @@ class ReservationServiceTest : DescribeSpec({
             it("예약 정보를 반환해야 한다") {
                 // given
                 val reservationId = 1L
-                val temporaryStatus = ReservationStatusType("TEMPORARY", "임시예약", "임시 예약 상태", true, "NORMAL", 0, false, 5)
+                val temporaryStatus = TestDataFixture.createReservationStatusType()
                 val reservation = Reservation.createTemporary(1L, 1L, 1L, "A1", BigDecimal("50000"), temporaryStatus)
                 reservation.reservationId = reservationId
                 

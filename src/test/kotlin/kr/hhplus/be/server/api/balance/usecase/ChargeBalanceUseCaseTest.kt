@@ -17,6 +17,8 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepos
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
 import kr.hhplus.be.server.domain.common.BusinessRuleViolationException
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -40,7 +42,11 @@ class ChargeBalanceUseCaseTest : DescribeSpec({
                 val expectedFinalAmount = BigDecimal("25000")
                 
                 val expectedResultPoint = Point.create(userId, BigDecimal("25000"))
-                val chargeType = PointHistoryType(PointHistoryType.CHARGE, "충전", "포인트 충전")
+                val chargeType = TestDataFixture.createPointHistoryType(
+                    code = TestDataConstants.PointHistoryType.CHARGE.code,
+                    name = TestDataConstants.PointHistoryType.CHARGE.name,
+                    description = TestDataConstants.PointHistoryType.CHARGE.description
+                )
                 val history = PointHistory.charge(userId, chargeAmount, chargeType, "포인트 충전")
                 
                 every { pointRepository.findByUserId(userId) } returns Point.create(userId, BigDecimal("10000"))
@@ -124,7 +130,11 @@ class ChargeBalanceUseCaseTest : DescribeSpec({
                 val chargeAmount = BigDecimal("5000")
                 val existingPoint = Point.create(userId, BigDecimal.ZERO) // 0원으로 시작
                 val chargedPoint = mockk<Point>()
-                val chargeType = PointHistoryType(PointHistoryType.CHARGE, "충전", "포인트 충전")
+                val chargeType = TestDataFixture.createPointHistoryType(
+                    code = TestDataConstants.PointHistoryType.CHARGE.code,
+                    name = TestDataConstants.PointHistoryType.CHARGE.name,
+                    description = TestDataConstants.PointHistoryType.CHARGE.description
+                )
                 val history = PointHistory.charge(userId, chargeAmount, chargeType, "포인트 충전")
                 
                 // 기존 포인트가 있는 것처럼 설정

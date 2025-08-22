@@ -5,14 +5,16 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.auth.dto.request.TokenIssueRequest
 import kr.hhplus.be.server.config.IntegrationTest
-import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
 import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.config.TestDataCleanupHelper
+import kr.hhplus.be.server.config.TestDataFixture
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.context.WebApplicationContext
 import java.util.concurrent.TimeUnit
@@ -20,7 +22,6 @@ import java.util.concurrent.TimeUnit
 @IntegrationTest
 class AuthIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
-    private val userJpaRepository: UserJpaRepository,
     private val objectMapper: ObjectMapper,
     private val distributedLock: DistributedLock,
     private val redisTemplate: RedisTemplate<String, Any>
@@ -36,15 +37,8 @@ class AuthIntegrationTest(
             .build()
         
         // 기존 데이터 정리
-        userJpaRepository.deleteAll()
-        userJpaRepository.flush()
-        
-        // Redis 데이터 완전 정리 - Rate Limit 키 포함
-        try {
-            redisTemplate.connectionFactory?.connection?.flushAll()
-        } catch (e: Exception) {
-            println("Redis flush failed: ${e.message}")
-        }
+        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+        TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
         
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
@@ -72,16 +66,14 @@ class AuthIntegrationTest(
         context("유효한 사용자 ID로 토큰 발급을 요청할 때") {
             it("토큰이 성공적으로 발급되어야 한다") {
                 // given
-                val user = User(
+                val user = TestDataFixture.createTestUser(
+                    context = webApplicationContext,
                     userId = 1L,
-                    
-                    
+                    withPoints = false
                 )
-                val savedUser = userJpaRepository.save(user)
-                userJpaRepository.flush()
-                val userId = savedUser.userId
+                val userId = user.userId
                 
-                println("Created user for token issue: id=${savedUser.userId}")
+                println("Created user for token issue: id=${user.userId}")
                 
                 val request = TokenIssueRequest(userId)
 
@@ -129,14 +121,12 @@ class AuthIntegrationTest(
                 // given
                 Thread.sleep(500) // Rate limit 방지
                 
-                val user = User(
+                val user = TestDataFixture.createTestUser(
+                    context = webApplicationContext,
                     userId = 1L,
-                    
-                    
+                    withPoints = false
                 )
-                val savedUser = userJpaRepository.save(user)
-                userJpaRepository.flush()
-                val userId = savedUser.userId
+                val userId = user.userId
                 
                 val request = TokenIssueRequest(userId)
                 
@@ -201,14 +191,12 @@ class AuthIntegrationTest(
                 // given
                 Thread.sleep(500)
                 
-                val user = User(
+                val user = TestDataFixture.createTestUser(
+                    context = webApplicationContext,
                     userId = 1L,
-                    
-                    
+                    withPoints = false
                 )
-                val savedUser = userJpaRepository.save(user)
-                userJpaRepository.flush()
-                val userId = savedUser.userId
+                val userId = user.userId
                 
                 // 토큰 발급
                 val request = TokenIssueRequest(userId)

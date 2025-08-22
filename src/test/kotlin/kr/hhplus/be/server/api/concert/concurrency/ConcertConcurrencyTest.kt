@@ -9,21 +9,16 @@ import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
-import kr.hhplus.be.server.domain.concert.infrastructure.ConcertJpaRepository
-import kr.hhplus.be.server.domain.concert.infrastructure.ConcertScheduleJpaRepository
-import kr.hhplus.be.server.domain.concert.infrastructure.SeatJpaRepository
-import kr.hhplus.be.server.domain.concert.infrastructure.SeatStatusTypeJpaRepository
-import kr.hhplus.be.server.domain.reservation.infrastructure.ReservationStatusTypeJpaRepository
-import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.domain.concert.models.Concert
 import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
 import kr.hhplus.be.server.domain.concert.models.Seat
-import kr.hhplus.be.server.domain.concert.models.SeatStatusType
-import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
 import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.config.TestDataCleanupHelper
+import kr.hhplus.be.server.config.TestDataFixture
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -39,12 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger
 @ConcurrencyTest
 class ConcertConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
-    private val concertJpaRepository: ConcertJpaRepository,
-    private val concertScheduleJpaRepository: ConcertScheduleJpaRepository,
-    private val seatJpaRepository: SeatJpaRepository,
-    private val seatStatusTypeJpaRepository: SeatStatusTypeJpaRepository,
-    private val reservationStatusTypeJpaRepository: ReservationStatusTypeJpaRepository,
-    private val userJpaRepository: UserJpaRepository,
     private val tokenStore: TokenStore,
     private val tokenFactory: TokenFactory,
     private val objectMapper: ObjectMapper,
@@ -64,58 +53,25 @@ class ConcertConcurrencyTest(
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 데이터 정리
-        try {
-            seatJpaRepository.deleteAll()
-            concertScheduleJpaRepository.deleteAll()
-            concertJpaRepository.deleteAll()
-            seatStatusTypeJpaRepository.deleteAll()
-            userJpaRepository.deleteAll()
-        } catch (e: Exception) {
-            // 무시
-        }
-        
-        // Redis 정리
-        try {
-            redisTemplate.connectionFactory?.connection?.flushAll()
-        } catch (e: Exception) {
-            // 무시
-        }
+        // 테스트 데이터 정리
+        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+        TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
         
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
 
-        // 테스트 데이터 생성
-        testConcert = concertJpaRepository.save(
-            Concert.create("동시성 테스트 콘서트", "테스트 아티스트")
+        // TestDataFixture를 사용한 동시성 테스트 환경 구성
+        val testEnvironment = TestDataFixture.createConcurrencyTestEnvironment(
+            context = webApplicationContext,
+            userCount = 10,
+            concertTitle = "동시성 테스트 콘서트",
+            seatCount = 50
         )
         
-        testSchedule = concertScheduleJpaRepository.save(
-            ConcertSchedule.create(
-                concertId = testConcert.concertId,
-                concertDate = LocalDate.now().plusDays(10),
-                venue = "테스트 홀",
-                totalSeats = 50
-            )
-        )
-
-        // 테스트 사용자들 생성
-        testUsers = mutableListOf()
-        repeat(10) { index ->
-            val user = userJpaRepository.save(User(
-                userId = (index+1).toLong(),
-            ))
-            userJpaRepository.flush()
-            testUsers = testUsers + user
-        }
-
-        // 테스트 토큰들 생성
-        testTokens = testUsers.map { user ->
-            val token = tokenFactory.createWaitingToken(user.userId)
-            tokenStore.save(token)
-            tokenStore.activateToken(token.token)
-            token
-        }
+        testConcert = testEnvironment.concert
+        testSchedule = testEnvironment.schedule
+        testUsers = testEnvironment.users
+        testTokens = testEnvironment.tokens
 
         Thread.sleep(100)
     }
@@ -135,55 +91,18 @@ class ConcertConcurrencyTest(
         context("여러 사용자가 동시에 같은 좌석을 예약하려고 할 때") {
             it("분산락으로 하나의 예약만 성공해야 한다") {
                 // given
-                // 좌석 상태 타입 생성 - AVAILABLE과 RESERVED 모두 필요
-                val availableStatus = seatStatusTypeJpaRepository.save(
-                    SeatStatusType(
-                        code = SeatStatusType.AVAILABLE,
-                        name = "예약 가능",
-                        description = "예약 가능한 좌석"
-                    )
-                )
-
-                // RESERVED 상태 추가 - 예약 처리 시 필요
-                seatStatusTypeJpaRepository.save(
-                    SeatStatusType(
-                        code = SeatStatusType.RESERVED,
-                        name = "예약됨",
-                        description = "예약된 좌석"
-                    )
-                )
-
-                // ReservationStatusType 데이터 생성 - TEMPORARY와 CONFIRMED 필요
-                reservationStatusTypeJpaRepository.save(
-                    ReservationStatusType(
-                        code = ReservationStatusType.TEMPORARY,
-                        name = "임시 예약",
-                        description = "결제 대기 중",
-                        category = "NORMAL",
-                        autoExpireMinutes = 5,
-                        isFinal = false
-                    )
-                )
-
-                reservationStatusTypeJpaRepository.save(
-                    ReservationStatusType(
-                        code = ReservationStatusType.CONFIRMED,
-                        name = "예약 확정",
-                        description = "결제 완료",
-                        category = "NORMAL",
-                        autoExpireMinutes = null,
-                        isFinal = false
-                    )
-                )
+                // 모든 상태 타입 생성 (AVAILABLE, RESERVED, TEMPORARY, CONFIRMED 등)
+                TestDataFixture.createAllStatusTypes(webApplicationContext)
                 
-                val testSeat = seatJpaRepository.save(
-                    Seat.create(
-                        scheduleId = testSchedule.scheduleId,
-                        seatNumber = "A1",
-                        price = BigDecimal("80000"),
-                        availableStatus = availableStatus
-                    )
+                // TestDataFixture를 사용해서 테스트용 좌석 생성 (단일 좌석)
+                val testSeats = TestDataFixture.createTestSeats(
+                    context = webApplicationContext,
+                    scheduleId = testSchedule.scheduleId,
+                    seatCount = 1,
+                    startNumber = 1,
+                    price = BigDecimal("80000")
                 )
+                val testSeat = testSeats.first()
 
                 val executor = Executors.newFixedThreadPool(testUsers.size)
                 val latch = CountDownLatch(testUsers.size)

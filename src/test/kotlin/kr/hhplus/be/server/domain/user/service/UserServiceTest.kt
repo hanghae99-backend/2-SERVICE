@@ -12,6 +12,7 @@ import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.domain.user.exception.UserAlreadyExistsException
 import kr.hhplus.be.server.domain.user.exception.UserNotFoundException
 import kr.hhplus.be.server.domain.user.repositories.UserRepository
+import kr.hhplus.be.server.config.TestDataFixture
 
 class UserServiceTest : DescribeSpec({
     
@@ -25,7 +26,7 @@ class UserServiceTest : DescribeSpec({
                 val userCreateRequest = UserCreateRequest(
                     userId = 1L
                 )
-                val user = User.create(1L)
+                val user = TestDataFixture.createTestUserObject(1L)
                 user.userId = 1L
                 
                 every { userRepository.existsById(1L) } returns false
@@ -66,7 +67,7 @@ class UserServiceTest : DescribeSpec({
             it("사용자를 반환해야 한다") {
                 // given
                 val userId = 1L
-                val user = User.createWithId(userId)
+                val user = TestDataFixture.createTestUserObject(userId)
                 
                 every { userRepository.findById(userId) } returns user
                 
@@ -103,7 +104,7 @@ class UserServiceTest : DescribeSpec({
             it("UserDto를 반환해야 한다") {
                 // given
                 val userId = 1L
-                val user = User.createWithId(userId)
+                val user = TestDataFixture.createTestUserObject(userId)
                 
                 every { userRepository.findById(userId) } returns user
                 

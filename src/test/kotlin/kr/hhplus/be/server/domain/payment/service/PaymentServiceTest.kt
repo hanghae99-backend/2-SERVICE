@@ -39,7 +39,7 @@ class PaymentServiceTest : DescribeSpec({
                 val reservationId = 1L
                 val amount = BigDecimal("50000")
                 
-                val pendingStatus = PaymentStatusType("PEND", "결제 대기", "결제 대기 상태", true, "NORMAL", 0, false, false)
+                val pendingStatus = PaymentStatusType.createDefault(PaymentStatusType.PENDING, "결제 대기", PaymentStatusType.CATEGORY_NORMAL, "결제 대기 상태")
                 val payment = Payment.createForReservation(userId, reservationId, amount, "POINT", pendingStatus)
                 payment.paymentId = 1L
                 
@@ -67,8 +67,8 @@ class PaymentServiceTest : DescribeSpec({
                 val seatId = 1L
                 val token = "test-token"
                 
-                val pendingStatus = PaymentStatusType("PEND", "결제 대기", "결제 대기 상태", true, "NORMAL", 0, false, false)
-                val completedStatus = PaymentStatusType("COMPLETED", "결제 완료", "결제 완료 상태", true, "NORMAL", 1, true, false)
+                val pendingStatus = PaymentStatusType.createDefault(PaymentStatusType.PENDING, "결제 대기", PaymentStatusType.CATEGORY_NORMAL, "결제 대기 상태")
+                val completedStatus = PaymentStatusType.createDefault(PaymentStatusType.COMPLETED, "결제 완료", PaymentStatusType.CATEGORY_NORMAL, "결제 완료 상태")
                 val payment = Payment.createForReservation(1L, reservationId, BigDecimal("50000"), "POINT", pendingStatus)
                 payment.paymentId = paymentId
                 
@@ -93,7 +93,7 @@ class PaymentServiceTest : DescribeSpec({
             it("결제 정보를 반환해야 한다") {
                 // given
                 val paymentId = 1L
-                val pendingStatus = PaymentStatusType("PEND", "결제 대기", "결제 대기 상태", true, "NORMAL", 0, false, false)
+                val pendingStatus = PaymentStatusType.createDefault(PaymentStatusType.PENDING, "결제 대기", PaymentStatusType.CATEGORY_NORMAL, "결제 대기 상태")
                 val payment = Payment.createForReservation(1L, 1L, BigDecimal("50000"), "POINT", pendingStatus)
                 payment.paymentId = paymentId
                 

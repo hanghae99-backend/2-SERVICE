@@ -43,12 +43,6 @@ class Payment(
 ) : BaseEntity() {
 
     companion object {
-        // 상태 코드 상수
-        const val STATUS_PENDING = "PEND"
-        const val STATUS_COMPLETED = "COMP"
-        const val STATUS_FAILED = "FAIL"
-        const val STATUS_CANCELLED = "CANC"
-        const val STATUS_REFUNDED = "REFD"
 
         fun createForReservation(
             userId: Long,
@@ -90,7 +84,7 @@ class Payment(
     }
 
     fun complete() {
-        if (status.code != STATUS_PENDING) {
+        if (status.code != PaymentStatusType.PENDING) {
             throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
         // 상태 변경은 서비스 레이어에서 처리
@@ -102,29 +96,29 @@ class Payment(
     }
 
     fun fail() {
-        if (status.code != STATUS_PENDING) {
+        if (status.code != PaymentStatusType.PENDING) {
             throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
         // 상태 변경은 서비스 레이어에서 처리
     }
 
     fun cancel() {
-        if (status.code == STATUS_COMPLETED) {
+        if (status.code == PaymentStatusType.COMPLETED) {
             throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
         // 상태 변경은 서비스 레이어에서 처리
     }
 
     fun refund() {
-        if (status.code != STATUS_COMPLETED) {
+        if (status.code != PaymentStatusType.COMPLETED) {
             throw PaymentAlreadyProcessedException(paymentId, status.code)
         }
         // 상태 변경은 서비스 레이어에서 처리
     }
 
-    fun isCompleted(): Boolean = status.code == STATUS_COMPLETED
-    fun isPending(): Boolean = status.code == STATUS_PENDING
-    fun isFailed(): Boolean = status.code == STATUS_FAILED
-    fun isCancelled(): Boolean = status.code == STATUS_CANCELLED
-    fun isRefunded(): Boolean = status.code == STATUS_REFUNDED
+    fun isCompleted(): Boolean = status.code == PaymentStatusType.COMPLETED
+    fun isPending(): Boolean = status.code == PaymentStatusType.PENDING
+    fun isFailed(): Boolean = status.code == PaymentStatusType.FAILED
+    fun isCancelled(): Boolean = status.code == PaymentStatusType.CANCELLED
+    fun isRefunded(): Boolean = status.code == PaymentStatusType.REFUNDED
 }

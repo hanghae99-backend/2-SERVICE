@@ -43,17 +43,17 @@ class ReservationStatusTypeRepositoryImpl(
     
     // ========== 상태 조회 with 예외 처리 ==========
     override fun getTemporaryStatus(): ReservationStatusType {
-        return findByCodeAndIsActiveTrue("TEMPORARY")
+        return findByCodeAndIsActiveTrue(ReservationStatusType.TEMPORARY)
             ?: throw IllegalStateException("TEMPORARY 상태를 찾을 수 없습니다")
     }
     
     override fun getConfirmedStatus(): ReservationStatusType {
-        return findByCodeAndIsActiveTrue("CONFIRMED")
+        return findByCodeAndIsActiveTrue(ReservationStatusType.CONFIRMED)
             ?: throw IllegalStateException("CONFIRMED 상태를 찾을 수 없습니다")
     }
     
     override fun getCancelledStatus(): ReservationStatusType {
-        return findByCodeAndIsActiveTrue("CANCELLED")
+        return findByCodeAndIsActiveTrue(ReservationStatusType.CANCELLED)
             ?: throw IllegalStateException("CANCELLED 상태를 찾을 수 없습니다")
     }
     

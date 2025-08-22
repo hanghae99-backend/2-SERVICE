@@ -40,7 +40,7 @@ class ChargeBalanceUseCaseTest : DescribeSpec({
                 val expectedFinalAmount = BigDecimal("25000")
                 
                 val expectedResultPoint = Point.create(userId, BigDecimal("25000"))
-                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전")
+                val chargeType = PointHistoryType(PointHistoryType.CHARGE, "충전", "포인트 충전")
                 val history = PointHistory.charge(userId, chargeAmount, chargeType, "포인트 충전")
                 
                 every { pointRepository.findByUserId(userId) } returns Point.create(userId, BigDecimal("10000"))
@@ -124,7 +124,7 @@ class ChargeBalanceUseCaseTest : DescribeSpec({
                 val chargeAmount = BigDecimal("5000")
                 val existingPoint = Point.create(userId, BigDecimal.ZERO) // 0원으로 시작
                 val chargedPoint = mockk<Point>()
-                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전")
+                val chargeType = PointHistoryType(PointHistoryType.CHARGE, "충전", "포인트 충전")
                 val history = PointHistory.charge(userId, chargeAmount, chargeType, "포인트 충전")
                 
                 // 기존 포인트가 있는 것처럼 설정

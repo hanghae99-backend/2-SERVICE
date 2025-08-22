@@ -82,10 +82,11 @@ class BalanceConcurrencyTest(
         userRepository.flush()
 
         chargeType = pointHistoryTypeRepository.save(
-            PointHistoryType(
-                code = "CHARGE",
-                name = "충전",
-                description = "포인트 충전"
+            PointHistoryType.createDefault(
+                PointHistoryType.CHARGE,
+                "충전",
+                PointHistoryType.CATEGORY_CHARGE,
+                "포인트 충전"
             )
         )
         pointHistoryTypeRepository.flush()

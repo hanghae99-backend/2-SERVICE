@@ -50,25 +50,25 @@ class SeatStatusTypeRepositoryImpl(
     // ========== 상태 조회 with 예외 처리 ==========
     @Cacheable(value = ["status:types"], key = "'AVAILABLE'")
     override fun getAvailableStatus(): SeatStatusType {
-        return findByCodeAndIsActiveTrue("AVAILABLE")
+        return findByCodeAndIsActiveTrue(SeatStatusType.AVAILABLE)
             ?: throw IllegalStateException("AVAILABLE 상태를 찾을 수 없습니다")
     }
     
     @Cacheable(value = ["status:types"], key = "'RESERVED'")
     override fun getReservedStatus(): SeatStatusType {
-        return findByCodeAndIsActiveTrue("RESERVED")
+        return findByCodeAndIsActiveTrue(SeatStatusType.RESERVED)
             ?: throw IllegalStateException("RESERVED 상태를 찾을 수 없습니다")
     }
     
     @Cacheable(value = ["status:types"], key = "'OCCUPIED'")
     override fun getOccupiedStatus(): SeatStatusType {
-        return findByCodeAndIsActiveTrue("OCCUPIED")
+        return findByCodeAndIsActiveTrue(SeatStatusType.OCCUPIED)
             ?: throw IllegalStateException("OCCUPIED 상태를 찾을 수 없습니다")
     }
     
     @Cacheable(value = ["status:types"], key = "'MAINTENANCE'")
     override fun getMaintenanceStatus(): SeatStatusType {
-        return findByCodeAndIsActiveTrue("MAINTENANCE")
+        return findByCodeAndIsActiveTrue(SeatStatusType.MAINTENANCE)
             ?: throw IllegalStateException("MAINTENANCE 상태를 찾을 수 없습니다")
     }
     

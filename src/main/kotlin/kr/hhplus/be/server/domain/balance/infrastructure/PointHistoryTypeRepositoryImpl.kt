@@ -43,12 +43,12 @@ class PointHistoryTypeRepositoryImpl(
     
     // ========== 상태 조회 with 예외 처리 ==========
     override fun getChargeType(): PointHistoryType {
-        return findByCodeAndIsActiveTrue("CHARGE")
+        return findByCodeAndIsActiveTrue(PointHistoryType.CHARGE)
             ?: throw IllegalStateException("CHARGE 타입을 찾을 수 없습니다")
     }
     
     override fun getUseType(): PointHistoryType {
-        return findByCodeAndIsActiveTrue("USE")
+        return findByCodeAndIsActiveTrue(PointHistoryType.USE)
             ?: throw IllegalStateException("USE 타입을 찾을 수 없습니다")
     }
     

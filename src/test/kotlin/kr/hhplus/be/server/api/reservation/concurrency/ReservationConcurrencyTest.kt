@@ -149,7 +149,7 @@ class ReservationConcurrencyTest(
         // 좌석 상태 타입 생성
         availableStatus = seatStatusTypeRepository.save(
             SeatStatusType(
-                code = "AVAILABLE",
+                code = SeatStatusType.AVAILABLE,
                 name = "예약가능",
                 description = "예약 가능한 좌석"
             )
@@ -157,7 +157,7 @@ class ReservationConcurrencyTest(
 
         reservedStatus = seatStatusTypeRepository.save(
             SeatStatusType(
-                code = "RESERVED",
+                code = SeatStatusType.RESERVED,
                 name = "예약완료",
                 description = "예약된 좌석"
             )
@@ -179,7 +179,7 @@ class ReservationConcurrencyTest(
         // 예약 상태 타입 생성
         reservationStatusTypeRepository.save(
             ReservationStatusType(
-                code = "TEMPORARY",
+                code = ReservationStatusType.TEMPORARY,
                 name = "임시예약",
                 description = "임시 예약 상태"
             )
@@ -187,7 +187,7 @@ class ReservationConcurrencyTest(
 
         reservationStatusTypeRepository.save(
             ReservationStatusType(
-                code = "CONFIRMED",
+                code = ReservationStatusType.CONFIRMED,
                 name = "확정예약",
                 description = "결제 완료된 확정 예약"
             )

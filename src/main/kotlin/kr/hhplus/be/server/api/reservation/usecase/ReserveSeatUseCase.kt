@@ -2,6 +2,7 @@ package kr.hhplus.be.server.api.reservation.usecase
 
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.concert.service.SeatService
+import kr.hhplus.be.server.domain.concert.models.SeatStatusType
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.reservation.models.Reservation
@@ -78,7 +79,7 @@ class ReserveSeatUseCase(
         
         val seat = seatService.getSeatById(seatId)
         
-        if (seat.statusCode != "AVAILABLE") {
+        if (seat.statusCode != SeatStatusType.AVAILABLE) {
             logger.warn("예약 불가능한 좌석 - seatId: {}, status: {}", seatId, seat.statusCode)
             throw ReservationFailedException("예약할 수 없는 좌석입니다: $seatId")
         }

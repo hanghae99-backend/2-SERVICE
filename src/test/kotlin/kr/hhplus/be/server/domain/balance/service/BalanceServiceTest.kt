@@ -68,8 +68,8 @@ class BalanceServiceTest : DescribeSpec({
             it("이력 목록을 반환해야 한다") {
                 // given
                 val userId = 1L
-                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전")
-                val useType = PointHistoryType("USE", "사용", "포인트 사용")
+                val chargeType = PointHistoryType(PointHistoryType.CHARGE, "충전", "포인트 충전")
+                val useType = PointHistoryType(PointHistoryType.USE, "사용", "포인트 사용")
                 val histories = listOf(
                     PointHistory.charge(userId, BigDecimal("10000"), chargeType, "충전", BigDecimal("10000")),
                     PointHistory.use(userId, BigDecimal("3000"), useType, "사용", BigDecimal("7000"))

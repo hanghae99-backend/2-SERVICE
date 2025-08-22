@@ -123,7 +123,7 @@ class ReservationIntegrationTest(
         // 좌석 상태 타입
         val availableStatus = seatStatusTypeRepository.save(
             SeatStatusType(
-                code = "AVAILABLE",
+                code = SeatStatusType.AVAILABLE,
                 name = "예약 가능",
                 description = "예약 가능한 좌석"
             )
@@ -131,7 +131,7 @@ class ReservationIntegrationTest(
 
         seatStatusTypeRepository.save(
             SeatStatusType(
-                code = "RESERVED",
+                code = SeatStatusType.RESERVED,
                 name = "예약됨",
                 description = "예약된 좌석"
             )
@@ -151,7 +151,7 @@ class ReservationIntegrationTest(
         // 예약 상태 타입
         reservationStatusTypeRepository.save(
             ReservationStatusType(
-                code = "TEMPORARY",
+                code = ReservationStatusType.TEMPORARY,
                 name = "임시 예약",
                 description = "임시 예약 상태"
             )
@@ -159,7 +159,7 @@ class ReservationIntegrationTest(
 
         reservationStatusTypeRepository.save(
             ReservationStatusType(
-                code = "CONFIRMED",
+                code = ReservationStatusType.CONFIRMED,
                 name = "예약 확정",
                 description = "결제 완료된 확정 예약"
             )

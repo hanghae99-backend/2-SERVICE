@@ -182,7 +182,7 @@ class PaymentIntegrationTest(
         // 결제 상태 타입
         paymentStatusTypeRepository.save(
             PaymentStatusType(
-                code = "PEND",
+                code = PaymentStatusType.PENDING,
                 name = "결제대기",
                 description = "결제 처리 대기중"
             )
@@ -190,17 +190,18 @@ class PaymentIntegrationTest(
         
         paymentStatusTypeRepository.save(
             PaymentStatusType(
-                code = "COMP",
+                code = PaymentStatusType.COMPLETED,
                 name = "결제완료",
                 description = "결제가 성공적으로 완료됨"
             )
         )
 
         pointHistoryTypeRepository.save(
-            PointHistoryType(
-                code = "USE",
-                name = "사용",
-                description = "포인트 사용"
+            PointHistoryType.createDefault(
+                PointHistoryType.USE,
+                "사용",
+                PointHistoryType.CATEGORY_USE,
+                "포인트 사용"
             )
         )
         // 좌석을 예약 상태로 변경

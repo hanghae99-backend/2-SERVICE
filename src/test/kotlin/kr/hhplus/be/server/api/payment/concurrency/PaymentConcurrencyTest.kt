@@ -129,10 +129,11 @@ class PaymentConcurrencyTest(
         
         // USE 타입도 추가 (호환성을 위해)
         pointHistoryTypeRepository.save(
-            PointHistoryType(
-                code = "USE",
-                name = "사용",
-                description = "포인트 사용"
+            PointHistoryType.createDefault(
+                PointHistoryType.USE,
+                "사용",
+                PointHistoryType.CATEGORY_USE,
+                "포인트 사용"
             )
         )
         pointHistoryTypeRepository.flush()
@@ -158,7 +159,7 @@ class PaymentConcurrencyTest(
         // 좌석 상태 타입
         val availableStatus = seatStatusTypeRepository.save(
             SeatStatusType(
-                code = "AVAILABLE",
+                code = SeatStatusType.AVAILABLE,
                 name = "예약 가능",
                 description = "예약 가능한 좌석"
             )
@@ -166,7 +167,7 @@ class PaymentConcurrencyTest(
 
         val reservedStatus = seatStatusTypeRepository.save(
             SeatStatusType(
-                code = "RESERVED",
+                code = SeatStatusType.RESERVED,
                 name = "예약됨",
                 description = "예약된 좌석"
             )
@@ -174,7 +175,7 @@ class PaymentConcurrencyTest(
         
         val occupiedStatus = seatStatusTypeRepository.save(
             SeatStatusType(
-                code = "OCCUPIED",
+                code = SeatStatusType.OCCUPIED,
                 name = "점유완료",
                 description = "결제 완료된 좌석"
             )
@@ -194,7 +195,7 @@ class PaymentConcurrencyTest(
         // 예약 상태 타입
         val temporaryStatus = reservationStatusTypeRepository.save(
             ReservationStatusType(
-                code = "TEMPORARY",
+                code = ReservationStatusType.TEMPORARY,
                 name = "임시 예약",
                 description = "임시 예약 상태"
             )
@@ -202,7 +203,7 @@ class PaymentConcurrencyTest(
 
         reservationStatusTypeRepository.save(
             ReservationStatusType(
-                code = "CONFIRMED",
+                code = ReservationStatusType.CONFIRMED,
                 name = "예약 확정",
                 description = "결제 완료된 확정 예약"
             )
@@ -212,7 +213,7 @@ class PaymentConcurrencyTest(
         // 결제 상태 타입
         paymentStatusTypeRepository.save(
             PaymentStatusType(
-                code = "PEND",
+                code = PaymentStatusType.PENDING,
                 name = "대기중",
                 description = "결제 처리 대기중"
             )
@@ -220,7 +221,7 @@ class PaymentConcurrencyTest(
 
         paymentStatusTypeRepository.save(
             PaymentStatusType(
-                code = "COMP",
+                code = PaymentStatusType.COMPLETED,
                 name = "결제 완료",
                 description = "결제가 성공적으로 완료됨"
             )
@@ -229,7 +230,7 @@ class PaymentConcurrencyTest(
         // FAILED 상태 추가 (에러 처리용)
         paymentStatusTypeRepository.save(
             PaymentStatusType(
-                code = "FAIL",
+                code = PaymentStatusType.FAILED,
                 name = "결제 실패",
                 description = "결제 처리 실패"
             )

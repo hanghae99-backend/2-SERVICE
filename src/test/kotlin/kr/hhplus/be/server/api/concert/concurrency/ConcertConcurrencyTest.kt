@@ -138,7 +138,7 @@ class ConcertConcurrencyTest(
                 // 좌석 상태 타입 생성 - AVAILABLE과 RESERVED 모두 필요
                 val availableStatus = seatStatusTypeJpaRepository.save(
                     SeatStatusType(
-                        code = "AVAILABLE",
+                        code = SeatStatusType.AVAILABLE,
                         name = "예약 가능",
                         description = "예약 가능한 좌석"
                     )
@@ -147,7 +147,7 @@ class ConcertConcurrencyTest(
                 // RESERVED 상태 추가 - 예약 처리 시 필요
                 seatStatusTypeJpaRepository.save(
                     SeatStatusType(
-                        code = "RESERVED",
+                        code = SeatStatusType.RESERVED,
                         name = "예약됨",
                         description = "예약된 좌석"
                     )
@@ -156,7 +156,7 @@ class ConcertConcurrencyTest(
                 // ReservationStatusType 데이터 생성 - TEMPORARY와 CONFIRMED 필요
                 reservationStatusTypeJpaRepository.save(
                     ReservationStatusType(
-                        code = "TEMPORARY",
+                        code = ReservationStatusType.TEMPORARY,
                         name = "임시 예약",
                         description = "결제 대기 중",
                         category = "NORMAL",
@@ -167,7 +167,7 @@ class ConcertConcurrencyTest(
 
                 reservationStatusTypeJpaRepository.save(
                     ReservationStatusType(
-                        code = "CONFIRMED",
+                        code = ReservationStatusType.CONFIRMED,
                         name = "예약 확정",
                         description = "결제 완료",
                         category = "NORMAL",

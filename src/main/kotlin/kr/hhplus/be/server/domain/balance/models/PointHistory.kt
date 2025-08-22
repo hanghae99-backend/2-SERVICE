@@ -48,10 +48,6 @@ class PointHistory(
 ) : BaseEntity() {
     
     companion object {
-        const val TYPE_CHARGE = "CHARGE"
-        const val TYPE_USE = "USE"
-        const val TYPE_REFUND = "REFUND"
-        const val TYPE_ADJUSTMENT = "ADJUSTMENT"
         
         fun charge(
             userId: Long, 
@@ -149,10 +145,10 @@ class PointHistory(
     val typeCode: String
         get() = historyType.code
     
-    fun isCharge(): Boolean = historyType.code == TYPE_CHARGE
-    fun isUse(): Boolean = historyType.code == TYPE_USE
-    fun isRefund(): Boolean = historyType.code == TYPE_REFUND
-    fun isAdjustment(): Boolean = historyType.code == TYPE_ADJUSTMENT
+    fun isCharge(): Boolean = historyType.code == PointHistoryType.CHARGE
+    fun isUse(): Boolean = historyType.code == PointHistoryType.USE
+    fun isRefund(): Boolean = historyType.code == PointHistoryType.REFUND
+    fun isAdjustment(): Boolean = historyType.code == PointHistoryType.ADJUSTMENT
     
     fun isRelatedTo(entityType: String, entityId: Long): Boolean {
         return relatedEntityType == entityType && relatedEntityId == entityId

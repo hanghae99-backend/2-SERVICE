@@ -41,7 +41,7 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val expectedFinalAmount = BigDecimal("5000")
                 
                 val expectedResultPoint = Point.create(userId, BigDecimal("5000"))
-                val useType = PointHistoryType("USE", "사용", "포인트 사용")
+                val useType = PointHistoryType(PointHistoryType.USE, "사용", "포인트 사용")
                 val history = PointHistory.use(userId, deductAmount, useType, "포인트 사용")
                 
                 every { pointRepository.findByUserId(userId) } returns Point.create(userId, BigDecimal("10000"))

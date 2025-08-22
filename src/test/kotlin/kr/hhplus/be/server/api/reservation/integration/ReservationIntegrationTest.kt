@@ -2,6 +2,7 @@ package kr.hhplus.be.server.api.reservation.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.config.IntegrationTest
@@ -18,6 +19,9 @@ import kr.hhplus.be.server.domain.user.models.User
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
+import jakarta.persistence.EntityManager
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
@@ -33,9 +37,13 @@ class ReservationIntegrationTest(
     private val tokenStore: TokenStore,
     private val tokenFactory: TokenFactory,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>
+    private val redisTemplate: RedisTemplate<String, Any>,
+    private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)
+    
+    // 테스트 격리를 위한 설정
+    isolationMode = IsolationMode.InstancePerTest
 
     lateinit var mockMvc: MockMvc
     lateinit var testUser: User
@@ -43,37 +51,61 @@ class ReservationIntegrationTest(
     lateinit var testSchedule: ConcertSchedule
     lateinit var testSeat: Seat
     lateinit var testToken: String
+    
+    // 각 테스트마다 고유한 userId 사용
+    val testUserId = System.currentTimeMillis() % 1000000
 
     beforeEach {
+        val transactionTemplate = TransactionTemplate(transactionManager)
+        val entityManager = webApplicationContext.getBean(EntityManager::class.java)
+        
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 테스트 데이터 정리
-        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-        TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
-        
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
+
+        transactionTemplate.execute { _ ->
+            // 테스트 데이터 정리
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
+            
+            // 영속성 컨텍스트 클리어
+            entityManager.flush()
+            entityManager.clear()
+
+            // TestDataFixture를 사용한 완전한 테스트 환경 구성
+            // 고유 userId 사용
+            testUser = TestDataFixture.createTestUser(
+                context = webApplicationContext,
+                userId = testUserId,
+                withPoints = true,
+                pointAmount = BigDecimal("200000")
+            )
+            
+            // 콘서트 환경 생성
+            val concertEnv = TestDataFixture.createFullConcertEnvironment(
+                context = webApplicationContext,
+                concertTitle = TestDataConstants.Concert.RESERVATION_TITLE,
+                seatCount = TestDataConstants.Seat.DEFAULT_SEAT_COUNT
+            )
+            
+            testConcert = concertEnv.concert
+            testSchedule = concertEnv.schedule
+            testSeat = concertEnv.seats.first()
+
+            // 토큰 생성 및 활성화
+            val token = TestDataFixture.createAndActivateToken(webApplicationContext, testUser.userId)
+            testToken = token.token
+            
+            // DB에 즉시 반영
+            entityManager.flush()
+        }
         
+        // 트랜잭션 후 영속성 컨텍스트 클리어
+        entityManager.clear()
         Thread.sleep(100)
-
-        // TestDataFixture를 사용한 완전한 테스트 환경 구성
-        val testEnvironment = TestDataFixture.createCompleteTestEnvironment(
-            context = webApplicationContext,
-            userCount = 1,
-            concertTitle = TestDataConstants.Concert.RESERVATION_TITLE,
-            seatCount = TestDataConstants.Seat.DEFAULT_SEAT_COUNT
-        )
-        
-        testUser = testEnvironment.primaryUser
-        testConcert = testEnvironment.concert
-        testSchedule = testEnvironment.schedule
-        testSeat = testEnvironment.firstSeat
-
-        // 토큰 생성 및 활성화
-        val token = TestDataFixture.createAndActivateToken(webApplicationContext, testUser.userId)
-        testToken = token.token
     }
 
     afterEach {
@@ -133,10 +165,11 @@ class ReservationIntegrationTest(
                 // 첫 번째 예약이 완료될 시간을 줌
                 Thread.sleep(500)
 
-                // 다른 사용자 생성
+                // 다른 사용자 생성 - 고유한 userId 사용
+                val anotherUserId = testUserId + 1000 // 충돌 방지를 위해 기존 userId에 1000을 더함
                 val anotherUser = TestDataFixture.createTestUser(
                     context = webApplicationContext,
-                    userId = 2L,
+                    userId = anotherUserId,
                     withPoints = true,
                     pointAmount = TestDataConstants.Point.DEFAULT_AMOUNT
                 )

@@ -2,8 +2,10 @@ package kr.hhplus.be.server.api.concert.concurrency
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
+import jakarta.persistence.EntityManager
 import kr.hhplus.be.server.config.ConcurrencyTest
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
@@ -19,6 +21,8 @@ import kr.hhplus.be.server.config.TestDataFixture
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -38,40 +42,81 @@ class ConcertConcurrencyTest(
     private val tokenFactory: TokenFactory,
     private val objectMapper: ObjectMapper,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>
+    private val redisTemplate: RedisTemplate<String, Any>,
+    private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)
+    
+    // 테스트 격리를 위한 설정
+    isolationMode = IsolationMode.InstancePerTest
 
     lateinit var mockMvc: MockMvc
     lateinit var testConcert: Concert
     lateinit var testSchedule: ConcertSchedule
     lateinit var testUsers: List<User>
     lateinit var testTokens: List<WaitingToken>
+    
+    // 각 테스트마다 고유한 base userId 사용
+    val baseUserId = System.currentTimeMillis() % 1000000
 
     beforeEach {
+        val transactionTemplate = TransactionTemplate(transactionManager)
+        
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 테스트 데이터 정리
-        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-        TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
-        
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
 
-        // TestDataFixture를 사용한 동시성 테스트 환경 구성
-        val testEnvironment = TestDataFixture.createConcurrencyTestEnvironment(
-            context = webApplicationContext,
-            userCount = 10,
-            concertTitle = "동시성 테스트 콘서트",
-            seatCount = 50
-        )
+        transactionTemplate.execute { _ ->
+            // 테스트 데이터 정리 (시퀀스 초기화 포함)
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            TestDataCleanupHelper.cleanupAllWithSequenceReset(redisTemplate, jdbcTemplate)
+            
+            // 영속성 컨텍스트 클리어
+            val entityManager = webApplicationContext.getBean(EntityManager::class.java)
+            entityManager.flush()
+            entityManager.clear()
+
+            // TestDataFixture를 사용한 동시성 테스트 환경 구성
+            // 각 사용자에게 고유한 userId 할당 (baseUserId부터 시작)
+            val userCount = 10
+            val users = (0 until userCount).map { index ->
+                TestDataFixture.createTestUser(
+                    context = webApplicationContext,
+                    userId = baseUserId + index,
+                    withPoints = true,
+                    pointAmount = BigDecimal("200000")
+                )
+            }
+            
+            // 콘서트 환경 생성
+            val concertEnv = TestDataFixture.createFullConcertEnvironment(
+                context = webApplicationContext,
+                concertTitle = "동시성 테스트 콘서트",
+                seatCount = 50
+            )
+            
+            testConcert = concertEnv.concert
+            testSchedule = concertEnv.schedule
+            testUsers = users
+            
+            // 토큰 생성
+            testTokens = users.map { user ->
+                val token = tokenFactory.createWaitingToken(user.userId)
+                tokenStore.save(token)
+                tokenStore.activateToken(token.token)
+                token
+            }
+            
+            // DB에 즉시 반영
+            entityManager.flush()
+        }
         
-        testConcert = testEnvironment.concert
-        testSchedule = testEnvironment.schedule
-        testUsers = testEnvironment.users
-        testTokens = testEnvironment.tokens
+        // 트랜잭션 후 영속성 컨텍스트 클리어
+        val entityManager = webApplicationContext.getBean(EntityManager::class.java)
+        entityManager.clear()
 
         Thread.sleep(100)
     }

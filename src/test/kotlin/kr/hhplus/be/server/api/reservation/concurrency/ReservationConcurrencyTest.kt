@@ -2,8 +2,10 @@ package kr.hhplus.be.server.api.reservation.concurrency
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
+import jakarta.persistence.EntityManager
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.config.ConcurrencyTest
 import kr.hhplus.be.server.config.TestDataFixture
@@ -20,6 +22,8 @@ import kr.hhplus.be.server.domain.balance.models.Point
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -37,9 +41,13 @@ class ReservationConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>
+    private val redisTemplate: RedisTemplate<String, Any>,
+    private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)
+    
+    // 테스트 격리를 위한 설정
+    isolationMode = IsolationMode.InstancePerTest
 
     lateinit var mockMvc: MockMvc
     lateinit var testUsers: List<User>
@@ -49,74 +57,93 @@ class ReservationConcurrencyTest(
     lateinit var testTokens: List<WaitingToken>
     lateinit var availableStatus: SeatStatusType
     lateinit var reservedStatus: SeatStatusType
+    
+    // 각 테스트마다 고유한 base userId 사용
+    val baseUserId = System.currentTimeMillis() % 1000000
 
     beforeEach {
+        val transactionTemplate = TransactionTemplate(transactionManager)
+        
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 테스트 데이터 정리 (시퀀스 초기화 포함)
-        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-        TestDataCleanupHelper.cleanupAllWithSequenceReset(redisTemplate, jdbcTemplate)
-        
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
 
-        // 테스트 사용자 생성
-        testUsers = TestDataFixture.createSimpleUsers(
+        transactionTemplate.execute { _ ->
+            // 테스트 데이터 정리 (시퀀스 초기화 포함)
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            TestDataCleanupHelper.cleanupAllWithSequenceReset(redisTemplate, jdbcTemplate)
+            
+            // 영속성 컨텍스트 클리어
+            val entityManager = webApplicationContext.getBean(
+                EntityManager::class.java)
+            entityManager.flush()
+            entityManager.clear()
+
+            // 테스트 사용자 생성 (고유 userId 사용)
+            testUsers = TestDataFixture.createSimpleUsers(
             context = webApplicationContext,
             userCount = 10,
-            startUserId = 1L
-        )
-        
-        // 사용자별 포인트 초기화 (결제를 위한 준비)
-        testUsers.forEach { user ->
-            TestDataFixture.createTestPoints(
-                context = webApplicationContext,
-                userId = user.userId,
-                amount = TestDataConstants.Point.DEFAULT_AMOUNT
+            startUserId = baseUserId
             )
+            
+            // 사용자별 포인트 초기화 (결제를 위한 준비)
+            testUsers.forEach { user ->
+                TestDataFixture.createTestPoints(
+                    context = webApplicationContext,
+                    userId = user.userId,
+                    amount = TestDataConstants.Point.DEFAULT_AMOUNT
+                )
+            }
+
+            // 콘서트 생성
+            testConcert = TestDataFixture.createTestConcert(
+                context = webApplicationContext,
+                title = "예약 동시성 테스트 콘서트",
+                artist = "테스트 아티스트"
+            )
+
+            // 스케줄 생성
+            testSchedule = TestDataFixture.createTestConcertSchedule(
+                context = webApplicationContext,
+                concertId = testConcert.concertId,
+                daysFromNow = 30,
+                venue = "테스트 공연장",
+                totalSeats = 50
+            )
+
+            // 모든 상태 타입 생성
+            TestDataFixture.createAllStatusTypes(webApplicationContext)
+            
+            // 상태 타입 레퍼런스 가져오기
+            availableStatus = TestDataFixture.createSeatStatusType()
+            reservedStatus = TestDataFixture.createSeatStatusType(
+                code = TestDataConstants.SeatStatusType.RESERVED.code,
+                name = TestDataConstants.SeatStatusType.RESERVED.name,
+                description = TestDataConstants.SeatStatusType.RESERVED.description
+            )
+
+            // 테스트 좌석들 생성
+            testSeats = TestDataFixture.createTestSeats(
+                context = webApplicationContext,
+                scheduleId = testSchedule.scheduleId,
+                seatCount = 10
+            )
+
+            // 토큰 생성 및 활성화
+            testTokens = testUsers.map { user ->
+                TestDataFixture.createAndActivateToken(webApplicationContext, user.userId)
+            }
+            
+            // DB에 즉시 반영
+            entityManager.flush()
         }
-
-        // 콘서트 생성
-        testConcert = TestDataFixture.createTestConcert(
-            context = webApplicationContext,
-            title = "예약 동시성 테스트 콘서트",
-            artist = "테스트 아티스트"
-        )
-
-        // 스케줄 생성
-        testSchedule = TestDataFixture.createTestConcertSchedule(
-            context = webApplicationContext,
-            concertId = testConcert.concertId,
-            daysFromNow = 30,
-            venue = "테스트 공연장",
-            totalSeats = 50
-        )
-
-        // 모든 상태 타입 생성
-        TestDataFixture.createAllStatusTypes(webApplicationContext)
         
-        // 상태 타입 레퍼런스 가져오기
-        availableStatus = TestDataFixture.createSeatStatusType()
-        reservedStatus = TestDataFixture.createSeatStatusType(
-            code = TestDataConstants.SeatStatusType.RESERVED.code,
-            name = TestDataConstants.SeatStatusType.RESERVED.name,
-            description = TestDataConstants.SeatStatusType.RESERVED.description
-        )
-
-        // 테스트 좌석들 생성
-        testSeats = TestDataFixture.createTestSeats(
-            context = webApplicationContext,
-            scheduleId = testSchedule.scheduleId,
-            seatCount = 10
-        )
-
-        // 토큰 생성 및 활성화
-        testTokens = testUsers.map { user ->
-            TestDataFixture.createAndActivateToken(webApplicationContext, user.userId)
-        }
-        
+        // 트랜잭션 후 영속성 컨텍스트 클리어
+        val entityManager = webApplicationContext.getBean(EntityManager::class.java)
+        entityManager.clear()
         Thread.sleep(100)
     }
 

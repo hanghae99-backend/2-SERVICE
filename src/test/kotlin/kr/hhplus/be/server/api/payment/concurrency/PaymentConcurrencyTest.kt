@@ -2,6 +2,7 @@ package kr.hhplus.be.server.api.payment.concurrency
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
 import kr.hhplus.be.server.api.payment.dto.request.PaymentRequest
@@ -19,6 +20,8 @@ import kr.hhplus.be.server.config.TestDataFixture
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -38,9 +41,13 @@ class PaymentConcurrencyTest(
     private val reservationRepository: ReservationRepository,
     private val paymentRepository: PaymentRepository,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>
+    private val redisTemplate: RedisTemplate<String, Any>,
+    private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)
+    
+    // 테스트 격리를 위한 설정
+    isolationMode = IsolationMode.InstancePerTest
 
     lateinit var mockMvc: MockMvc
     lateinit var testUsers: List<User>
@@ -49,8 +56,13 @@ class PaymentConcurrencyTest(
     lateinit var testSeat: Seat
     lateinit var testReservations: List<Reservation>
     lateinit var testTokens: List<WaitingToken>
+    
+    // 각 테스트마다 고유한 base userId 사용
+    val baseUserId = System.currentTimeMillis() % 1000000
 
     beforeEach {
+        val transactionTemplate = TransactionTemplate(transactionManager)
+        
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
@@ -62,58 +74,85 @@ class PaymentConcurrencyTest(
             // 무시
         }
         
-        // 테스트 데이터 정리
-        try {
-            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-            TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
-        } catch (e: Exception) {
-            // 무시
+        transactionTemplate.execute { _ ->
+            // 테스트 데이터 정리
+            try {
+                val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+                TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
+            } catch (e: Exception) {
+                // 무시
+            }
+            
+            // 영속성 컨텍스트 클리어
+            val entityManager = webApplicationContext.getBean(jakarta.persistence.EntityManager::class.java)
+            entityManager.flush()
+            entityManager.clear()
+
+            // TestDataFixture를 사용한 기본 환경 구성
+            // 각 사용자에게 고유한 userId 할당
+            val userCount = 5
+            testUsers = (0 until userCount).map { index ->
+                TestDataFixture.createTestUser(
+                    context = webApplicationContext,
+                    userId = baseUserId + index,
+                    withPoints = true,
+                    pointAmount = BigDecimal("200000")
+                )
+            }
+            
+            // 콘서트 환경 생성
+            val concertEnv = TestDataFixture.createFullConcertEnvironment(
+                context = webApplicationContext,
+                concertTitle = "결제 테스트 콘서트",
+                seatCount = 50
+            )
+            
+            testConcert = concertEnv.concert
+            testSchedule = concertEnv.schedule
+            testSeat = concertEnv.seats.first()
+            
+            // 각 사용자별로 개별 좌석과 예약 생성
+            testReservations = TestDataFixture.createReservationsForUsers(
+                context = webApplicationContext,
+                users = testUsers,
+                concertId = testConcert.concertId,
+                scheduleId = testSchedule.scheduleId,
+                seatPrice = BigDecimal("50000")
+            )
+            
+            // 토큰 생성
+            val tokenFactory = webApplicationContext.getBean(kr.hhplus.be.server.domain.auth.factory.TokenFactory::class.java)
+            val tokenStore = webApplicationContext.getBean(kr.hhplus.be.server.domain.auth.repositories.TokenStore::class.java)
+            testTokens = testUsers.map { user ->
+                val token = tokenFactory.createWaitingToken(user.userId)
+                tokenStore.save(token)
+                tokenStore.activateToken(token.token)
+                token
+            }
+            
+            // 테스트 데이터 검증
+            val createdSeats = seatRepository.findAll()
+            println("생성된 좌석 수: ${createdSeats.size}")
+            createdSeats.forEach { seat ->
+                println("좌석 ${seat.seatNumber}: 상태 = ${seat.status.code}")
+            }
+            
+            val createdReservations = reservationRepository.findAll()
+            println("생성된 예약 수: ${createdReservations.size}")
+            createdReservations.forEach { reservation ->
+                println("예약 ID ${reservation.reservationId}: 사용자 ${reservation.userId}, 좌석 ${reservation.seatNumber}, 상태 = ${reservation.status.code}")
+            }
+            
+            // DB에 즉시 반영
+            entityManager.flush()
         }
         
-        // 충분한 초기화 대기
-        Thread.sleep(500)
-
-        // TestDataFixture를 사용한 기본 환경 구성
-        val testEnvironment = TestDataFixture.createConcurrencyTestEnvironment(
-            context = webApplicationContext,
-            userCount = 5,
-            concertTitle = "결제 테스트 콘서트",
-            seatCount = 50,
-            userPointAmount = BigDecimal("200000")
-        )
-        
-        testUsers = testEnvironment.users
-        testConcert = testEnvironment.concert
-        testSchedule = testEnvironment.schedule
-        testSeat = testEnvironment.firstSeat
-        
-        // 각 사용자별로 개별 좌석과 예약 생성
-        testReservations = TestDataFixture.createReservationsForUsers(
-            context = webApplicationContext,
-            users = testUsers,
-            concertId = testConcert.concertId,
-            scheduleId = testSchedule.scheduleId,
-            seatPrice = BigDecimal("50000")
-        )
-        
-        // 토큰들은 이미 testEnvironment에서 생성됨
-        testTokens = testEnvironment.tokens
+        // 트랜잭션 후 영속성 컨텍스트 클리어
+        val entityManager = webApplicationContext.getBean(jakarta.persistence.EntityManager::class.java)
+        entityManager.clear()
         
         // 데이터 정합성 확인을 위한 대기
         Thread.sleep(500)
-        
-        // 테스트 데이터 검증
-        val createdSeats = seatRepository.findAll()
-        println("생성된 좌석 수: ${createdSeats.size}")
-        createdSeats.forEach { seat ->
-            println("좌석 ${seat.seatNumber}: 상태 = ${seat.status.code}")
-        }
-        
-        val createdReservations = reservationRepository.findAll()
-        println("생성된 예약 수: ${createdReservations.size}")
-        createdReservations.forEach { reservation ->
-            println("예약 ID ${reservation.reservationId}: 사용자 ${reservation.userId}, 좌석 ${reservation.seatNumber}, 상태 = ${reservation.status.code}")
-        }
     }
 
     afterEach {

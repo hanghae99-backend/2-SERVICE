@@ -2,6 +2,7 @@ package kr.hhplus.be.server.api.payment.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.payment.dto.request.PaymentRequest
 import kr.hhplus.be.server.config.IntegrationTest
@@ -19,6 +20,8 @@ import kr.hhplus.be.server.domain.user.models.User
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
@@ -34,9 +37,13 @@ class PaymentIntegrationTest(
     private val tokenStore: TokenStore,
     private val tokenFactory: TokenFactory,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>
+    private val redisTemplate: RedisTemplate<String, Any>,
+    private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)
+    
+    // 테스트 격리를 위한 설정
+    isolationMode = IsolationMode.InstancePerTest
 
     lateinit var mockMvc: MockMvc
     lateinit var testUser: User
@@ -44,8 +51,14 @@ class PaymentIntegrationTest(
     lateinit var testSchedule: ConcertSchedule
     lateinit var testSeat: Seat
     lateinit var testReservation: Reservation
+    
+    // 각 테스트마다 고유한 userId 사용
+    val testUserId = System.currentTimeMillis() % 1000000
 
     beforeEach {
+        val transactionTemplate = TransactionTemplate(transactionManager)
+        val entityManager = webApplicationContext.getBean(jakarta.persistence.EntityManager::class.java)
+        
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
@@ -57,39 +70,55 @@ class PaymentIntegrationTest(
             // 무시
         }
 
-        // 테스트 데이터 정리
-        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-        TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
+        transactionTemplate.execute { _ ->
+            // 테스트 데이터 정리
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
+            
+            // 영속성 컨텍스트 클리어
+            entityManager.flush()
+            entityManager.clear()
+
+            // TestDataFixture를 사용한 완전한 테스트 환경 구성
+            // 고유 userId 사용
+            testUser = TestDataFixture.createTestUser(
+                context = webApplicationContext,
+                userId = testUserId,
+                withPoints = true,
+                pointAmount = BigDecimal("200000")
+            )
+            
+            // 콘서트 환경 생성
+            val concertEnv = TestDataFixture.createFullConcertEnvironment(
+                context = webApplicationContext,
+                concertTitle = TestDataConstants.Concert.PAYMENT_TITLE,
+                seatCount = TestDataConstants.Seat.DEFAULT_SEAT_COUNT
+            )
+            
+            testConcert = concertEnv.concert
+            testSchedule = concertEnv.schedule
+            testSeat = concertEnv.seats.first()
+
+            // 결제 상태 타입은 createCompleteTestEnvironment에서 이미 생성됨
+
+            // 좌석 예약 생성 (TestDataFixture 사용)
+            testReservation = TestDataFixture.createReservationForSeat(
+                context = webApplicationContext,
+                userId = testUser.userId,
+                concertId = testConcert.concertId,
+                seat = testSeat,
+                tempMinutes = 10
+            )
+
+            // 토큰 생성 및 활성화
+            val token = TestDataFixture.createAndActivateToken(webApplicationContext, testUser.userId)
+            
+            // DB에 즉시 반영
+            entityManager.flush()
+        }
         
-        // 충분한 초기화 대기
-        Thread.sleep(500)
-
-        // TestDataFixture를 사용한 완전한 테스트 환경 구성
-        val testEnvironment = TestDataFixture.createCompleteTestEnvironment(
-            context = webApplicationContext,
-            userCount = 1,
-            concertTitle = TestDataConstants.Concert.PAYMENT_TITLE,
-            seatCount = TestDataConstants.Seat.DEFAULT_SEAT_COUNT
-        )
-        
-        testUser = testEnvironment.primaryUser
-        testConcert = testEnvironment.concert
-        testSchedule = testEnvironment.schedule
-        testSeat = testEnvironment.firstSeat
-
-        // 결제 상태 타입은 createCompleteTestEnvironment에서 이미 생성됨
-
-        // 좌석 예약 생성 (TestDataFixture 사용)
-        testReservation = TestDataFixture.createReservationForSeat(
-            context = webApplicationContext,
-            userId = testUser.userId,
-            concertId = testConcert.concertId,
-            seat = testSeat,
-            tempMinutes = 10
-        )
-
-        // 토큰 생성 및 활성화
-        val token = TestDataFixture.createAndActivateToken(webApplicationContext, testUser.userId)
+        // 트랜잭션 후 영속성 컨텍스트 클리어
+        entityManager.clear()
         Thread.sleep(200) // 활성화 대기
     }
 
@@ -134,7 +163,7 @@ class PaymentIntegrationTest(
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.paymentId").exists())
                 .andExpect(jsonPath("$.data.userId").value(testUser.userId))
-                .andExpect(jsonPath("$.data.amount").value(100000))
+                .andExpect(jsonPath("$.data.amount").value(50000))  // 좌석 기본 가격
             }
         }
 

@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.common
 
 import kr.hhplus.be.server.domain.common.BusinessRuleViolationException
-import kr.hhplus.be.server.global.config.ConcertProperties
+import kr.hhplus.be.server.global.properties.ConcertProperties
 import java.math.BigDecimal
 import java.time.LocalDateTime
 

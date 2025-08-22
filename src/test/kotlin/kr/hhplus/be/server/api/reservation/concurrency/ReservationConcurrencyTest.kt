@@ -17,7 +17,6 @@ import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusType
 import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import kr.hhplus.be.server.global.lock.DistributedLock
-import kr.hhplus.be.server.test.utils.TestRedisUtils
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate

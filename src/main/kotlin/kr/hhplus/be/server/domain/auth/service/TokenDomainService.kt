@@ -4,8 +4,7 @@ import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
 import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
-import kr.hhplus.be.server.global.config.ConcertProperties
-
+import kr.hhplus.be.server.global.properties.ConcertProperties
 import org.springframework.stereotype.Component
 
 
@@ -13,20 +12,16 @@ import org.springframework.stereotype.Component
 class TokenDomainService(
     private val concertProperties: ConcertProperties
 ) {
-
-
     fun validateTokenActivation(token: WaitingToken, currentStatus: TokenStatus) {
         if (currentStatus != TokenStatus.WAITING) {
             throw TokenActivationException("대기 중인 토큰만 활성화 가능합니다. 현재 상태: $currentStatus")
         }
     }
 
-
     fun validateActiveToken(token: WaitingToken?, currentStatus: TokenStatus) {
         if (token == null) {
             throw TokenNotFoundException("유효하지 않은 토큰입니다.")
         }
-        
         if (currentStatus != TokenStatus.ACTIVE) {
             throw TokenActivationException("활성화된 토큰이 아닙니다. 현재 상태: $currentStatus")
         }
@@ -43,7 +38,6 @@ class TokenDomainService(
             null
         }
     }
-
 
     fun calculateAvailableSlots(currentActiveCount: Long): Int {
         return (concertProperties.queue.maxActiveTokens - currentActiveCount).toInt()

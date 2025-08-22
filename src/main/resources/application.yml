@@ -3,6 +3,8 @@ spring:
     name: hhplus
   profiles:
     active: local
+  main:
+    allow-bean-definition-overriding: true
   datasource:
     name: HangHaePlusDataSource
     type: com.zaxxer.hikari.HikariDataSource

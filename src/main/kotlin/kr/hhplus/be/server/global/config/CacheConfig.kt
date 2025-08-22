@@ -1,19 +1,20 @@
 package kr.hhplus.be.server.global.config
 
-import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.boot.context.properties.bind.ConstructorBinding
+import kr.hhplus.be.server.global.properties.CacheProperties
+import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.cache.annotation.EnableCaching
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.data.redis.cache.CacheKeyPrefix
 import org.springframework.data.redis.cache.RedisCacheConfiguration
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.serializer.RedisSerializationContext
 import org.springframework.data.redis.serializer.StringRedisSerializer
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer
-import java.time.Duration
 
 @Configuration
+@EnableCaching
+@EnableConfigurationProperties(CacheProperties::class)
 class CacheConfig {
 
     @Bean
@@ -87,26 +88,3 @@ class CacheConfig {
             .computePrefixWith { cacheName -> "${cacheProperties.keyPrefix}$cacheName:" }
     }
 }
-
-@ConfigurationProperties(prefix = "cache")
-data class CacheProperties @ConstructorBinding constructor(
-    val keyPrefix: String = "concert-service:",
-    val defaultTtl: Duration = Duration.ofMinutes(30),
-    val concerts: CacheSetting = CacheSetting(Duration.ofHours(2)),
-    val concertSchedules: CacheSetting = CacheSetting(Duration.ofHours(1)),
-    val concertDetails: CacheSetting = CacheSetting(Duration.ofMinutes(30)),
-    val availableConcerts: CacheSetting = CacheSetting(Duration.ofMinutes(5)),
-    val availableSeats: CacheSetting = CacheSetting(Duration.ofMinutes(2)),
-    val popularConcerts: CacheSetting = CacheSetting(Duration.ofMinutes(10)),
-    val trendingConcerts: CacheSetting = CacheSetting(Duration.ofMinutes(3)),
-    val systemTypes: CacheSetting = CacheSetting(Duration.ofHours(24)),
-    val systemConfig: CacheSetting = CacheSetting(Duration.ofHours(12)),
-    val userBalance: CacheSetting = CacheSetting(Duration.ofMinutes(5)),
-    val tokenStatus: CacheSetting = CacheSetting(Duration.ofMinutes(1))
-)
-
-data class CacheSetting(
-    val ttl: Duration,
-    val maxSize: Long? = null,
-    val enableEviction: Boolean = true
-)

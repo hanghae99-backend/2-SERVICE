@@ -83,4 +83,17 @@ class AsyncConfig {
         executor.initialize()
         return executor
     }
+    
+    @Bean("redisListenerExecutor")
+    fun redisListenerExecutor(): Executor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.corePoolSize = 2
+        executor.maxPoolSize = 5
+        executor.queueCapacity = 100
+        executor.setThreadNamePrefix("Redis-Listener-")
+        executor.setWaitForTasksToCompleteOnShutdown(true)
+        executor.setAwaitTerminationSeconds(10)
+        executor.initialize()
+        return executor
+    }
 }

@@ -1,13 +1,10 @@
-package kr.hhplus.be.server.global.config
+package kr.hhplus.be.server.global.properties
 
 import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.boot.context.properties.bind.ConstructorBinding
-import org.springframework.stereotype.Component
 import java.time.Duration
 
-@Component
 @ConfigurationProperties(prefix = "concert")
-data class ConcertProperties @ConstructorBinding constructor(
+data class ConcertProperties(
     val defaultSeatsPerSchedule: Int = 50,
     val maxSeatsPerSchedule: Int = 1000,
     val reservationTimeoutMinutes: Long = 5L,

@@ -25,7 +25,6 @@ import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusType
 import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import kr.hhplus.be.server.global.lock.DistributedLock
-import kr.hhplus.be.server.test.utils.TestRedisUtils
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -84,7 +83,13 @@ class PaymentConcurrencyTest(
         }
         
         // Redis 정리
-        TestRedisUtils.flushDatabase(redisTemplate)
+        try {
+            redisTemplate.connectionFactory?.connection?.use { connection ->
+                connection.serverCommands()?.flushDb()
+            }
+        } catch (e: Exception) {
+            // 테스트 환경에서 Redis 초기화 실패는 무시
+        }
         
         // DB 데이터 정리
         try {

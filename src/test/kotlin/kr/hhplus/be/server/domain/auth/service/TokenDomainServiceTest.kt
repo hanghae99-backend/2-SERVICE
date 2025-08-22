@@ -9,7 +9,8 @@ import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
 import kr.hhplus.be.server.domain.auth.exception.TokenNotFoundException
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
-import kr.hhplus.be.server.global.config.ConcertProperties
+import kr.hhplus.be.server.global.properties.ConcertProperties
+import kr.hhplus.be.server.global.properties.QueueProperties
 
 class TokenDomainServiceTest : DescribeSpec({
     

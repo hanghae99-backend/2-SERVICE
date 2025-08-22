@@ -23,8 +23,6 @@ import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusType
 import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import kr.hhplus.be.server.global.lock.DistributedLock
-import kr.hhplus.be.server.test.utils.TestRedisUtils
-import kr.hhplus.be.server.test.utils.TestDataCleanupUtils
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -77,11 +75,29 @@ class PaymentIntegrationTest(
         }
 
         // Redis 정리
-        TestRedisUtils.flushDatabase(redisTemplate)
+        try {
+            redisTemplate.connectionFactory?.connection?.use { connection ->
+                connection.serverCommands()?.flushDb()
+            }
+        } catch (e: Exception) {
+            // 테스트 환경에서 Redis 초기화 실패는 무시
+        }
 
         // DB 데이터 정리
         val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-        TestDataCleanupUtils.cleanupDatabase(jdbcTemplate)
+        try {
+            // 외래키 제약 순서를 고려한 삭제
+            jdbcTemplate.execute("DELETE FROM payment")
+            jdbcTemplate.execute("DELETE FROM reservation")
+            jdbcTemplate.execute("DELETE FROM seat")
+            jdbcTemplate.execute("DELETE FROM concert_schedule")
+            jdbcTemplate.execute("DELETE FROM concert")
+            jdbcTemplate.execute("DELETE FROM point_history")
+            jdbcTemplate.execute("DELETE FROM point")
+            jdbcTemplate.execute("DELETE FROM users")
+        } catch (e: Exception) {
+            // 테스트 환경에서 DB 정리 실패는 무시
+        }
         
         // 충분한 초기화 대기
         Thread.sleep(500)

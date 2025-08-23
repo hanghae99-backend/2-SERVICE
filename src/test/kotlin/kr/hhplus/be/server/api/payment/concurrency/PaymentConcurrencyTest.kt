@@ -17,7 +17,7 @@ import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.config.TestDataFixture
-import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.PlatformTransactionManager
@@ -41,7 +41,7 @@ class PaymentConcurrencyTest(
     private val reservationRepository: ReservationRepository,
     private val paymentRepository: PaymentRepository,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>,
+    private val redisTemplate: StringRedisTemplate,
     private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)

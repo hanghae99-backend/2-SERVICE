@@ -5,11 +5,10 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.auth.dto.request.TokenIssueRequest
 import kr.hhplus.be.server.config.IntegrationTest
-import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.config.TestDataFixture
-import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
@@ -24,7 +23,7 @@ class AuthIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>
+    private val redisTemplate: StringRedisTemplate
 ) : DescribeSpec({
 
     extension(SpringExtension)

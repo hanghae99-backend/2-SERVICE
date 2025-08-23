@@ -9,7 +9,7 @@ import kr.hhplus.be.server.config.IntegrationTest
 import kr.hhplus.be.server.config.TestDataFixture
 import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.domain.user.models.User
-import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.PlatformTransactionManager
@@ -25,7 +25,7 @@ import java.math.BigDecimal
 class BalanceIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
-    private val redisTemplate: RedisTemplate<String, Any>,
+    private val redisTemplate: StringRedisTemplate,
     private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)

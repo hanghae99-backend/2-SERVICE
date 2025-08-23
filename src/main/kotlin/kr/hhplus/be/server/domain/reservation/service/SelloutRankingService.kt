@@ -5,7 +5,7 @@ import kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
 import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
 import org.springframework.cache.annotation.Cacheable
-import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -14,7 +14,7 @@ import java.time.LocalDateTime
 @Service
 @Transactional(readOnly = true)
 class SelloutRankingService(
-    private val redisTemplate: RedisTemplate<String, Any>,
+    private val redisTemplate: StringRedisTemplate,
     private val concertRepository: ConcertRepository,
     private val concertScheduleRepository: ConcertScheduleRepository,
     private val reservationRepository: ReservationRepository

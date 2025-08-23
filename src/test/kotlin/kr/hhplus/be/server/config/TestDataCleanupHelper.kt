@@ -2,7 +2,7 @@ package kr.hhplus.be.server.config
 
 import org.springframework.cache.CacheManager
 import org.springframework.context.ApplicationContext
-import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.jdbc.core.JdbcTemplate
 
 /**
@@ -14,7 +14,7 @@ object TestDataCleanupHelper {
     /**
      * Redis 데이터베이스 초기화 (캐시 포함)
      */
-    fun cleanupRedis(redisTemplate: RedisTemplate<*, *>) {
+    fun cleanupRedis(redisTemplate: StringRedisTemplate) {
         try {
             redisTemplate.connectionFactory?.connection?.use { connection ->
                 // flushDb() 대신 flushAll() 사용하여 모든 DB 초기화
@@ -120,7 +120,7 @@ object TestDataCleanupHelper {
     /**
      * Redis + DB 전체 정리 (일반적인 사용)
      */
-    fun cleanupAll(redisTemplate: RedisTemplate<*, *>, jdbcTemplate: JdbcTemplate) {
+    fun cleanupAll(redisTemplate: StringRedisTemplate, jdbcTemplate: JdbcTemplate) {
         cleanupRedis(redisTemplate)
         cleanupDatabase(jdbcTemplate)
     }
@@ -128,7 +128,7 @@ object TestDataCleanupHelper {
     /**
      * Redis + DB 전체 정리 + 시퀀스 초기화 (필요한 경우)
      */
-    fun cleanupAllWithSequenceReset(redisTemplate: RedisTemplate<*, *>, jdbcTemplate: JdbcTemplate) {
+    fun cleanupAllWithSequenceReset(redisTemplate: StringRedisTemplate, jdbcTemplate: JdbcTemplate) {
         cleanupRedis(redisTemplate)
         cleanupDatabase(jdbcTemplate)
         resetSequences(jdbcTemplate)
@@ -139,7 +139,7 @@ object TestDataCleanupHelper {
      */
     fun cleanupCompleteTestEnvironment(
         context: ApplicationContext,
-        redisTemplate: RedisTemplate<*, *>,
+        redisTemplate: StringRedisTemplate,
         jdbcTemplate: JdbcTemplate
     ) {
         cleanupRedis(redisTemplate)

@@ -11,7 +11,6 @@ import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.serializer.RedisSerializationContext
 import org.springframework.data.redis.serializer.StringRedisSerializer
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer
 import java.time.Duration
 
 @Configuration
@@ -22,10 +21,9 @@ class CacheConfig {
     @Bean
     fun cacheManager(
         redisConnectionFactory: RedisConnectionFactory,
-        cacheProperties: CacheProperties,
-        redisSerializer: GenericJackson2JsonRedisSerializer
+        cacheProperties: CacheProperties
     ): RedisCacheManager {
-        val defaultConfig = createDefaultCacheConfiguration(cacheProperties, redisSerializer)
+        val defaultConfig = createDefaultCacheConfiguration(cacheProperties)
         
         return RedisCacheManager.builder(redisConnectionFactory)
             .cacheDefaults(defaultConfig)
@@ -78,13 +76,12 @@ class CacheConfig {
     }
     
     private fun createDefaultCacheConfiguration(
-        cacheProperties: CacheProperties,
-        redisSerializer: GenericJackson2JsonRedisSerializer
+        cacheProperties: CacheProperties
     ): RedisCacheConfiguration {
         return RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(cacheProperties.defaultTtl)
             .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(StringRedisSerializer()))
-            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(redisSerializer))
+            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(StringRedisSerializer()))
             .disableCachingNullValues()
             .computePrefixWith { cacheName -> "$cacheName:" }
     }

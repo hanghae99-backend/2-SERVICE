@@ -2,7 +2,7 @@ package kr.hhplus.be.server.domain.concert.service
 
 import kr.hhplus.be.server.api.concert.dto.PopularConcertDto
 import org.springframework.cache.annotation.Cacheable
-import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.scheduling.annotation.Async
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class ConcertStatsService(
-    private val redisTemplate: RedisTemplate<String, Any>,
+    private val redisTemplate: StringRedisTemplate,
     private val concertRepository: kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
 ) {
     
@@ -61,7 +61,7 @@ class ConcertStatsService(
     
     @Async
     fun incrementViewCount(concertId: Long) {
-        redisTemplate.opsForHash<String, Long>()
+        redisTemplate.opsForHash<String, String>()
             .increment(VIEW_COUNT_KEY, concertId.toString(), 1)
         updatePopularityScore(concertId)
         updateTrendingScore(concertId, 1.0)
@@ -73,19 +73,12 @@ class ConcertStatsService(
         val concerts = concertRepository.findAll().filter { it.concertId in concertIds }
         val concertMap = concerts.associateBy { it.concertId }
         
-        val viewCounts = redisTemplate.opsForHash<String, Any>()
+        val viewCounts = redisTemplate.opsForHash<String, String>()
             .multiGet(VIEW_COUNT_KEY, concertIds.map { it.toString() })
         
         return concertIds.mapIndexed { index, concertId ->
             val concert = concertMap[concertId]
-            val viewCount = viewCounts.getOrNull(index)?.let {
-                when (it) {
-                    is Long -> it
-                    is Int -> it.toLong()
-                    is String -> it.toLongOrNull() ?: 0L
-                    else -> 0L
-                }
-            } ?: 0L
+            val viewCount = viewCounts.getOrNull(index)?.toLongOrNull() ?: 0L
             
             if (concert != null) {
                 PopularConcertDto(
@@ -102,21 +95,15 @@ class ConcertStatsService(
     }
     
     private fun updatePopularityScore(concertId: Long) {
-        val viewCount = redisTemplate.opsForHash<String, Any>()
-            .get(VIEW_COUNT_KEY, concertId.toString())?.let {
-                when (it) {
-                    is Number -> it.toDouble()
-                    is String -> it.toDoubleOrNull() ?: 0.0
-                    else -> 0.0
-                }
-            } ?: 0.0
-        redisTemplate.opsForZSet().add(POPULAR_CONCERTS_KEY, concertId, viewCount)
+        val viewCount = redisTemplate.opsForHash<String, String>()
+            .get(VIEW_COUNT_KEY, concertId.toString())?.toDoubleOrNull() ?: 0.0
+        redisTemplate.opsForZSet().add(POPULAR_CONCERTS_KEY, concertId.toString(), viewCount)
     }
     
     private fun updateTrendingScore(concertId: Long, weight: Double) {
         val currentTime = System.currentTimeMillis()
         val score = currentTime * weight
-        redisTemplate.opsForZSet().add(TRENDING_KEY, concertId, score)
+        redisTemplate.opsForZSet().add(TRENDING_KEY, concertId.toString(), score)
     }
     
     @Scheduled(fixedRate = 3600000)
@@ -132,9 +119,9 @@ class ConcertStatsService(
         
         val inactiveIds = currentPopularIds.filter { it !in activeConcertIds }
         inactiveIds.forEach { concertId ->
-            redisTemplate.opsForZSet().remove(POPULAR_CONCERTS_KEY, concertId)
-            redisTemplate.opsForZSet().remove(TRENDING_KEY, concertId)
-            redisTemplate.opsForHash<String, Any>().delete(VIEW_COUNT_KEY, concertId.toString())
+            redisTemplate.opsForZSet().remove(POPULAR_CONCERTS_KEY, concertId.toString())
+            redisTemplate.opsForZSet().remove(TRENDING_KEY, concertId.toString())
+            redisTemplate.opsForHash<String, String>().delete(VIEW_COUNT_KEY, concertId.toString())
         }
     }
 }

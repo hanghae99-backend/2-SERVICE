@@ -56,7 +56,7 @@ class LockGuardAspect(
             logger.info("🔓 분산락 종료 - 키: $lockKeys, 총 소요시간: ${totalTime - startTime}ms")
         }
     }
-    
+
     private fun generateLockKeys(joinPoint: ProceedingJoinPoint, lockGuard: LockGuard): List<String> {
         return if (lockGuard.keys.isNotEmpty()) {
             lockGuard.keys.map { generateLockKey(joinPoint, it) }.let { sortLockKeys(it) }
@@ -66,7 +66,7 @@ class LockGuardAspect(
             throw IllegalArgumentException("락 키가 지정되지 않았습니다")
         }
     }
-    
+
     private fun sortLockKeys(keys: List<String>): List<String> {
         return keys.sortedWith { key1, key2 ->
             val priority1 = getLockPriority(key1)
@@ -89,12 +89,21 @@ class LockGuardAspect(
             else -> 999
         }
     }
-    
+
     private fun generateLockKey(joinPoint: ProceedingJoinPoint, keyExpression: String): String {
-        return if (keyExpression.contains("#")) {
+        val rawKey = if (keyExpression.contains("#")) {
             evaluateSpelExpression(joinPoint, keyExpression)
         } else {
             keyExpression
+        }
+        return normalizeValue(rawKey)
+    }
+
+    private fun normalizeValue(value: Any?): String {
+        return when (value) {
+            null -> "null"
+            is Enum<*> -> value.name
+            else -> value.toString()
         }
     }
     

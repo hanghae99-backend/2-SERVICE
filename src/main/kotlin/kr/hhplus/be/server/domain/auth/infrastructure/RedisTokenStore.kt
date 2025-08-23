@@ -5,13 +5,13 @@ import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Component
 import java.time.Duration
 
 @Component
 class RedisTokenStore(
-    private val redisTemplate: StringRedisTemplate,
+    private val redisTemplate: RedisTemplate<String, Any>,
     @Qualifier("redis") private val objectMapper: ObjectMapper
 ) : TokenStore {
     fun flushAll() {
@@ -32,21 +32,20 @@ class RedisTokenStore(
 
     override fun save(token: WaitingToken) {
         val key = TOKEN_PREFIX + token.token
-        val value = objectMapper.writeValueAsString(token)
-
-        redisTemplate.opsForValue().set(key, value, TOKEN_TTL)
+        redisTemplate.opsForValue().set(key, token, TOKEN_TTL)
         redisTemplate.opsForSet().add(USER_PREFIX + token.userId, token.token)
     }
 
     override fun findByToken(token: String): WaitingToken? {
         val value = redisTemplate.opsForValue().get(TOKEN_PREFIX + token) ?: return null
-        return objectMapper.readValue(value, WaitingToken::class.java)
+        return value as? WaitingToken
     }
     
     override fun findActiveTokenByUserId(userId: Long): WaitingToken? {
         val userTokens = redisTemplate.opsForSet().members(USER_PREFIX + userId) ?: return null
         
-        for (tokenStr in userTokens) {
+        for (tokenAny in userTokens) {
+            val tokenStr = tokenAny.toString()
             if (redisTemplate.opsForHash<String, String>().hasKey(ACTIVE_TOKENS_HASH, tokenStr)) {
                 return findByToken(tokenStr)
             }
@@ -62,8 +61,10 @@ class RedisTokenStore(
             val value = redisTemplate.opsForValue().get(key)
             if (value != null) {
                 try {
-                    val token = objectMapper.readValue(value, WaitingToken::class.java)
-                    tokens.add(token)
+                    val token = value as? WaitingToken
+                    if (token != null) {
+                        tokens.add(token)
+                    }
                 } catch (e: Exception) {
                     // 파싱 실패 시 무시
                 }
@@ -128,7 +129,7 @@ class RedisTokenStore(
             redisTemplate.opsForZSet().remove(WAITING_QUEUE_ZSET, token)
         }
 
-        return tokens?.toList() ?: emptyList()
+        return tokens?.map { it.toString() } ?: emptyList()
     }
 
     override fun getQueueSize(): Long {

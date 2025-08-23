@@ -2,7 +2,7 @@ package kr.hhplus.be.server.domain.concert.service
 
 import kr.hhplus.be.server.api.concert.dto.PopularConcertDto
 import org.springframework.cache.annotation.Cacheable
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.scheduling.annotation.Async
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class ConcertStatsService(
-    private val redisTemplate: StringRedisTemplate,
+    private val redisTemplate: RedisTemplate<String, Any>,
     private val concertRepository: kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
 ) {
     

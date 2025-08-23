@@ -7,9 +7,7 @@ import kr.hhplus.be.server.api.concert.dto.PopularConcertDto
 import org.slf4j.LoggerFactory
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
-import org.springframework.data.redis.core.StringRedisTemplate
-import com.fasterxml.jackson.databind.ObjectMapper
-import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.scheduling.annotation.Async
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -18,10 +16,9 @@ import java.util.concurrent.TimeUnit
 
 @Component
 class ConcertCacheScheduler(
-    private val redisTemplate: StringRedisTemplate,
+    private val redisTemplate: RedisTemplate<String, Any>,
     private val concertRepository: ConcertRepository,
-    private val concertScheduleRepository: ConcertScheduleRepository,
-    @Qualifier("redis") private val objectMapper: ObjectMapper
+    private val concertScheduleRepository: ConcertScheduleRepository
 ) {
     
     private val logger = LoggerFactory.getLogger(ConcertCacheScheduler::class.java)
@@ -72,18 +69,15 @@ class ConcertCacheScheduler(
             
             // 기본 범위 (3개월)
             val defaultConcerts = getAvailableConcertsFromDB(today, today.plusMonths(3))
-            val defaultJson = objectMapper.writeValueAsString(defaultConcerts)
-            redisTemplate.opsForValue().set(AVAILABLE_CONCERTS_DEFAULT, defaultJson, 15, TimeUnit.MINUTES)
+            redisTemplate.opsForValue().set(AVAILABLE_CONCERTS_DEFAULT, defaultConcerts, 15, TimeUnit.MINUTES)
             
             // 주간 범위
             val weeklyConcerts = getAvailableConcertsFromDB(today, today.plusWeeks(1))
-            val weeklyJson = objectMapper.writeValueAsString(weeklyConcerts)
-            redisTemplate.opsForValue().set(AVAILABLE_CONCERTS_WEEKLY, weeklyJson, 15, TimeUnit.MINUTES)
+            redisTemplate.opsForValue().set(AVAILABLE_CONCERTS_WEEKLY, weeklyConcerts, 15, TimeUnit.MINUTES)
             
             // 월간 범위
             val monthlyConcerts = getAvailableConcertsFromDB(today, today.plusMonths(1))
-            val monthlyJson = objectMapper.writeValueAsString(monthlyConcerts)
-            redisTemplate.opsForValue().set(AVAILABLE_CONCERTS_MONTHLY, monthlyJson, 15, TimeUnit.MINUTES)
+            redisTemplate.opsForValue().set(AVAILABLE_CONCERTS_MONTHLY, monthlyConcerts, 15, TimeUnit.MINUTES)
             
             logger.debug("✅ 예약 가능한 콘서트 캐시 갱신 완료")
         } catch (e: Exception) {
@@ -107,17 +101,13 @@ class ConcertCacheScheduler(
                 val top10 = buildPopularConcertDtos(popularConcertIds)
                 val top5 = top10.take(5)
                 
-                val top10Json = objectMapper.writeValueAsString(top10)
-                val top5Json = objectMapper.writeValueAsString(top5)
-                redisTemplate.opsForValue().set(POPULAR_CONCERTS_TOP10, top10Json, 10, TimeUnit.MINUTES)
-                redisTemplate.opsForValue().set(POPULAR_CONCERTS_TOP5, top5Json, 10, TimeUnit.MINUTES)
+                redisTemplate.opsForValue().set(POPULAR_CONCERTS_TOP10, top10, 10, TimeUnit.MINUTES)
+                redisTemplate.opsForValue().set(POPULAR_CONCERTS_TOP5, top5, 10, TimeUnit.MINUTES)
             } else {
                 // 기본 데이터로 초기화
                 val defaultConcerts = getDefaultPopularConcerts()
-                val top10Json = objectMapper.writeValueAsString(defaultConcerts.take(10))
-                val top5Json = objectMapper.writeValueAsString(defaultConcerts.take(5))
-                redisTemplate.opsForValue().set(POPULAR_CONCERTS_TOP10, top10Json, 10, TimeUnit.MINUTES)
-                redisTemplate.opsForValue().set(POPULAR_CONCERTS_TOP5, top5Json, 10, TimeUnit.MINUTES)
+                redisTemplate.opsForValue().set(POPULAR_CONCERTS_TOP10, defaultConcerts.take(10), 10, TimeUnit.MINUTES)
+                redisTemplate.opsForValue().set(POPULAR_CONCERTS_TOP5, defaultConcerts.take(5), 10, TimeUnit.MINUTES)
             }
             
             // 트렌딩 콘서트
@@ -128,13 +118,11 @@ class ConcertCacheScheduler(
             
             if (trendingIds.isNotEmpty()) {
                 val trending = buildPopularConcertDtos(trendingIds)
-                val trendingJson = objectMapper.writeValueAsString(trending)
-                redisTemplate.opsForValue().set(TRENDING_CONCERTS_TOP5, trendingJson, 5, TimeUnit.MINUTES)
+                redisTemplate.opsForValue().set(TRENDING_CONCERTS_TOP5, trending, 5, TimeUnit.MINUTES)
             } else {
                 // 기본 데이터로 초기화
                 val defaultConcerts = getDefaultPopularConcerts()
-                val trendingJson = objectMapper.writeValueAsString(defaultConcerts.take(5))
-                redisTemplate.opsForValue().set(TRENDING_CONCERTS_TOP5, trendingJson, 5, TimeUnit.MINUTES)
+                redisTemplate.opsForValue().set(TRENDING_CONCERTS_TOP5, defaultConcerts.take(5), 5, TimeUnit.MINUTES)
             }
             
             logger.debug("✅ 인기 콘서트 캐시 갱신 완료")
@@ -160,19 +148,17 @@ class ConcertCacheScheduler(
                     // 콘서트 상세 정보
                     val concert = concertRepository.findById(concertId)
                     if (concert != null) {
-                        val concertJson = objectMapper.writeValueAsString(concert)
                         redisTemplate.opsForValue().set(
                             "$CONCERT_DETAILS_PREFIX$concertId", 
-                            concertJson, 
+                            concert, 
                             1, TimeUnit.HOURS
                         )
                         
                         // 콘서트 스케줄 정보
                         val schedules = concertScheduleRepository.findByConcertId(concertId)
-                        val schedulesJson = objectMapper.writeValueAsString(schedules)
                         redisTemplate.opsForValue().set(
                             "$CONCERT_SCHEDULES_PREFIX$concertId", 
-                            schedulesJson, 
+                            schedules, 
                             1, TimeUnit.HOURS
                         )
                     }

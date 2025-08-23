@@ -12,17 +12,17 @@ import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import org.springframework.data.redis.core.HashOperations
 import org.springframework.data.redis.core.SetOperations
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import org.springframework.data.redis.core.ZSetOperations
 import java.time.Duration
 
 class RedisTokenStoreTest : DescribeSpec({
     
-    lateinit var redisTemplate: StringRedisTemplate
-    lateinit var valueOperations: ValueOperations<String, String>
-    lateinit var setOperations: SetOperations<String, String>
-    lateinit var zSetOperations: ZSetOperations<String, String>
+    lateinit var redisTemplate: RedisTemplate<String, Any>
+    lateinit var valueOperations: ValueOperations<String, Any>
+    lateinit var setOperations: SetOperations<String, Any>
+    lateinit var zSetOperations: ZSetOperations<String, Any>
     lateinit var hashOperations: HashOperations<String, String, String>
     lateinit var objectMapper: ObjectMapper
     lateinit var redisTokenStore: RedisTokenStore
@@ -45,15 +45,13 @@ class RedisTokenStoreTest : DescribeSpec({
     
     describe("save") {
         context("새로운 토큰을 저장할 때") {
-            it("Redis에 토큰 정보를 JSON으로 저장하고 사용자별 토큰 Set에 추가해야 한다") {
+            it("Redis에 토큰 정보를 저장하고 사용자별 토큰 Set에 추가해야 한다") {
                 // given
                 val waitingToken = WaitingToken(
                     token = "test-token-123",
                     userId = 456L
                 )
-                val tokenJson = """{"token":"test-token-123","userId":456}"""
                 
-                every { objectMapper.writeValueAsString(waitingToken) } returns tokenJson
                 every { valueOperations.set(any(), any(), any<Duration>()) } just Runs
                 every { setOperations.add(any(), any()) } returns 1L
                 
@@ -64,7 +62,7 @@ class RedisTokenStoreTest : DescribeSpec({
                 verify(exactly = 1) { 
                     valueOperations.set(
                         "waiting_token:test-token-123", 
-                        tokenJson, 
+                        waitingToken, 
                         Duration.ofMinutes(30)
                     )
                 }
@@ -77,17 +75,15 @@ class RedisTokenStoreTest : DescribeSpec({
     
     describe("findByToken") {
         context("존재하는 토큰을 조회할 때") {
-            it("JSON에서 WaitingToken 객체로 역직렬화해서 반환해야 한다") {
+            it("WaitingToken 객체를 반환해야 한다") {
                 // given
                 val token = "test-token-123"
-                val tokenJson = """{"token":"test-token-123","userId":456}"""
                 val expectedToken = WaitingToken(
                     token = "test-token-123",
                     userId = 456L
                 )
                 
-                every { valueOperations.get("waiting_token:test-token-123") } returns tokenJson
-                every { objectMapper.readValue(tokenJson, WaitingToken::class.java) } returns expectedToken
+                every { valueOperations.get("waiting_token:test-token-123") } returns expectedToken
                 
                 // when
                 val result = redisTokenStore.findByToken(token)
@@ -95,7 +91,6 @@ class RedisTokenStoreTest : DescribeSpec({
                 // then
                 result shouldBe expectedToken
                 verify(exactly = 1) { valueOperations.get("waiting_token:test-token-123") }
-                verify(exactly = 1) { objectMapper.readValue(tokenJson, WaitingToken::class.java) }
             }
         }
         
@@ -111,7 +106,6 @@ class RedisTokenStoreTest : DescribeSpec({
                 // then
                 result shouldBe null
                 verify(exactly = 1) { valueOperations.get("waiting_token:non-existent-token") }
-                verify(exactly = 0) { objectMapper.readValue(any<String>(), any<Class<WaitingToken>>()) }
             }
         }
     }
@@ -406,10 +400,8 @@ class RedisTokenStoreTest : DescribeSpec({
                     token = token,
                     userId = 123L
                 )
-                val tokenJson = """{"token":"token-to-delete","userId":123}"""
                 
-                every { valueOperations.get("waiting_token:token-to-delete") } returns tokenJson
-                every { objectMapper.readValue(tokenJson, WaitingToken::class.java) } returns waitingToken
+                every { valueOperations.get("waiting_token:token-to-delete") } returns waitingToken
                 every { redisTemplate.delete("waiting_token:token-to-delete") } returns true
                 every { setOperations.remove("user_tokens:123", token) } returns 1L
                 every { zSetOperations.remove("waiting_queue_zset", token) } returns 1L
@@ -436,13 +428,11 @@ class RedisTokenStoreTest : DescribeSpec({
                 val inactiveToken = "inactive-token"
                 val userTokens = setOf(activeToken, inactiveToken)
                 val waitingToken = WaitingToken(token = activeToken, userId = userId)
-                val tokenJson = """{"token":"active-token","userId":123}"""
                 
                 every { setOperations.members("user_tokens:123") } returns userTokens
                 every { hashOperations.hasKey("active_tokens_hash", activeToken) } returns true
                 every { hashOperations.hasKey("active_tokens_hash", inactiveToken) } returns false
-                every { valueOperations.get("waiting_token:active-token") } returns tokenJson
-                every { objectMapper.readValue(tokenJson, WaitingToken::class.java) } returns waitingToken
+                every { valueOperations.get("waiting_token:active-token") } returns waitingToken
                 
                 // when
                 val result = redisTokenStore.findActiveTokenByUserId(userId)

@@ -2,6 +2,7 @@ package kr.hhplus.be.server.global.config
 
 import kr.hhplus.be.server.global.constants.CacheConstants
 import kr.hhplus.be.server.global.properties.CacheProperties
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.cache.annotation.EnableCaching
 import org.springframework.context.annotation.Bean
@@ -9,8 +10,11 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.data.redis.cache.RedisCacheConfiguration
 import org.springframework.data.redis.cache.RedisCacheManager
 import org.springframework.data.redis.connection.RedisConnectionFactory
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer
 import org.springframework.data.redis.serializer.RedisSerializationContext
 import org.springframework.data.redis.serializer.StringRedisSerializer
+import com.fasterxml.jackson.databind.ObjectMapper
 import java.time.Duration
 
 @Configuration
@@ -21,9 +25,10 @@ class CacheConfig {
     @Bean
     fun cacheManager(
         redisConnectionFactory: RedisConnectionFactory,
-        cacheProperties: CacheProperties
+        cacheProperties: CacheProperties,
+        @Qualifier("redis") objectMapper: ObjectMapper
     ): RedisCacheManager {
-        val defaultConfig = createDefaultCacheConfiguration(cacheProperties)
+        val defaultConfig = createDefaultCacheConfiguration(cacheProperties, objectMapper)
         
         return RedisCacheManager.builder(redisConnectionFactory)
             .cacheDefaults(defaultConfig)
@@ -76,12 +81,16 @@ class CacheConfig {
     }
     
     private fun createDefaultCacheConfiguration(
-        cacheProperties: CacheProperties
+        cacheProperties: CacheProperties,
+        objectMapper: ObjectMapper
     ): RedisCacheConfiguration {
+        // Use the same ObjectMapper that has JsonTypeInfo configuration
+        val jsonSerializer = GenericJackson2JsonRedisSerializer(objectMapper)
+        
         return RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(cacheProperties.defaultTtl)
             .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(StringRedisSerializer()))
-            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(StringRedisSerializer()))
+            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer))
             .disableCachingNullValues()
             .computePrefixWith { cacheName -> "$cacheName:" }
     }

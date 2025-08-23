@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.global.lock
 
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.listener.PatternTopic
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.data.redis.connection.Message
@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @Component
 class DistributedLock(
-    private val redisTemplate: StringRedisTemplate?,
+    private val redisTemplate: RedisTemplate<String, Any>?,
     private val redisMessageListenerContainer: RedisMessageListenerContainer?
 ) {
     private val logger = LoggerFactory.getLogger(DistributedLock::class.java)

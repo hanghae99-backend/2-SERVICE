@@ -17,7 +17,7 @@ import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import jakarta.persistence.EntityManager
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.http.MediaType
@@ -39,7 +39,7 @@ class BalanceConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: StringRedisTemplate
+    private val redisTemplate: RedisTemplate<String, Any>
 ) : DescribeSpec({
     extension(SpringExtension)
 

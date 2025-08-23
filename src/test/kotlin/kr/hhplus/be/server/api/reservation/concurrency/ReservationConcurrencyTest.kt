@@ -21,7 +21,7 @@ import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.global.constants.CacheConstants
 import org.springframework.cache.CacheManager
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.PlatformTransactionManager
@@ -43,7 +43,7 @@ class ReservationConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: StringRedisTemplate,
+    private val redisTemplate: RedisTemplate<String, Any>,
     private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)

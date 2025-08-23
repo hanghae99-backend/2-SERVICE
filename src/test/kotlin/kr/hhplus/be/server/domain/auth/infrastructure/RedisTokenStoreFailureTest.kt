@@ -15,10 +15,10 @@ class RedisTokenStoreFailureTest : DescribeSpec({
     
     describe("RedisTokenStore 장애 상황 테스트") {
         
-        lateinit var redisTemplate: StringRedisTemplate
-        lateinit var valueOperations: ValueOperations<String, String>
-        lateinit var setOperations: SetOperations<String, String>
-        lateinit var zSetOperations: ZSetOperations<String, String>
+        lateinit var redisTemplate: RedisTemplate<String, Any>
+        lateinit var valueOperations: ValueOperations<String, Any>
+        lateinit var setOperations: SetOperations<String, Any>
+        lateinit var zSetOperations: ZSetOperations<String, Any>
         lateinit var hashOperations: HashOperations<String, String, String>
         lateinit var objectMapper: com.fasterxml.jackson.databind.ObjectMapper
         lateinit var redisTokenStore: RedisTokenStore
@@ -46,7 +46,6 @@ class RedisTokenStoreFailureTest : DescribeSpec({
                     token = "test-token",
                     userId = 123L
                 )
-                every { objectMapper.writeValueAsString(any()) } returns "{}"
                 every { valueOperations.set(any(), any(), any<java.time.Duration>()) } throws RedisConnectionFailureException("Redis 연결 실패")
                 
                 // when & then
@@ -85,7 +84,6 @@ class RedisTokenStoreFailureTest : DescribeSpec({
                     token = "test-token",
                     userId = 123L
                 )
-                every { objectMapper.writeValueAsString(any()) } returns "{}"
                 every { valueOperations.set(any(), any(), any<java.time.Duration>()) } throws 
                     RuntimeException("OOM command not allowed when used memory > 'maxmemory'")
                 
@@ -120,34 +118,18 @@ class RedisTokenStoreFailureTest : DescribeSpec({
             }
         }
         
-        context("데이터 직렬화/역직렬화 실패 시") {
-            it("JSON 직렬화 실패 시 예외가 발생해야 한다") {
-                // given
-                val waitingToken = WaitingToken(
-                    token = "test-token",
-                    userId = 123L
-                )
-                every { objectMapper.writeValueAsString(any()) } throws 
-                    RuntimeException("JSON 직렬화 실패")
-                
-                // when & then
-                shouldThrow<RuntimeException> {
-                    redisTokenStore.save(waitingToken)
-                }
-            }
-            
-            it("JSON 역직렬화 실패 시 예외가 발생해야 한다") {
+        context("데이터 형변환 실패 시") {
+            it("잘못된 데이터 타입 반환 시 null을 반환해야 한다") {
                 // given
                 val token = "test-token"
-                val invalidJson = "invalid json"
-                every { valueOperations.get(any()) } returns invalidJson
-                every { objectMapper.readValue(any<String>(), any<Class<WaitingToken>>()) } throws 
-                    RuntimeException("JSON 파싱 실패")
+                // Redis에서 WaitingToken이 아닌 다른 타입 반환
+                every { valueOperations.get(any()) } returns "invalid-data-type"
                 
-                // when & then
-                shouldThrow<RuntimeException> {
-                    redisTokenStore.findByToken(token)
-                }
+                // when
+                val result = redisTokenStore.findByToken(token)
+                
+                // then - 형변환 실패 시 null 반환
+                result shouldBe null
             }
         }
         
@@ -232,6 +214,10 @@ class RedisTokenStoreFailureTest : DescribeSpec({
             it("연결 실패 후 재연결이 가능해야 한다") {
                 // given
                 val token = "recovery-test-token"
+                val waitingToken = WaitingToken(
+                    token = token,
+                    userId = 123L
+                )
                 var callCount = 0
                 
                 // 첫 번째 호출: 실패, 두 번째 호출: 성공
@@ -239,7 +225,7 @@ class RedisTokenStoreFailureTest : DescribeSpec({
                     if (callCount++ == 0) {
                         throw RedisConnectionFailureException("연결 실패")
                     } else {
-                        "token-data"
+                        waitingToken
                     }
                 }
                 
@@ -248,13 +234,11 @@ class RedisTokenStoreFailureTest : DescribeSpec({
                     redisTokenStore.findByToken(token)
                 }
                 
-                // when & then - 두 번째 호출은 성공 (재연결됨)
-                every { objectMapper.readValue(any<String>(), any<Class<WaitingToken>>()) } returns WaitingToken(
-                    token = token,
-                    userId = 123L
-                )
-                
+                // when - 두 번째 호출은 성공 (재연결됨)
                 val result = redisTokenStore.findByToken(token)
+                
+                // then
+                result shouldBe waitingToken
                 result?.token shouldBe token
             }
             
@@ -309,6 +293,59 @@ class RedisTokenStoreFailureTest : DescribeSpec({
                 result.size shouldBe 2
                 result shouldContain "token1"
                 result shouldContain "token2"
+            }
+        }
+        
+        context("트랜잭션 실패 시나리오") {
+            it("save 작업 중 일부만 성공하면 부분적인 상태가 될 수 있다") {
+                // given
+                val waitingToken = WaitingToken(
+                    token = "partial-save-token",
+                    userId = 456L
+                )
+                
+                // ValueOperations는 성공, SetOperations는 실패
+                every { valueOperations.set(any(), any(), any<java.time.Duration>()) } just Runs
+                every { setOperations.add(any(), any()) } throws RuntimeException("Set 추가 실패")
+                
+                // when & then
+                shouldThrow<RuntimeException> {
+                    redisTokenStore.save(waitingToken)
+                }
+                
+                // 첫 번째 작업은 수행되었지만 두 번째 작업에서 실패
+                verify(exactly = 1) { 
+                    valueOperations.set(
+                        "waiting_token:partial-save-token", 
+                        waitingToken, 
+                        java.time.Duration.ofMinutes(30)
+                    )
+                }
+            }
+        }
+        
+        context("null 처리 시나리오") {
+            it("ZSet rank가 null일 때 적절히 처리해야 한다") {
+                // given
+                val token = "null-rank-token"
+                every { zSetOperations.rank("waiting_queue_zset", token) } returns null
+                
+                // when
+                val position = redisTokenStore.getQueuePosition(token)
+                
+                // then
+                position shouldBe -1
+            }
+            
+            it("ZSet zCard가 null일 때 0을 반환해야 한다") {
+                // given
+                every { zSetOperations.zCard("waiting_queue_zset") } returns null
+                
+                // when
+                val size = redisTokenStore.getQueueSize()
+                
+                // then
+                size shouldBe 0L
             }
         }
     }

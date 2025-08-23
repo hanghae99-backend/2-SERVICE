@@ -3,6 +3,7 @@ package kr.hhplus.be.server.domain.payment.models
 import jakarta.persistence.*
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import kr.hhplus.be.server.global.common.BaseEntity
 
 @Entity
@@ -13,6 +14,7 @@ import kr.hhplus.be.server.global.common.BaseEntity
         Index(name = "idx_payment_status_type_category", columnList = "category, is_active")
     ]
 )
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
 class PaymentStatusType @JsonCreator constructor(
     @JsonProperty("code")
     @Id

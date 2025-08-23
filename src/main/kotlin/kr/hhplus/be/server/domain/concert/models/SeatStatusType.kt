@@ -3,6 +3,7 @@ package kr.hhplus.be.server.domain.concert.models
 import jakarta.persistence.*
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import kr.hhplus.be.server.global.common.BaseEntity
 
 @Entity
@@ -13,6 +14,7 @@ import kr.hhplus.be.server.global.common.BaseEntity
         Index(name = "idx_seat_status_type_name", columnList = "name")
     ]
 )
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
 class SeatStatusType @JsonCreator constructor(
     @JsonProperty("code")
     @Id

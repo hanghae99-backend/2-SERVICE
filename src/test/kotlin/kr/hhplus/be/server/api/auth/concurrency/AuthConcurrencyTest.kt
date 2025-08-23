@@ -14,7 +14,7 @@ import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.config.TestDataFixture
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
@@ -32,7 +32,7 @@ class AuthConcurrencyTest(
     private val userJpaRepository: UserJpaRepository,
     private val objectMapper: ObjectMapper,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: StringRedisTemplate,
+    private val redisTemplate: RedisTemplate<String, Any>,
     private val tokenLifecycleManager: TokenLifecycleManager
 ) : DescribeSpec({
 

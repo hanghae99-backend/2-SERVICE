@@ -8,18 +8,18 @@ import kr.hhplus.be.server.domain.concert.models.Concert
 import kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
 import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ZSetOperations
 import java.time.LocalDateTime
 import java.time.LocalDate
 
 class SelloutRankingServiceTest : BehaviorSpec({
 
-    val redisTemplate = mockk<StringRedisTemplate>()
+    val redisTemplate = mockk<RedisTemplate<String, Any>>()
     val reservationRepository = mockk<ReservationRepository>()
     val concertRepository = mockk<ConcertRepository>()
     val concertScheduleRepository = mockk<ConcertScheduleRepository>()
-    val zSetOperations = mockk<ZSetOperations<String, String>>()
+    val zSetOperations = mockk<ZSetOperations<String, Any>>()
     
     val selloutRankingService = SelloutRankingService(
         redisTemplate = redisTemplate,

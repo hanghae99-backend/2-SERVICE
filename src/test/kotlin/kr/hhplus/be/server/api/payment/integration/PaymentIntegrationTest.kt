@@ -17,7 +17,7 @@ import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
 import kr.hhplus.be.server.domain.concert.models.Seat
 import kr.hhplus.be.server.domain.reservation.models.Reservation
 import kr.hhplus.be.server.domain.user.models.User
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.PlatformTransactionManager
@@ -37,7 +37,7 @@ class PaymentIntegrationTest(
     private val tokenStore: TokenStore,
     private val tokenFactory: TokenFactory,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: StringRedisTemplate,
+    private val redisTemplate: RedisTemplate<String, Any>,
     private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)

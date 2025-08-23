@@ -5,10 +5,7 @@ import kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
 import org.slf4j.LoggerFactory
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.Cacheable
-import org.springframework.data.redis.core.StringRedisTemplate
-import com.fasterxml.jackson.databind.ObjectMapper
-import org.springframework.beans.factory.annotation.Qualifier
-import com.fasterxml.jackson.core.type.TypeReference
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.TimeUnit
@@ -16,10 +13,9 @@ import java.util.concurrent.TimeUnit
 @Service
 @Transactional(readOnly = true)
 class CacheTestService(
-    private val redisTemplate: StringRedisTemplate,
+    private val redisTemplate: RedisTemplate<String, Any>,
     private val concertRepository: ConcertRepository,
-    private val cacheManager: CacheManager,
-    @Qualifier("redis") private val objectMapper: ObjectMapper
+    private val cacheManager: CacheManager
 ) {
     
     private val logger = LoggerFactory.getLogger(CacheTestService::class.java)
@@ -37,15 +33,14 @@ class CacheTestService(
         val cacheKey = "$SCHEDULER_CACHE_KEY_PREFIX$limit"
         
         return try {
-            val cachedJson = redisTemplate.opsForValue().get(cacheKey)
-            if (cachedJson != null) {
-                val typeReference = object : TypeReference<List<PopularConcertDto>>() {}
-                objectMapper.readValue(cachedJson, typeReference)
+            val cachedData = redisTemplate.opsForValue().get(cacheKey)
+            if (cachedData != null) {
+                @Suppress("UNCHECKED_CAST")
+                cachedData as List<PopularConcertDto>
             } else {
                 // 캐시 미스 시 생성 후 저장
                 val result = buildPopularConcertDtos(limit)
-                val resultJson = objectMapper.writeValueAsString(result)
-                redisTemplate.opsForValue().set(cacheKey, resultJson, 10, TimeUnit.MINUTES)
+                redisTemplate.opsForValue().set(cacheKey, result, 10, TimeUnit.MINUTES)
                 result
             }
         } catch (e: Exception) {
@@ -125,8 +120,7 @@ class CacheTestService(
             popularLimits.forEach { l ->
                 val result = buildPopularConcertDtos(l)
                 val cacheKey = "$SCHEDULER_CACHE_KEY_PREFIX$l"
-                val resultJson = objectMapper.writeValueAsString(result)
-                redisTemplate.opsForValue().set(cacheKey, resultJson, 10, TimeUnit.MINUTES)
+                redisTemplate.opsForValue().set(cacheKey, result, 10, TimeUnit.MINUTES)
                 logger.debug("스케줄러 캐시 생성: $cacheKey (${result.size}건)")
             }
             

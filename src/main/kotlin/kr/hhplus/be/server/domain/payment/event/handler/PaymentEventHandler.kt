@@ -52,11 +52,11 @@ class PaymentEventHandler(
             )
             eventPublisher.publish(seatConfirmedEvent)
             
-            // 3. 토큰 완료 처리 (단순한 로직 - service 직접 호출)
+            // 3. 토큰 완료 처리 (스케줄러에서 활성화하므로 토큰만 만료)
             tokenLifecycleManager.findToken(event.token)
                 ?: throw TokenNotFoundException("토큰을 찾을 수 없습니다.")
             tokenLifecycleManager.completeToken(event.token)
-            logger.info("토큰 완료 처리: token=${event.token}")
+            logger.info("토큰 만료 처리 완료: token=${event.token} (활성화는 스케줄러에서 자동 처리)")
             
             logger.info("결제 완료 이벤트 처리 완료: paymentId=${event.paymentId}")
             
@@ -74,11 +74,11 @@ class PaymentEventHandler(
         logger.info("결제 실패 이벤트 처리 시작: paymentId=${event.paymentId}, reason=${event.reason}")
         
         try {
-            // 1. 토큰 완료 처리 (실패해도 토큰은 해제) - 단순한 로직, service 직접 호출
+            // 1. 토큰 완료 처리 (실패해도 토큰은 해제, 활성화는 스케줄러에서 자동 처리)
             tokenLifecycleManager.findToken(event.token)
                 ?: throw TokenNotFoundException("토큰을 찾을 수 없습니다.")
             tokenLifecycleManager.completeToken(event.token)
-            logger.info("토큰 해제 완료: token=${event.token}")
+            logger.info("토큰 만료 완료: token=${event.token} (활성화는 스케줄러에서 자동 처리)")
             
             // 2. 결제 실패 알림 처리
             // TODO: 사용자에게 결제 실패 알림 발송

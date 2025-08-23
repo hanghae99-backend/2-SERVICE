@@ -151,6 +151,73 @@ class QueueManagerTest : DescribeSpec({
         }
     }
     
+    describe("activateTokensByCount") {
+        context("지정된 개수만큼 토큰을 활성화할 때") {
+            it("최소값(maxCount와 가용 슬롯)만큼 활성화해야 한다") {
+                // given
+                val maxCount = 5
+                val availableSlots = 3  // 더 작은 값
+                val tokensToActivate = listOf("token1", "token2", "token3")
+                
+                every { tokenStore.countActiveTokens() } returns 97L // 100 - 97 = 3 slots
+                every { tokenStore.getNextTokensFromQueue(availableSlots) } returns tokensToActivate
+                every { tokenStore.activateToken(any()) } just Runs
+                
+                // when
+                val result = queueManager.activateTokensByCount(maxCount)
+                
+                // then
+                result shouldBe 3
+                verify(exactly = 1) { tokenStore.countActiveTokens() }
+                verify(exactly = 1) { tokenStore.getNextTokensFromQueue(availableSlots) }
+                verify(exactly = 1) { tokenStore.activateToken("token1") }
+                verify(exactly = 1) { tokenStore.activateToken("token2") }
+                verify(exactly = 1) { tokenStore.activateToken("token3") }
+            }
+        }
+        
+        context("가용 슬롯이 maxCount보다 많을 때") {
+            it("maxCount만큼 활성화해야 한다") {
+                // given
+                val maxCount = 3
+                val availableSlots = 5  // 더 큰 값
+                val tokensToActivate = listOf("token1", "token2", "token3")
+                
+                every { tokenStore.countActiveTokens() } returns 95L // 100 - 95 = 5 slots
+                every { tokenStore.getNextTokensFromQueue(maxCount) } returns tokensToActivate
+                every { tokenStore.activateToken(any()) } just Runs
+                
+                // when
+                val result = queueManager.activateTokensByCount(maxCount)
+                
+                // then
+                result shouldBe 3
+                verify(exactly = 1) { tokenStore.countActiveTokens() }
+                verify(exactly = 1) { tokenStore.getNextTokensFromQueue(maxCount) }
+            }
+        }
+        
+        context("가용 슬롯이 0일 때") {
+            it("아무것도 활성화하지 않아야 한다") {
+                // given
+                val maxCount = 5
+                val isolatedTokenStore = mockk<TokenStore>(relaxed = true)
+                val isolatedQueueManager = QueueManager(isolatedTokenStore)
+                
+                every { isolatedTokenStore.countActiveTokens() } returns 100L // 가용 슬롯 0
+                
+                // when
+                val result = isolatedQueueManager.activateTokensByCount(maxCount)
+                
+                // then
+                result shouldBe 0
+                verify(exactly = 1) { isolatedTokenStore.countActiveTokens() }
+                verify(exactly = 0) { isolatedTokenStore.getNextTokensFromQueue(any()) }
+                verify(exactly = 0) { isolatedTokenStore.activateToken(any()) }
+            }
+        }
+    }
+
     describe("processQueueAutomatically") {
         context("가용 슬롯이 있고 대기자가 있을 때") {
             it("대기자를 가용 슬롯만큼 활성화해야 한다") {

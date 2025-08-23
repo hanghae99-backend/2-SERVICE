@@ -1,5 +1,7 @@
 package kr.hhplus.be.server.config
 
+import org.springframework.cache.CacheManager
+import org.springframework.context.ApplicationContext
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.jdbc.core.JdbcTemplate
 
@@ -10,15 +12,31 @@ import org.springframework.jdbc.core.JdbcTemplate
 object TestDataCleanupHelper {
     
     /**
-     * Redis 데이터베이스 초기화
+     * Redis 데이터베이스 초기화 (캐시 포함)
      */
     fun cleanupRedis(redisTemplate: RedisTemplate<*, *>) {
         try {
             redisTemplate.connectionFactory?.connection?.use { connection ->
-                connection.serverCommands()?.flushDb()
+                // flushDb() 대신 flushAll() 사용하여 모든 DB 초기화
+                connection.serverCommands()?.flushAll()
             }
         } catch (e: Exception) {
+            println("Redis cleanup failed: ${e.message}")
             // 테스트 환경에서 Redis 초기화 실패는 무시
+        }
+    }
+    
+    /**
+     * 캐시 매니저 초기화
+     */
+    fun cleanupCacheManager(context: ApplicationContext) {
+        try {
+            val cacheManager = context.getBean(CacheManager::class.java)
+            cacheManager.cacheNames.forEach { cacheName ->
+                cacheManager.getCache(cacheName)?.clear()
+            }
+        } catch (e: Exception) {
+            println("Cache manager cleanup failed: ${e.message}")
         }
     }
     
@@ -112,6 +130,20 @@ object TestDataCleanupHelper {
      */
     fun cleanupAllWithSequenceReset(redisTemplate: RedisTemplate<*, *>, jdbcTemplate: JdbcTemplate) {
         cleanupRedis(redisTemplate)
+        cleanupDatabase(jdbcTemplate)
+        resetSequences(jdbcTemplate)
+    }
+    
+    /**
+     * 전체 테스트 환경 초기화 (캐시 포함)
+     */
+    fun cleanupCompleteTestEnvironment(
+        context: ApplicationContext,
+        redisTemplate: RedisTemplate<*, *>,
+        jdbcTemplate: JdbcTemplate
+    ) {
+        cleanupRedis(redisTemplate)
+        cleanupCacheManager(context)
         cleanupDatabase(jdbcTemplate)
         resetSequences(jdbcTemplate)
     }

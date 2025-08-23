@@ -19,6 +19,8 @@ import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.domain.balance.models.Point
+import kr.hhplus.be.server.global.constants.CacheConstants
+import org.springframework.cache.CacheManager
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -70,6 +72,18 @@ class ReservationConcurrencyTest(
 
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
+        
+        // Redis 전체 초기화 (캐시 포함)
+        redisTemplate.execute { connection ->
+            connection.serverCommands()?.flushAll()
+            null
+        }
+        
+        // 캐시 매니저도 초기화
+        val cacheManager = webApplicationContext.getBean(CacheManager::class.java)
+        cacheManager.cacheNames.forEach { cacheName ->
+            cacheManager.getCache(cacheName)?.clear()
+        }
 
         transactionTemplate.execute { _ ->
             // 테스트 데이터 정리 (시퀀스 초기화 포함)

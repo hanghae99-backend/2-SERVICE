@@ -39,6 +39,12 @@ class ReservationScheduler(
     
     @Value("\${app.scheduler.token.cleanup.interval:30000}")
     private var tokenCleanupInterval: Long = 30000
+
+    @Value("\${app.scheduler.token.activation.interval:10000}")
+    private var tokenActivationInterval: Long = 10000
+
+    @Value("\${app.scheduler.token.activation.count:10}")
+    private var tokenActivationBatchSize: Int = 10
     
     @Value("\${app.scheduler.sellout.ranking.interval:300000}")
     private var selloutRankingInterval: Long = 300000
@@ -47,6 +53,7 @@ class ReservationScheduler(
     private val reservationCleanupCount = AtomicInteger(0)
     private val queueProcessCount = AtomicInteger(0)
     private val tokenCleanupCount = AtomicInteger(0)
+    private val tokenActivationCount = AtomicInteger(0)
     private val selloutRankingCount = AtomicInteger(0)
     private val errorCount = AtomicInteger(0)
     
@@ -87,50 +94,45 @@ class ReservationScheduler(
     }
     
     /**
-     * 대기열 처리 - 만료 토큰 체크하고 대기열에서 자동 갈아끼우기
+     * N초마다 M개씩 토큰 활성화 - 단순하고 예측 가능한 방식
      */
-    @Scheduled(fixedRateString = "\${app.scheduler.queue.process.interval:5000}")
-    fun processQueue() {
+    @Scheduled(fixedRateString = "\${app.scheduler.token.activation.interval:10000}")
+    fun activateTokensScheduled() {
         distributedLock.executeWithLock(
-            lockKey = "scheduler:queue:process",
-            lockTimeoutMs = 4000L,
-            waitTimeoutMs = 1000L
+            lockKey = "scheduler:token:activation",
+            lockTimeoutMs = 8000L,
+            waitTimeoutMs = 2000L
         ) {
             try {
                 val startTime = System.currentTimeMillis()
                 val currentTime = LocalDateTime.now().format(timeFormatter)
                 
-                // 만료 토큰 정리와 동시에 대기열 자동 처리
-                val (expiredTokenCount, activatedTokenCount) = tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue()
+                // N초마다 M개씩 토큰 활성화
+                val activatedCount = queueManager.activateTokensByCount(tokenActivationBatchSize)
                 
                 val elapsed = System.currentTimeMillis() - startTime
-                queueProcessCount.incrementAndGet()
+                tokenActivationCount.addAndGet(activatedCount)
                 
-                if (expiredTokenCount > 0 || activatedTokenCount > 0) {
-                    logger.info("🔄 대기열 처리 완료 [{}] - 만료정리: {}개, 새로활성화: {}개 ({}ms)", 
-                        currentTime, expiredTokenCount, activatedTokenCount, elapsed)
+                if (activatedCount > 0) {
+                    logger.info("⚡ 토큰 활성화 완료 [{}] - {}개 활성화 ({}ms)", 
+                        currentTime, activatedCount, elapsed)
                 } else {
-                    logger.debug("🔍 대기열 처리 완료 [{}] - 변경사항 없음 ({}ms)", currentTime, elapsed)
-                }
-                
-                // 통계 정보 주기적 출력 (매 10회마다)
-                if (queueProcessCount.get() % 10 == 0) {
-                    logSchedulerStatistics()
+                    logger.debug("🔍 토큰 활성화 [{}] - 활성화할 대기 토큰 없음 ({}ms)", currentTime, elapsed)
                 }
                 
             } catch (e: Exception) {
                 errorCount.incrementAndGet()
-                logger.error("❌ 대기열 자동 처리 중 오류 발생", e)
+                logger.error("❌ 토큰 활성화 스케줄러 중 오류 발생", e)
                 throw e
             }
         }
     }
     
     /**
-     * 만료된 토큰 정리 및 대기열 자동 처리 - 더 빠른 정리를 위한 별도 스케줄
+     * 만료된 토큰 정리 - 활성화와 분리된 단순한 정리 작업
      */
     @Scheduled(fixedRateString = "\${app.scheduler.token.cleanup.interval:30000}")
-    fun cleanupExpiredTokensAndProcessQueue() {
+    fun cleanupExpiredTokens() {
         distributedLock.executeWithLock(
             lockKey = "scheduler:token:cleanup",
             lockTimeoutMs = 25000L,
@@ -138,13 +140,13 @@ class ReservationScheduler(
         ) {
             try {
                 val startTime = System.currentTimeMillis()
-                val (cleanedCount, activatedCount) = tokenLifecycleManager.cleanupExpiredTokensAndProcessQueue()
+                val cleanedCount = tokenLifecycleManager.cleanupExpiredTokens()
                 val elapsed = System.currentTimeMillis() - startTime
                 
                 tokenCleanupCount.addAndGet(cleanedCount)
                 
-                if (cleanedCount > 0 || activatedCount > 0) {
-                    logger.info("🧹 토큰 정리 및 대기열 처리 완료: 정리 {}개, 활성화 {}개 ({}ms)", cleanedCount, activatedCount, elapsed)
+                if (cleanedCount > 0) {
+                    logger.info("🧹 만료된 토큰 정리 완료: {}개 정리 ({}ms)", cleanedCount, elapsed)
                 } else {
                     logger.debug("🔍 만료된 토큰 없음 ({}ms)", elapsed)
                 }
@@ -258,6 +260,7 @@ class ReservationScheduler(
             reservationCleanupCount.set(0)
             queueProcessCount.set(0)
             tokenCleanupCount.set(0)
+            tokenActivationCount.set(0)
             errorCount.set(0)
             
             // 다른 시스템 통계도 리셋
@@ -277,13 +280,14 @@ class ReservationScheduler(
     }
     
     fun getSchedulerStatistics(): SchedulerStatistics {
-        val totalJobs = reservationCleanupCount.get() + queueProcessCount.get() + tokenCleanupCount.get()
+        val totalJobs = reservationCleanupCount.get() + queueProcessCount.get() + tokenCleanupCount.get() + tokenActivationCount.get()
         val errors = errorCount.get()
         
         return SchedulerStatistics(
             reservationCleanupCount = reservationCleanupCount.get(),
             queueProcessCount = queueProcessCount.get(),
             tokenCleanupCount = tokenCleanupCount.get(),
+            tokenActivationCount = tokenActivationCount.get(),
             totalJobs = totalJobs,
             errorCount = errors,
             errorRate = if (totalJobs > 0) (errors.toDouble() / totalJobs * 100) else 0.0,
@@ -305,6 +309,7 @@ data class SchedulerStatistics(
     val reservationCleanupCount: Int,
     val queueProcessCount: Int,
     val tokenCleanupCount: Int,
+    val tokenActivationCount: Int,
     val totalJobs: Int,
     val errorCount: Int,
     val errorRate: Double,

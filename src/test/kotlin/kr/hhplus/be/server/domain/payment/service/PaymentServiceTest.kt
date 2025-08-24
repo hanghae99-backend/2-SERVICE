@@ -13,6 +13,8 @@ import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
 import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
 import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
 import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal
 
 class PaymentServiceTest : DescribeSpec({
@@ -39,7 +41,11 @@ class PaymentServiceTest : DescribeSpec({
                 val reservationId = 1L
                 val amount = BigDecimal("50000")
                 
-                val pendingStatus = PaymentStatusType("PEND", "결제 대기", "결제 대기 상태", true, "NORMAL", 0, false, false)
+                val pendingStatus = TestDataFixture.createPaymentStatusType(
+                    code = TestDataConstants.PaymentStatusType.PENDING.code,
+                    name = TestDataConstants.PaymentStatusType.PENDING.name,
+                    description = TestDataConstants.PaymentStatusType.PENDING.description
+                )
                 val payment = Payment.createForReservation(userId, reservationId, amount, "POINT", pendingStatus)
                 payment.paymentId = 1L
                 
@@ -67,8 +73,16 @@ class PaymentServiceTest : DescribeSpec({
                 val seatId = 1L
                 val token = "test-token"
                 
-                val pendingStatus = PaymentStatusType("PEND", "결제 대기", "결제 대기 상태", true, "NORMAL", 0, false, false)
-                val completedStatus = PaymentStatusType("COMPLETED", "결제 완료", "결제 완료 상태", true, "NORMAL", 1, true, false)
+                val pendingStatus = TestDataFixture.createPaymentStatusType(
+                    code = TestDataConstants.PaymentStatusType.PENDING.code,
+                    name = TestDataConstants.PaymentStatusType.PENDING.name,
+                    description = TestDataConstants.PaymentStatusType.PENDING.description
+                )
+                val completedStatus = TestDataFixture.createPaymentStatusType(
+                    code = TestDataConstants.PaymentStatusType.COMPLETED.code,
+                    name = TestDataConstants.PaymentStatusType.COMPLETED.name,
+                    description = TestDataConstants.PaymentStatusType.COMPLETED.description
+                )
                 val payment = Payment.createForReservation(1L, reservationId, BigDecimal("50000"), "POINT", pendingStatus)
                 payment.paymentId = paymentId
                 
@@ -93,7 +107,11 @@ class PaymentServiceTest : DescribeSpec({
             it("결제 정보를 반환해야 한다") {
                 // given
                 val paymentId = 1L
-                val pendingStatus = PaymentStatusType("PEND", "결제 대기", "결제 대기 상태", true, "NORMAL", 0, false, false)
+                val pendingStatus = TestDataFixture.createPaymentStatusType(
+                    code = TestDataConstants.PaymentStatusType.PENDING.code,
+                    name = TestDataConstants.PaymentStatusType.PENDING.name,
+                    description = TestDataConstants.PaymentStatusType.PENDING.description
+                )
                 val payment = Payment.createForReservation(1L, 1L, BigDecimal("50000"), "POINT", pendingStatus)
                 payment.paymentId = paymentId
                 

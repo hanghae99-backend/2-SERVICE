@@ -39,10 +39,6 @@ class Seat(
     ) : BaseEntity() {
 
     companion object {
-        const val STATUS_AVAILABLE = "AVAILABLE"
-        const val STATUS_RESERVED = "RESERVED"
-        const val STATUS_OCCUPIED = "OCCUPIED"
-        const val STATUS_MAINTENANCE = "MAINTENANCE"
 
         fun create(scheduleId: Long, seatNumber: String, price: BigDecimal, availableStatus: SeatStatusType): Seat {
             if (scheduleId <= 0) throw ParameterValidationException("스케줄 ID는 0보다 커야 합니다: $scheduleId")
@@ -95,10 +91,10 @@ class Seat(
         }
     }
 
-    fun isAvailable(): Boolean = status.code == STATUS_AVAILABLE
-    fun isReserved(): Boolean = status.code == STATUS_RESERVED
-    fun isOccupied(): Boolean = status.code == STATUS_OCCUPIED
-    fun canBeReserved(): Boolean = status.code == STATUS_AVAILABLE
+    fun isAvailable(): Boolean = status.code == SeatStatusType.AVAILABLE
+    fun isReserved(): Boolean = status.code == SeatStatusType.RESERVED
+    fun isOccupied(): Boolean = status.code == SeatStatusType.OCCUPIED
+    fun canBeReserved(): Boolean = status.code == SeatStatusType.AVAILABLE
 
     val statusName: String
         get() = status.name

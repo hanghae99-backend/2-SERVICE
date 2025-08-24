@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.domain.reservation.models
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import jakarta.persistence.*
 import com.fasterxml.jackson.annotation.JsonProperty
 import kr.hhplus.be.server.global.common.BaseEntity
@@ -13,6 +14,7 @@ import kr.hhplus.be.server.global.common.BaseEntity
         Index(name = "idx_reservation_status_type_category", columnList = "category, is_active")
     ]
 )
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
 class ReservationStatusType @JsonCreator constructor(
     @JsonProperty("code")
     @Id

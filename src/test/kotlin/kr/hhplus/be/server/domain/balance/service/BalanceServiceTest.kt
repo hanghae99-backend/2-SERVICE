@@ -12,6 +12,8 @@ import kr.hhplus.be.server.domain.balance.models.PointHistory
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -31,7 +33,7 @@ class BalanceServiceTest : DescribeSpec({
             it("현재 잔액을 반환해야 한다") {
                 // given
                 val userId = 1L
-                val point = Point.create(userId, BigDecimal("10000"))
+                val point = TestDataFixture.createTestPoint(userId, TestDataConstants.Point.SMALL_AMOUNT)
                 
                 every { pointRepository.findByUserId(userId) } returns point
                 
@@ -40,7 +42,7 @@ class BalanceServiceTest : DescribeSpec({
                 
                 // then
                 result shouldNotBe null
-                result.amount shouldBe BigDecimal("10000")
+                result.amount shouldBe TestDataConstants.Point.SMALL_AMOUNT
                 verify { pointRepository.findByUserId(userId) }
             }
         }
@@ -68,11 +70,19 @@ class BalanceServiceTest : DescribeSpec({
             it("이력 목록을 반환해야 한다") {
                 // given
                 val userId = 1L
-                val chargeType = PointHistoryType("CHARGE", "충전", "포인트 충전")
-                val useType = PointHistoryType("USE", "사용", "포인트 사용")
+                val chargeType = TestDataFixture.createPointHistoryType(
+                    code = TestDataConstants.PointHistoryType.CHARGE.code,
+                    name = TestDataConstants.PointHistoryType.CHARGE.name,
+                    description = TestDataConstants.PointHistoryType.CHARGE.description
+                )
+                val useType = TestDataFixture.createPointHistoryType(
+                    code = TestDataConstants.PointHistoryType.USE.code,
+                    name = TestDataConstants.PointHistoryType.USE.name,
+                    description = TestDataConstants.PointHistoryType.USE.description
+                )
                 val histories = listOf(
-                    PointHistory.charge(userId, BigDecimal("10000"), chargeType, "충전", BigDecimal("10000")),
-                    PointHistory.use(userId, BigDecimal("3000"), useType, "사용", BigDecimal("7000"))
+                    PointHistory.charge(userId, TestDataConstants.Point.SMALL_AMOUNT, chargeType, "충전", TestDataConstants.Point.SMALL_AMOUNT),
+                    PointHistory.use(userId, BigDecimal("3000"), useType, "사용", BigDecimal("47000"))
                 )
                 
                 every { pointHistoryRepository.findByUserIdOrderByCreatedAtDesc(userId) } returns histories

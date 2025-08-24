@@ -2,6 +2,7 @@ package kr.hhplus.be.server.api.balance.concurrency
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.ints.shouldBeGreaterThan
@@ -9,13 +10,16 @@ import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
 import kr.hhplus.be.server.config.ConcurrencyTest
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
-import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
-import kr.hhplus.be.server.domain.balance.repositories.PointRepository
-import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
 import kr.hhplus.be.server.domain.user.models.User
-import kr.hhplus.be.server.domain.user.repositories.UserRepository
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.config.TestDataCleanupHelper
+import kr.hhplus.be.server.domain.balance.repositories.PointRepository
+import jakarta.persistence.EntityManager
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
@@ -34,65 +38,86 @@ import java.util.concurrent.atomic.AtomicInteger
 class BalanceConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
-    private val userRepository: UserRepository,
-    private val pointRepository: PointRepository,
-    private val userJpaRepository: UserJpaRepository,
-
-    private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
     private val distributedLock: DistributedLock,
     private val redisTemplate: RedisTemplate<String, Any>
 ) : DescribeSpec({
     extension(SpringExtension)
 
+    // 테스트 격리를 위한 설정
+    isolationMode = IsolationMode.InstancePerTest  // 각 테스트마다 새 인스턴스
+
     lateinit var mockMvc: MockMvc
     lateinit var testUser: User
     lateinit var chargeType: PointHistoryType
+
+    // 각 테스트마다 고유한 userId 사용
+    val testUserId = System.currentTimeMillis() % 100000
 
     beforeEach {
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        userJpaRepository.deleteAll()
-        userJpaRepository.flush()
+        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+        val entityManager = webApplicationContext.getBean(EntityManager::class.java)
+        val pointRepository = webApplicationContext.getBean(PointRepository::class.java)
+        val transactionManager = webApplicationContext.getBean(PlatformTransactionManager::class.java)
+        val transactionTemplate = TransactionTemplate(transactionManager)
 
-        // 데이터 정리
-        try {
-            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-            jdbcTemplate.execute("DELETE FROM point_history")
-            jdbcTemplate.execute("DELETE FROM point")
-            jdbcTemplate.execute("DELETE FROM users")
-            jdbcTemplate.execute("DELETE FROM point_history_type")
-        } catch (e: Exception) {
-            // 무시
-        }
-        
-        // Redis 정리
-        try {
-            redisTemplate.connectionFactory?.connection?.flushAll()
-        } catch (e: Exception) {
-            // 무시
-        }
-        
-        // 분산락 통계 초기화
+        // 분산락 통계 초기화 (트랜잭션 밖에서)
         distributedLock.resetStatistics()
 
-        // 테스트 데이터 설정 - User.create() 메서드 사용
-        testUser = userRepository.save(User(userId = 1L))
-        userRepository.flush()
+        // 전체 데이터 초기화 및 생성을 하나의 트랜잭션으로 처리
+        transactionTemplate.execute { _ ->
+            // 1. 테스트 데이터 정리
+            println("[BeforeEach] 테스트 데이터 정리 시작")
+            TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
 
-        chargeType = pointHistoryTypeRepository.save(
-            PointHistoryType(
-                code = "CHARGE",
-                name = "충전",
-                description = "포인트 충전"
+            // 2. 영속성 컨텍스트 클리어 (정리 후)
+            entityManager.flush()
+            entityManager.clear()
+
+            // 3. DB 상태 확인 (정리 후)
+            val countAfterCleanup = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM point", Int::class.java)
+            println("[BeforeEach] 정리 후 Point 테이블 레코드 수: $countAfterCleanup")
+
+            // 4. 새로운 테스트 데이터 생성 (같은 트랜잭션 내에서)
+            println("[BeforeEach] 테스트 데이터 생성 시작 - userId: $testUserId")
+            testUser = TestDataFixture.createTestUser(
+                context = webApplicationContext,
+                userId = testUserId,
+                withPoints = true,
+                pointAmount = BigDecimal("10000")
             )
-        )
-        pointHistoryTypeRepository.flush()
 
-        // 초기 포인트 생성
-        pointRepository.save(Point.create(testUser.userId, BigDecimal("10000")))
-        pointRepository.flush()
+            // 5. flush하여 DB에 즉시 반영
+            entityManager.flush()
+
+            // 6. 생성 확인
+            val savedPoint = pointRepository.findByUserId(testUser.userId)
+            val countInDb = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM point WHERE user_id = ?",
+                Int::class.java,
+                testUser.userId
+            )
+            println("[BeforeEach] 트랜잭션 내 DB 저장 확인 - userId: ${testUser.userId}, JPA 조회: ${savedPoint != null}, JDBC COUNT: $countInDb, balance: ${savedPoint?.amount}")
+        }
+
+        // 트랜잭션 커밋 후 영속성 컨텍스트 clear
+        entityManager.clear()
+
+        // 트랜잭션 외부에서 최종 확인
+        val finalCheck = transactionTemplate.execute { _ ->
+            val point = pointRepository.findByUserId(testUser.userId)
+            println("[BeforeEach] 최종 확인 - userId: ${testUser.userId}, point exists: ${point != null}, balance: ${point?.amount}")
+            point
+        }
+
+        chargeType = TestDataFixture.createPointHistoryType(
+            code = TestDataConstants.PointHistoryType.CHARGE.code,
+            name = TestDataConstants.PointHistoryType.CHARGE.name,
+            description = TestDataConstants.PointHistoryType.CHARGE.description
+        )
     }
 
     afterEach {
@@ -112,15 +137,12 @@ class BalanceConcurrencyTest(
             it("분산락으로 모든 충전이 안전하게 처리되어야 한다") {
                 // given
                 val userCount = 5
-                val users = mutableListOf<User>()
-                
-                repeat(userCount) {
-                    val user = userRepository.save(User(
-                        userId = (it + 1).toLong()
-                    ))
-                    userRepository.flush()
-                    users.add(user)
-                }
+                val baseUserId = System.currentTimeMillis() % 100000  // 고유한 base userId
+                val users = TestDataFixture.createSimpleUsers(
+                    context = webApplicationContext,
+                    userCount = userCount,
+                    startUserId = baseUserId
+                )
 
                 val executor = Executors.newFixedThreadPool(userCount)
                 val latch = CountDownLatch(userCount)
@@ -132,12 +154,12 @@ class BalanceConcurrencyTest(
                         try {
                             latch.countDown()
                             latch.await() // 동시 시작
-                            
+
                             val request = ChargeBalanceRequest(
                                 userId = user.userId,
                                 amount = BigDecimal("50000")
                             )
-                            
+
                             val result = mockMvc.perform(
                                 post("/api/v1/balance")
                                     .contentType(MediaType.APPLICATION_JSON)
@@ -162,7 +184,7 @@ class BalanceConcurrencyTest(
                 println("=== 여러 사용자 동시 충전 결과 ===")
                 println("성공: ${successCount.get()}")
                 results.forEach { println(it) }
-                
+
                 // 모든 요청이 성공해야 함 (서로 다른 사용자)
                 successCount.get() shouldBe userCount
 
@@ -186,7 +208,7 @@ class BalanceConcurrencyTest(
                         try {
                             latch.countDown()
                             latch.await()
-                            
+
                             val request = ChargeBalanceRequest(
                                 userId = testUser.userId,
                                 amount = chargeAmount
@@ -216,16 +238,16 @@ class BalanceConcurrencyTest(
                 println("=== 동일 사용자 동시 충전 결과 ===")
                 println("성공: ${successCount.get()}")
                 results.forEach { println(it) }
-                
+
                 // 모든 요청이 성공해야 함 (분산락으로 순차 처리)
                 successCount.get() shouldBe requestCount
 
                 // 최종 잔액 검증
-                val expectedBalance = 10000 + (10000 * requestCount)
+                val expectedBalance = 10000 + (10000 * requestCount)  // 10000 + (10000 * 5) = 60000
                 val result = mockMvc.perform(
                     get("/api/v1/balance/{userId}", testUser.userId)
                 ).andReturn()
-                
+
                 val responseJson = objectMapper.readTree(result.response.contentAsString)
                 val actualBalance = responseJson.get("data").get("balance").asLong()
                 actualBalance shouldBe expectedBalance

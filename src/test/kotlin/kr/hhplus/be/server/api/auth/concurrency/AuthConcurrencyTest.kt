@@ -12,6 +12,8 @@ import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
 import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.config.TestDataCleanupHelper
+import kr.hhplus.be.server.config.TestDataFixture
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
@@ -47,11 +49,7 @@ class AuthConcurrencyTest(
         userJpaRepository.deleteAll()
         userJpaRepository.flush()
 
-        try {
-            redisTemplate.connectionFactory?.connection?.flushAll()
-        } catch (e: Exception) {
-            // 무시
-        }
+        TestDataCleanupHelper.cleanupRedis(redisTemplate)
 
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
@@ -76,16 +74,16 @@ class AuthConcurrencyTest(
                 val userCount = 10
                 val userIds = mutableListOf<Long>()
                 
-                // 사용자들 미리 생성 - userId를 명시적으로 0으로 설정
+                // 사용자들 미리 생성
                 repeat(userCount) { index ->
-                    val user = User(
-                        userId = (index+1).toLong(),  // ID를 0으로 설정하여 JPA가 자동 생성하도록 함
+                    val user = TestDataFixture.createTestUser(
+                        context = webApplicationContext,
+                        userId = (index + 1).toLong(),
+                        withPoints = false
                     )
-                    val savedUser = userJpaRepository.save(user)
-                    userJpaRepository.flush()
-                    userIds.add(savedUser.userId)
+                    userIds.add(user.userId)
                     
-                    println("Created user: id=${savedUser.userId}")
+                    println("Created user: id=${user.userId}")
                 }
                 
                 // 저장 확인
@@ -153,14 +151,14 @@ class AuthConcurrencyTest(
         context("동일한 사용자가 동시에 여러 번 토큰 발급을 요청할 때") {
             it("분산락으로 중복 토큰 발급을 방지해야 한다") {
                 // given
-                val user = User(
+                val user = TestDataFixture.createTestUser(
+                    context = webApplicationContext,
                     userId = 100L,
+                    withPoints = false
                 )
-                val savedUser = userJpaRepository.save(user)
-                userJpaRepository.flush()
-                val userId = savedUser.userId
+                val userId = user.userId
                 
-                println("Created user for duplicate test: id=${savedUser.userId}")
+                println("Created user for duplicate test: id=${user.userId}")
                 
                 // 저장 확인
                 val foundUser = userJpaRepository.findById(userId)
@@ -257,12 +255,12 @@ class AuthConcurrencyTest(
         context("분산락 전략별 성능 테스트") {
             it("SIMPLE 전략이 정상 동작해야 한다") {
                 // given
-                val user = User(
+                val user = TestDataFixture.createTestUser(
+                    context = webApplicationContext,
                     userId = 200L,
+                    withPoints = false
                 )
-                val savedUser = userJpaRepository.save(user)
-                userJpaRepository.flush()
-                val userId = savedUser.userId
+                val userId = user.userId
                 
                 // 저장 확인
                 userJpaRepository.findById(userId).isPresent shouldBe true
@@ -316,12 +314,12 @@ class AuthConcurrencyTest(
         context("분산락 타임아웃 테스트") {
             it("많은 동시 요청에서도 안정적으로 처리되어야 한다") {
                 // given
-                val user = User(
+                val user = TestDataFixture.createTestUser(
+                    context = webApplicationContext,
                     userId = 300L,
+                    withPoints = false
                 )
-                val savedUser = userJpaRepository.save(user)
-                userJpaRepository.flush()
-                val userId = savedUser.userId
+                val userId = user.userId
 
                 val requestCount = 10 // 적절한 수의 요청
                 val executor = Executors.newFixedThreadPool(requestCount)

@@ -2,22 +2,26 @@ package kr.hhplus.be.server.api.reservation.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.config.IntegrationTest
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
-import kr.hhplus.be.server.domain.concert.models.*
-import kr.hhplus.be.server.domain.concert.repositories.*
-import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
-import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
-import kr.hhplus.be.server.domain.user.models.User
-import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.config.TestDataCleanupHelper
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
+import kr.hhplus.be.server.domain.concert.models.Concert
+import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
+import kr.hhplus.be.server.domain.concert.models.Seat
+import kr.hhplus.be.server.domain.user.models.User
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
+import jakarta.persistence.EntityManager
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
@@ -30,19 +34,16 @@ import java.time.LocalDate
 class ReservationIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
-    private val userRepository: UserRepository,
-    private val concertRepository: ConcertRepository,
-    private val concertScheduleRepository: ConcertScheduleRepository,
-    private val seatRepository: SeatRepository,
-    private val seatStatusTypeRepository: SeatStatusTypePojoRepository,
-    private val reservationRepository: ReservationRepository,
-    private val reservationStatusTypeRepository: ReservationStatusTypePojoRepository,
     private val tokenStore: TokenStore,
     private val tokenFactory: TokenFactory,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>
+    private val redisTemplate: RedisTemplate<String, Any>,
+    private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)
+    
+    // 테스트 격리를 위한 설정
+    isolationMode = IsolationMode.InstancePerTest
 
     lateinit var mockMvc: MockMvc
     lateinit var testUser: User
@@ -50,126 +51,61 @@ class ReservationIntegrationTest(
     lateinit var testSchedule: ConcertSchedule
     lateinit var testSeat: Seat
     lateinit var testToken: String
+    
+    // 각 테스트마다 고유한 userId 사용
+    val testUserId = System.currentTimeMillis() % 1000000
 
     beforeEach {
+        val transactionTemplate = TransactionTemplate(transactionManager)
+        val entityManager = webApplicationContext.getBean(EntityManager::class.java)
+        
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 데이터 정리
-        try {
-            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-            // 외래키 관계를 고려한 순서로 삭제
-            jdbcTemplate.execute("DELETE FROM point_history")
-            jdbcTemplate.execute("DELETE FROM payment")
-            jdbcTemplate.execute("DELETE FROM reservation")
-            jdbcTemplate.execute("DELETE FROM seat")
-            jdbcTemplate.execute("DELETE FROM concert_schedule")
-            jdbcTemplate.execute("DELETE FROM concert")
-            jdbcTemplate.execute("DELETE FROM point")
-            jdbcTemplate.execute("DELETE FROM users")
-        } catch (e: Exception) {
-            // 무시
-        }
-        
-        // Redis 정리
-        try {
-            redisTemplate.connectionFactory?.connection?.flushAll()
-        } catch (e: Exception) {
-            // 무시
-        }
-        
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
-        
-        Thread.sleep(100)
 
-        // 테스트 사용자 생성
-        testUser = userRepository.save(User(userId = 1L))
-        userRepository.flush()
-        
-        // 사용자 포인트 초기화 (결제를 위한 준비)
-        try {
-            val pointRepository = webApplicationContext.getBean("pointRepository", 
-                kr.hhplus.be.server.domain.balance.repositories.PointRepository::class.java)
-            val point = kr.hhplus.be.server.domain.balance.models.Point.create(
-                testUser.userId, 
-                BigDecimal("1000000") // 100만 포인트 초기 지급
+        transactionTemplate.execute { _ ->
+            // 테스트 데이터 정리
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
+            
+            // 영속성 컨텍스트 클리어
+            entityManager.flush()
+            entityManager.clear()
+
+            // TestDataFixture를 사용한 완전한 테스트 환경 구성
+            // 고유 userId 사용
+            testUser = TestDataFixture.createTestUser(
+                context = webApplicationContext,
+                userId = testUserId,
+                withPoints = true,
+                pointAmount = BigDecimal("200000")
             )
-            pointRepository.save(point)
-            pointRepository.flush()
-        } catch (e: Exception) {
-            // 무시
+            
+            // 콘서트 환경 생성
+            val concertEnv = TestDataFixture.createFullConcertEnvironment(
+                context = webApplicationContext,
+                concertTitle = TestDataConstants.Concert.RESERVATION_TITLE,
+                seatCount = TestDataConstants.Seat.DEFAULT_SEAT_COUNT
+            )
+            
+            testConcert = concertEnv.concert
+            testSchedule = concertEnv.schedule
+            testSeat = concertEnv.seats.first()
+
+            // 토큰 생성 및 활성화
+            val token = TestDataFixture.createAndActivateToken(webApplicationContext, testUser.userId)
+            testToken = token.token
+            
+            // DB에 즉시 반영
+            entityManager.flush()
         }
-
-        // 콘서트 생성
-        testConcert = concertRepository.save(
-            Concert.create(
-                title = "예약 테스트 콘서트",
-                artist = "테스트 아티스트"
-            )
-        )
-
-        // 스케줄 생성
-        testSchedule = concertScheduleRepository.save(
-            ConcertSchedule.create(
-                concertId = testConcert.concertId,
-                concertDate = LocalDate.now().plusDays(30),
-                venue = "테스트 공연장",
-                totalSeats = 50
-            )
-        )
-
-        // 좌석 상태 타입
-        val availableStatus = seatStatusTypeRepository.save(
-            SeatStatusType(
-                code = "AVAILABLE",
-                name = "예약 가능",
-                description = "예약 가능한 좌석"
-            )
-        )
-
-        seatStatusTypeRepository.save(
-            SeatStatusType(
-                code = "RESERVED",
-                name = "예약됨",
-                description = "예약된 좌석"
-            )
-        )
-
-        // 좌석 생성
-        testSeat = seatRepository.save(
-            Seat.create(
-                scheduleId = testSchedule.scheduleId,
-                seatNumber = "A1",
-                price = BigDecimal("100000"),
-                availableStatus = availableStatus
-            )
-        )
-        seatRepository.flush()
-
-        // 예약 상태 타입
-        reservationStatusTypeRepository.save(
-            ReservationStatusType(
-                code = "TEMPORARY",
-                name = "임시 예약",
-                description = "임시 예약 상태"
-            )
-        )
-
-        reservationStatusTypeRepository.save(
-            ReservationStatusType(
-                code = "CONFIRMED",
-                name = "예약 확정",
-                description = "결제 완료된 확정 예약"
-            )
-        )
-
-        // 토큰 생성 및 활성화
-        val token = tokenFactory.createWaitingToken(testUser.userId)
-        tokenStore.save(token)
-        tokenStore.activateToken(token.token)
-        testToken = token.token
+        
+        // 트랜잭션 후 영속성 컨텍스트 클리어
+        entityManager.clear()
+        Thread.sleep(100)
     }
 
     afterEach {
@@ -229,23 +165,14 @@ class ReservationIntegrationTest(
                 // 첫 번째 예약이 완료될 시간을 줌
                 Thread.sleep(500)
 
-                // 다른 사용자 생성
-                val anotherUser = userRepository.save(User(userId = 1L))
-                userRepository.flush()
-                
-                // 다른 사용자 포인트 초기화
-                try {
-                    val pointRepository = webApplicationContext.getBean("pointRepository", 
-                        kr.hhplus.be.server.domain.balance.repositories.PointRepository::class.java)
-                    val point = kr.hhplus.be.server.domain.balance.models.Point.create(
-                        anotherUser.userId, 
-                        BigDecimal("1000000")
-                    )
-                    pointRepository.save(point)
-                    pointRepository.flush()
-                } catch (e: Exception) {
-                    // 무시
-                }
+                // 다른 사용자 생성 - 고유한 userId 사용
+                val anotherUserId = testUserId + 1000 // 충돌 방지를 위해 기존 userId에 1000을 더함
+                val anotherUser = TestDataFixture.createTestUser(
+                    context = webApplicationContext,
+                    userId = anotherUserId,
+                    withPoints = true,
+                    pointAmount = TestDataConstants.Point.DEFAULT_AMOUNT
+                )
                 
                 val anotherToken = tokenFactory.createWaitingToken(anotherUser.userId)
                 tokenStore.save(anotherToken)

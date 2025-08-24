@@ -4,6 +4,7 @@ import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.domain.reservation.exception.ReservationCancelFailedException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAccessDeniedException
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
@@ -92,7 +93,7 @@ class CancelReservationUseCase(
             throw ReservationAccessDeniedException(userId, reservationId)
         }
         
-        if (reservation.status.code == "CANCELLED") {
+        if (reservation.status.code == ReservationStatusType.CANCELLED) {
             logger.warn(
                 "이미 취소된 예약 - reservationId: {}, status: {}", 
                 reservationId, reservation.status.code

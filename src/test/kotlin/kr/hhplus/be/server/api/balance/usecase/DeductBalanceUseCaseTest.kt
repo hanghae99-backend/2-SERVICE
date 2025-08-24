@@ -18,6 +18,8 @@ import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
 import kr.hhplus.be.server.domain.balance.exception.InsufficientBalanceException
 import kr.hhplus.be.server.domain.balance.exception.PointNotFoundException
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -41,7 +43,11 @@ class DeductBalanceUseCaseTest : DescribeSpec({
                 val expectedFinalAmount = BigDecimal("5000")
                 
                 val expectedResultPoint = Point.create(userId, BigDecimal("5000"))
-                val useType = PointHistoryType("USE", "사용", "포인트 사용")
+                val useType = TestDataFixture.createPointHistoryType(
+                    code = TestDataConstants.PointHistoryType.USE.code,
+                    name = TestDataConstants.PointHistoryType.USE.name,
+                    description = TestDataConstants.PointHistoryType.USE.description
+                )
                 val history = PointHistory.use(userId, deductAmount, useType, "포인트 사용")
                 
                 every { pointRepository.findByUserId(userId) } returns Point.create(userId, BigDecimal("10000"))

@@ -2,25 +2,30 @@ package kr.hhplus.be.server.api.reservation.concurrency
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.shouldBe
+import jakarta.persistence.EntityManager
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.config.ConcurrencyTest
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
 import kr.hhplus.be.server.domain.concert.models.*
-import kr.hhplus.be.server.domain.concert.repositories.*
 import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
-import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
 import kr.hhplus.be.server.domain.user.models.User
-import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import kr.hhplus.be.server.global.lock.DistributedLock
-import kr.hhplus.be.server.test.utils.TestRedisUtils
+import kr.hhplus.be.server.config.TestDataCleanupHelper
+import kr.hhplus.be.server.domain.balance.models.Point
+import kr.hhplus.be.server.global.constants.CacheConstants
+import org.springframework.cache.CacheManager
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -37,19 +42,14 @@ import java.util.concurrent.atomic.AtomicInteger
 class ReservationConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
-    private val userRepository: UserRepository,
-    private val concertRepository: ConcertRepository,
-    private val concertScheduleRepository: ConcertScheduleRepository,
-    private val seatRepository: SeatRepository,
-    private val seatStatusTypeRepository: SeatStatusTypePojoRepository,
-    private val reservationRepository: ReservationRepository,
-    private val reservationStatusTypeRepository: ReservationStatusTypePojoRepository,
-    private val tokenStore: TokenStore,
-    private val tokenFactory: TokenFactory,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>
+    private val redisTemplate: RedisTemplate<String, Any>,
+    private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)
+    
+    // 테스트 격리를 위한 설정
+    isolationMode = IsolationMode.InstancePerTest
 
     lateinit var mockMvc: MockMvc
     lateinit var testUsers: List<User>
@@ -59,148 +59,105 @@ class ReservationConcurrencyTest(
     lateinit var testTokens: List<WaitingToken>
     lateinit var availableStatus: SeatStatusType
     lateinit var reservedStatus: SeatStatusType
+    
+    // 각 테스트마다 고유한 base userId 사용
+    val baseUserId = System.currentTimeMillis() % 1000000
 
     beforeEach {
+        val transactionTemplate = TransactionTemplate(transactionManager)
+        
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
 
-        // 데이터 정리
-        try {
-            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-            // 외래키 관계를 고려한 순서로 삭제
-            jdbcTemplate.execute("DELETE FROM point_history")
-            jdbcTemplate.execute("DELETE FROM payment")
-            jdbcTemplate.execute("DELETE FROM reservation")
-            jdbcTemplate.execute("DELETE FROM seat")
-            jdbcTemplate.execute("DELETE FROM concert_schedule")
-            jdbcTemplate.execute("DELETE FROM concert")
-            jdbcTemplate.execute("DELETE FROM point")
-            jdbcTemplate.execute("DELETE FROM users")
-            
-            // 시퀀스 초기화
-            jdbcTemplate.execute("ALTER SEQUENCE users_user_id_seq RESTART WITH 1")
-            jdbcTemplate.execute("ALTER SEQUENCE concert_concert_id_seq RESTART WITH 1")
-        } catch (e: Exception) {
-            // 무시
-        }
-        
-        // Redis 캐시 정리 - 안전한 방법으로 초기화
-        try {
-            redisTemplate.connectionFactory?.connection?.use { connection ->
-                connection.serverCommands().flushDb()
-            }
-        } catch (e: Exception) {
-            println("Redis 캐시 정리 실패: ${e.message}")
-            // fallback: 개별 키 삭제 시도
-            try {
-                redisTemplate.delete(redisTemplate.keys("*") ?: emptySet())
-            } catch (fallbackError: Exception) {
-                println("Redis 개별 키 삭제도 실패: ${fallbackError.message}")
-            }
-        }
-        
         // 분산락 통계 초기화
         distributedLock.resetStatistics()
-
-        // 테스트 사용자 생성
-        testUsers = (0..9).map { index ->
-            val user = userRepository.save(User(
-                userId = (index+1).toLong(),
-            ))
-            userRepository.flush()
-            user
+        
+        // Redis 전체 초기화 (캐시 포함)
+        redisTemplate.execute { connection ->
+            connection.serverCommands()?.flushAll()
+            null
         }
         
-        // 사용자별 포인트 초기화 (결제를 위한 준비)
-        try {
-            val pointRepository = webApplicationContext.getBean("pointRepository", 
-                kr.hhplus.be.server.domain.balance.repositories.PointRepository::class.java)
-            testUsers.forEach { user ->
-                val point = kr.hhplus.be.server.domain.balance.models.Point.create(
-                    user.userId, 
-                    BigDecimal("1000000") // 100만 포인트 초기 지급
-                )
-                pointRepository.save(point)
-            }
-            pointRepository.flush()
-        } catch (e: Exception) {
-            // 무시
+        // 캐시 매니저도 초기화
+        val cacheManager = webApplicationContext.getBean(CacheManager::class.java)
+        cacheManager.cacheNames.forEach { cacheName ->
+            cacheManager.getCache(cacheName)?.clear()
         }
 
-        // 콘서트 생성
-        testConcert = concertRepository.save(
-            Concert.create(
+        transactionTemplate.execute { _ ->
+            // 테스트 데이터 정리 (시퀀스 초기화 포함)
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            TestDataCleanupHelper.cleanupAllWithSequenceReset(redisTemplate, jdbcTemplate)
+            
+            // 영속성 컨텍스트 클리어
+            val entityManager = webApplicationContext.getBean(
+                EntityManager::class.java)
+            entityManager.flush()
+            entityManager.clear()
+
+            // 테스트 사용자 생성 (고유 userId 사용)
+            testUsers = TestDataFixture.createSimpleUsers(
+            context = webApplicationContext,
+            userCount = 10,
+            startUserId = baseUserId
+            )
+            
+            // 사용자별 포인트 초기화 (결제를 위한 준비)
+            testUsers.forEach { user ->
+                TestDataFixture.createTestPoints(
+                    context = webApplicationContext,
+                    userId = user.userId,
+                    amount = TestDataConstants.Point.DEFAULT_AMOUNT
+                )
+            }
+
+            // 콘서트 생성
+            testConcert = TestDataFixture.createTestConcert(
+                context = webApplicationContext,
                 title = "예약 동시성 테스트 콘서트",
                 artist = "테스트 아티스트"
             )
-        )
 
-        // 스케줄 생성
-        testSchedule = concertScheduleRepository.save(
-            ConcertSchedule.create(
+            // 스케줄 생성
+            testSchedule = TestDataFixture.createTestConcertSchedule(
+                context = webApplicationContext,
                 concertId = testConcert.concertId,
-                concertDate = LocalDate.now().plusDays(30),
+                daysFromNow = 30,
                 venue = "테스트 공연장",
                 totalSeats = 50
             )
-        )
 
-        // 좌석 상태 타입 생성
-        availableStatus = seatStatusTypeRepository.save(
-            SeatStatusType(
-                code = "AVAILABLE",
-                name = "예약가능",
-                description = "예약 가능한 좌석"
+            // 모든 상태 타입 생성
+            TestDataFixture.createAllStatusTypes(webApplicationContext)
+            
+            // 상태 타입 레퍼런스 가져오기
+            availableStatus = TestDataFixture.createSeatStatusType()
+            reservedStatus = TestDataFixture.createSeatStatusType(
+                code = TestDataConstants.SeatStatusType.RESERVED.code,
+                name = TestDataConstants.SeatStatusType.RESERVED.name,
+                description = TestDataConstants.SeatStatusType.RESERVED.description
             )
-        )
 
-        reservedStatus = seatStatusTypeRepository.save(
-            SeatStatusType(
-                code = "RESERVED",
-                name = "예약완료",
-                description = "예약된 좌석"
+            // 테스트 좌석들 생성
+            testSeats = TestDataFixture.createTestSeats(
+                context = webApplicationContext,
+                scheduleId = testSchedule.scheduleId,
+                seatCount = 10
             )
-        )
 
-        // 테스트 좌석들 생성
-        testSeats = (1..10).map { seatNum ->
-            seatRepository.save(
-                Seat.create(
-                    scheduleId = testSchedule.scheduleId,
-                    seatNumber = "A$seatNum",
-                    price = BigDecimal("100000"),
-                    availableStatus = availableStatus
-                )
-            )
-        }
-        seatRepository.flush()
-
-        // 예약 상태 타입 생성
-        reservationStatusTypeRepository.save(
-            ReservationStatusType(
-                code = "TEMPORARY",
-                name = "임시예약",
-                description = "임시 예약 상태"
-            )
-        )
-
-        reservationStatusTypeRepository.save(
-            ReservationStatusType(
-                code = "CONFIRMED",
-                name = "확정예약",
-                description = "결제 완료된 확정 예약"
-            )
-        )
-
-        // 토큰 생성 및 활성화
-        testTokens = testUsers.map { user ->
-            val token = tokenFactory.createWaitingToken(user.userId)
-            tokenStore.save(token)
-            tokenStore.activateToken(token.token)
-            token
+            // 토큰 생성 및 활성화
+            testTokens = testUsers.map { user ->
+                TestDataFixture.createAndActivateToken(webApplicationContext, user.userId)
+            }
+            
+            // DB에 즉시 반영
+            entityManager.flush()
         }
         
+        // 트랜잭션 후 영속성 컨텍스트 클리어
+        val entityManager = webApplicationContext.getBean(EntityManager::class.java)
+        entityManager.clear()
         Thread.sleep(100)
     }
 

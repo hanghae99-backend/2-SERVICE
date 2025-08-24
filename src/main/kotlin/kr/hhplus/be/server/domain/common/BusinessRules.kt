@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.domain.common
 
 import kr.hhplus.be.server.domain.common.BusinessRuleViolationException
+import kr.hhplus.be.server.global.properties.ConcertProperties
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -8,28 +9,26 @@ import java.time.LocalDateTime
  * 비즈니스 규칙을 중앙화하여 관리하는 객체들
  */
 
-object ReservationBusinessRules {
-    
-    const val RESERVATION_TIMEOUT_MINUTES = 5L
-    const val MAX_RESERVATIONS_PER_USER = 10
-    const val MAX_CONCURRENT_RESERVATIONS = 3
+class ReservationBusinessRules(
+    private val concertProperties: ConcertProperties
+) {
     
     fun validateReservationLimit(userId: Long, currentCount: Int) {
-        if (currentCount >= MAX_RESERVATIONS_PER_USER) {
+        if (currentCount >= concertProperties.maxReservationsPerUser) {
             throw BusinessRuleViolationException(
-                "사용자당 최대 예약 가능 수를 초과했습니다. 현재: $currentCount, 최대: $MAX_RESERVATIONS_PER_USER"
+                "사용자당 최대 예약 가능 수를 초과했습니다. 현재: $currentCount, 최대: ${concertProperties.maxReservationsPerUser}"
             )
         }
     }
     
     fun calculateExpirationTime(): LocalDateTime {
-        return LocalDateTime.now().plusMinutes(RESERVATION_TIMEOUT_MINUTES)
+        return LocalDateTime.now().plus(concertProperties.reservationTimeout)
     }
     
     fun validateConcurrentReservationLimit(userId: Long, activeReservationCount: Int) {
-        if (activeReservationCount >= MAX_CONCURRENT_RESERVATIONS) {
+        if (activeReservationCount >= concertProperties.maxConcurrentReservations) {
             throw BusinessRuleViolationException(
-                "동시 예약 가능 수를 초과했습니다. 현재: $activeReservationCount, 최대: $MAX_CONCURRENT_RESERVATIONS"
+                "동시 예약 가능 수를 초과했습니다. 현재: $activeReservationCount, 최대: ${concertProperties.maxConcurrentReservations}"
             )
         }
     }
@@ -99,16 +98,14 @@ object BalanceBusinessRules {
     }
 }
 
-object ConcertBusinessRules {
-    
-    const val MAX_SEATS_PER_SCHEDULE = 1000
-    const val MIN_CONCERT_DURATION_MINUTES = 30
-    const val MAX_CONCERT_DURATION_MINUTES = 480
+class ConcertBusinessRules(
+    private val concertProperties: ConcertProperties
+) {
     
     fun validateSeatCount(seatCount: Int) {
-        if (seatCount > MAX_SEATS_PER_SCHEDULE) {
+        if (seatCount > concertProperties.maxSeatsPerSchedule) {
             throw BusinessRuleViolationException(
-                "스케줄당 최대 좌석 수를 초과합니다. 요청: $seatCount, 최대: $MAX_SEATS_PER_SCHEDULE"
+                "스케줄당 최대 좌석 수를 초과합니다. 요청: $seatCount, 최대: ${concertProperties.maxSeatsPerSchedule}"
             )
         }
     }
@@ -116,20 +113,20 @@ object ConcertBusinessRules {
     fun validateConcertDuration(startTime: LocalDateTime, endTime: LocalDateTime) {
         val durationMinutes = java.time.Duration.between(startTime, endTime).toMinutes()
         when {
-            durationMinutes < MIN_CONCERT_DURATION_MINUTES -> throw BusinessRuleViolationException(
-                "콘서트 최소 진행 시간은 ${MIN_CONCERT_DURATION_MINUTES}분입니다. 현재: ${durationMinutes}분"
+            durationMinutes < concertProperties.minConcertDurationMinutes -> throw BusinessRuleViolationException(
+                "콘서트 최소 진행 시간은 ${concertProperties.minConcertDurationMinutes}분입니다. 현재: ${durationMinutes}분"
             )
-            durationMinutes > MAX_CONCERT_DURATION_MINUTES -> throw BusinessRuleViolationException(
-                "콘서트 최대 진행 시간은 ${MAX_CONCERT_DURATION_MINUTES}분입니다. 현재: ${durationMinutes}분"
+            durationMinutes > concertProperties.maxConcertDurationMinutes -> throw BusinessRuleViolationException(
+                "콘서트 최대 진행 시간은 ${concertProperties.maxConcertDurationMinutes}분입니다. 현재: ${durationMinutes}분"
             )
         }
     }
     
     fun validateScheduleTime(scheduleTime: LocalDateTime) {
         val now = LocalDateTime.now()
-        if (scheduleTime.isBefore(now.plusHours(1))) {
+        if (scheduleTime.isBefore(now.plus(concertProperties.minScheduleAdvance))) {
             throw BusinessRuleViolationException(
-                "콘서트 스케줄은 최소 1시간 후부터 등록 가능합니다. 요청 시간: $scheduleTime"
+                "콘서트 스케줄은 최소 ${concertProperties.minScheduleAdvanceHours}시간 후부터 등록 가능합니다. 요청 시간: $scheduleTime"
             )
         }
     }

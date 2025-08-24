@@ -27,4 +27,5 @@ interface ReservationRepository {
     fun delete(reservation: Reservation)
     fun deleteAll() // 테스트용 - 모든 예약 데이터 삭제
     fun flush() // 추가
+    fun countReservationsByHour(since: LocalDateTime): Map<Long, Long> // 매진 랭킹용
 }

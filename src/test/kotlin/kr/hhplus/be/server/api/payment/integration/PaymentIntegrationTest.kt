@@ -2,32 +2,26 @@ package kr.hhplus.be.server.api.payment.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
 import kr.hhplus.be.server.api.payment.dto.request.PaymentRequest
 import kr.hhplus.be.server.config.IntegrationTest
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
-import kr.hhplus.be.server.domain.balance.models.Point
-import kr.hhplus.be.server.domain.balance.models.PointHistoryType
-import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
-import kr.hhplus.be.server.domain.balance.repositories.PointRepository
-import kr.hhplus.be.server.domain.concert.models.*
-import kr.hhplus.be.server.domain.concert.repositories.*
-import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
-import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
-import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
-import kr.hhplus.be.server.domain.reservation.models.Reservation
-import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
-import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
-import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
-import kr.hhplus.be.server.domain.user.models.User
-import kr.hhplus.be.server.domain.user.repositories.UserRepository
 import kr.hhplus.be.server.global.lock.DistributedLock
-import kr.hhplus.be.server.test.utils.TestRedisUtils
-import kr.hhplus.be.server.test.utils.TestDataCleanupUtils
+import kr.hhplus.be.server.config.TestDataCleanupHelper
+import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.TestDataConstants
+import kr.hhplus.be.server.domain.concert.models.Concert
+import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
+import kr.hhplus.be.server.domain.concert.models.Seat
+import kr.hhplus.be.server.domain.reservation.models.Reservation
+import kr.hhplus.be.server.domain.user.models.User
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
@@ -40,22 +34,16 @@ import java.time.LocalDate
 class PaymentIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
-    private val userRepository: UserRepository,
-    private val pointRepository: PointRepository,
-    private val pointHistoryTypeRepository: PointHistoryTypePojoRepository,
-    private val concertRepository: ConcertRepository,
-    private val concertScheduleRepository: ConcertScheduleRepository,
-    private val seatRepository: SeatRepository,
-    private val seatStatusTypeRepository: SeatStatusTypePojoRepository,
-    private val reservationRepository: ReservationRepository,
-    private val reservationStatusTypeRepository: ReservationStatusTypePojoRepository,
-    private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
     private val tokenStore: TokenStore,
     private val tokenFactory: TokenFactory,
     private val distributedLock: DistributedLock,
-    private val redisTemplate: RedisTemplate<String, Any>
+    private val redisTemplate: RedisTemplate<String, Any>,
+    private val transactionManager: PlatformTransactionManager
 ) : DescribeSpec({
     extension(SpringExtension)
+    
+    // 테스트 격리를 위한 설정
+    isolationMode = IsolationMode.InstancePerTest
 
     lateinit var mockMvc: MockMvc
     lateinit var testUser: User
@@ -63,8 +51,14 @@ class PaymentIntegrationTest(
     lateinit var testSchedule: ConcertSchedule
     lateinit var testSeat: Seat
     lateinit var testReservation: Reservation
+    
+    // 각 테스트마다 고유한 userId 사용
+    val testUserId = System.currentTimeMillis() % 1000000
 
     beforeEach {
+        val transactionTemplate = TransactionTemplate(transactionManager)
+        val entityManager = webApplicationContext.getBean(jakarta.persistence.EntityManager::class.java)
+        
         mockMvc = MockMvcBuilders
             .webAppContextSetup(webApplicationContext)
             .build()
@@ -76,157 +70,55 @@ class PaymentIntegrationTest(
             // 무시
         }
 
-        // Redis 정리
-        TestRedisUtils.flushDatabase(redisTemplate)
-
-        // DB 데이터 정리
-        val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
-        TestDataCleanupUtils.cleanupDatabase(jdbcTemplate)
-        
-        // 충분한 초기화 대기
-        Thread.sleep(500)
-
-        // 테스트 사용자 생성 (userId를 명시적으로 설정하지 않음)
-        testUser = userRepository.save(User(
-            userId = 1L,
+        transactionTemplate.execute { _ ->
+            // 테스트 데이터 정리
+            val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
+            TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
             
+            // 영속성 컨텍스트 클리어
+            entityManager.flush()
+            entityManager.clear()
+
+            // TestDataFixture를 사용한 완전한 테스트 환경 구성
+            // 고유 userId 사용
+            testUser = TestDataFixture.createTestUser(
+                context = webApplicationContext,
+                userId = testUserId,
+                withPoints = true,
+                pointAmount = BigDecimal("200000")
+            )
             
-        ))
-        userRepository.flush()
-        
-        // 포인트 생성 (충분한 금액)
-        val point = pointRepository.save(Point.create(testUser.userId, BigDecimal("1000000")))
-        pointRepository.flush()
+            // 콘서트 환경 생성
+            val concertEnv = TestDataFixture.createFullConcertEnvironment(
+                context = webApplicationContext,
+                concertTitle = TestDataConstants.Concert.PAYMENT_TITLE,
+                seatCount = TestDataConstants.Seat.DEFAULT_SEAT_COUNT
+            )
+            
+            testConcert = concertEnv.concert
+            testSchedule = concertEnv.schedule
+            testSeat = concertEnv.seats.first()
 
-        // 포인트 이력 타입
-        pointHistoryTypeRepository.save(
-            PointHistoryType(
-                code = "DEDUCT",
-                name = "사용",
-                description = "포인트 사용"
-            )
-        )
+            // 결제 상태 타입은 createCompleteTestEnvironment에서 이미 생성됨
 
-        // 콘서트 생성
-        testConcert = concertRepository.save(
-            Concert.create(
-                title = "결제 테스트 콘서트",
-                artist = "테스트 아티스트"
-            )
-        )
-
-        // 스케줄 생성
-        testSchedule = concertScheduleRepository.save(
-            ConcertSchedule.create(
-                concertId = testConcert.concertId,
-                concertDate = LocalDate.now().plusDays(30),
-                venue = "테스트 공연장",
-                totalSeats = 50
-            )
-        )
-
-        // 좌석 상태 타입
-        val availableStatus = seatStatusTypeRepository.save(
-            SeatStatusType(
-                code = "AVAILABLE",
-                name = "예약가능",
-                description = "예약 가능한 좌석"
-            )
-        )
-        
-        val reservedStatus = seatStatusTypeRepository.save(
-            SeatStatusType(
-                code = "RESERVED",
-                name = "예약완료",
-                description = "예약된 좌석"
-            )
-        )
-        
-        val occupiedStatus = seatStatusTypeRepository.save(
-            SeatStatusType(
-                code = "OCCUPIED",
-                name = "점유완료",
-                description = "결제 완료된 좌석"
-            )
-        )
-        seatStatusTypeRepository.flush()
-
-        // 좌석 생성 (사용 가능 상태로)
-        testSeat = seatRepository.save(
-            Seat.create(
-                scheduleId = testSchedule.scheduleId,
-                seatNumber = "A1",
-                price = BigDecimal("100000"),
-                availableStatus = availableStatus
-            )
-        )
-        seatRepository.flush()
-
-        // 예약 상태 타입
-        val temporaryStatus = reservationStatusTypeRepository.save(
-            ReservationStatusType(
-                code = "TEMPORARY",
-                name = "임시예약",
-                description = "임시 예약 상태"
-            )
-        )
-
-        reservationStatusTypeRepository.save(
-            ReservationStatusType(
-                code = "CONFIRMED",
-                name = "확정예약",
-                description = "결제 완료된 확정 예약"
-            )
-        )
-
-        // 결제 상태 타입
-        paymentStatusTypeRepository.save(
-            PaymentStatusType(
-                code = "PEND",
-                name = "결제대기",
-                description = "결제 처리 대기중"
-            )
-        )
-        
-        paymentStatusTypeRepository.save(
-            PaymentStatusType(
-                code = "COMP",
-                name = "결제완료",
-                description = "결제가 성공적으로 완료됨"
-            )
-        )
-
-        pointHistoryTypeRepository.save(
-            PointHistoryType(
-                code = "USE",
-                name = "사용",
-                description = "포인트 사용"
-            )
-        )
-        // 좌석을 예약 상태로 변경
-        testSeat.reserve(reservedStatus)
-        seatRepository.save(testSeat)
-        seatRepository.flush()
-
-        // 예약 생성
-        testReservation = reservationRepository.save(
-            Reservation.createTemporary(
+            // 좌석 예약 생성 (TestDataFixture 사용)
+            testReservation = TestDataFixture.createReservationForSeat(
+                context = webApplicationContext,
                 userId = testUser.userId,
                 concertId = testConcert.concertId,
-                seatId = testSeat.seatId,
-                seatNumber = testSeat.seatNumber,
-                price = testSeat.price,
-                temporaryStatus = temporaryStatus,
+                seat = testSeat,
                 tempMinutes = 10
             )
-        )
-        reservationRepository.flush()
 
-        // 토큰 생성 및 활성화
-        val token = tokenFactory.createWaitingToken(testUser.userId)
-        tokenStore.save(token)
-        Thread.sleep(50) // 저장 대기
-        tokenStore.activateToken(token.token)
+            // 토큰 생성 및 활성화
+            val token = TestDataFixture.createAndActivateToken(webApplicationContext, testUser.userId)
+            
+            // DB에 즉시 반영
+            entityManager.flush()
+        }
+        
+        // 트랜잭션 후 영속성 컨텍스트 클리어
+        entityManager.clear()
         Thread.sleep(200) // 활성화 대기
     }
 
@@ -271,7 +163,7 @@ class PaymentIntegrationTest(
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.paymentId").exists())
                 .andExpect(jsonPath("$.data.userId").value(testUser.userId))
-                .andExpect(jsonPath("$.data.amount").value(100000))
+                .andExpect(jsonPath("$.data.amount").value(50000))  // 좌석 기본 가격
             }
         }
 

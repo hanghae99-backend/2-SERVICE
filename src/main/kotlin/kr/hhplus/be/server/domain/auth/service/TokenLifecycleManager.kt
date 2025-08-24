@@ -37,9 +37,11 @@ class TokenLifecycleManager(
     }
     
 
+    // 만료된 토큰만 정리 (활성화는 별도 스케줄러에서 처리)
     fun cleanupExpiredTokens(): Int {
         val expiredTokens = tokenStore.findExpiredActiveTokens()
         var cleanedCount = 0
+        
         expiredTokens.forEach { expiredToken ->
             try {
                 expireToken(expiredToken)
@@ -49,15 +51,40 @@ class TokenLifecycleManager(
                 println("토큰 만료 처리 실패: $expiredToken, 오류: ${e.message}")
             }
         }
+        
         return cleanedCount
     }
-    
-    // 예약/결제 완료 시 토큰 만료 및 다음 사용자 활성화
-    fun completeToken(token: String) {
-        // 토큰 만료
-        expireToken(token)
+
+    @Deprecated("스케줄러 분리로 인해 사용 중단 예정")
+    fun cleanupExpiredTokensAndProcessQueue(): Pair<Int, Int> {
+        val expiredTokens = tokenStore.findExpiredActiveTokens()
+        var cleanedCount = 0
         
-        // 즉시 다음 사용자 활성화
-        queueManager.processQueueAutomatically()
+        // 1. 만료된 토큰 정리
+        expiredTokens.forEach { expiredToken ->
+            try {
+                expireToken(expiredToken)
+                cleanedCount++
+                println("만료된 활성 토큰 정리: $expiredToken")
+            } catch (e: Exception) {
+                println("토큰 만료 처리 실패: $expiredToken, 오류: ${e.message}")
+            }
+        }
+        
+        // 2. 만료된 토큰 수만큼 대기열에서 새로운 토큰 활성화
+        val activatedCount = if (cleanedCount > 0) {
+            queueManager.processQueueAutomatically()
+        } else {
+            0
+        }
+        
+        return Pair(cleanedCount, activatedCount)
+    }
+    
+    // 예약/결제 완료 시 토큰만 만료 (활성화는 스케줄러에서 처리)
+    fun completeToken(token: String) {
+        // 토큰만 만료 처리
+        expireToken(token)
+        println("예약/결제 완료로 토큰 만료: $token")
     }
 }

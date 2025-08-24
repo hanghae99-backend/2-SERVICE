@@ -95,4 +95,13 @@ class ReservationRepositoryImpl(
     override fun flush() {
         reservationJpaRepository.flush()
     }
+    
+    override fun countReservationsByHour(since: LocalDateTime): Map<Long, Long> {
+        return reservationJpaRepository.countReservationsByConcertIdAndHour(since)
+            .associate { result ->
+                val concertId = result[0] as Long
+                val count = result[1] as Long
+                concertId to count
+            }
+    }
 }

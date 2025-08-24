@@ -3,6 +3,8 @@ spring:
     name: hhplus
   profiles:
     active: local
+  main:
+    allow-bean-definition-overriding: true
   datasource:
     name: HangHaePlusDataSource
     type: com.zaxxer.hikari.HikariDataSource
@@ -28,6 +30,12 @@ spring:
     username: application
     password: application
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
   jpa:
     hibernate:
@@ -47,3 +55,44 @@ spring:
     redis:
       host: localhost
       port: 16379
+
+concert:
+  default-seats-per-schedule: 50
+  max-seats-per-schedule: 1000
+  reservation-timeout-minutes: 5
+  max-reservations-per-user: 10
+  max-concurrent-reservations: 3
+  min-concert-duration-minutes: 30
+  max-concert-duration-minutes: 480
+  min-schedule-advance-hours: 1
+  queue:
+    max-active-tokens: 100
+    token-expiry-minutes: 5
+    waiting-time-multiplier: 2
+    tokens-per-minute: 10
+
+cache:
+  key-prefix: "concert-service:"
+  default-ttl: PT30M
+  concerts:
+    ttl: PT2H
+  concert-schedules:
+    ttl: PT1H
+  concert-details:
+    ttl: PT30M
+  available-concerts:
+    ttl: PT5M
+  available-seats:
+    ttl: PT2M
+  popular-concerts:
+    ttl: PT10M
+  trending-concerts:
+    ttl: PT3M
+  system-types:
+    ttl: PT24H
+  system-config:
+    ttl: PT12H
+  user-balance:
+    ttl: PT5M
+  token-status:
+    ttl: PT1M

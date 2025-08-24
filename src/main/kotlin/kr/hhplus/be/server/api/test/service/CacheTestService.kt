@@ -33,10 +33,10 @@ class CacheTestService(
         val cacheKey = "$SCHEDULER_CACHE_KEY_PREFIX$limit"
         
         return try {
-            val cached = redisTemplate.opsForValue().get(cacheKey)
-            if (cached is List<*>) {
+            val cachedData = redisTemplate.opsForValue().get(cacheKey)
+            if (cachedData != null) {
                 @Suppress("UNCHECKED_CAST")
-                cached as List<PopularConcertDto>
+                cachedData as List<PopularConcertDto>
             } else {
                 // 캐시 미스 시 생성 후 저장
                 val result = buildPopularConcertDtos(limit)

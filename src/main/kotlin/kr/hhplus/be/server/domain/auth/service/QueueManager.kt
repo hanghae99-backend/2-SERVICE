@@ -39,7 +39,29 @@ class QueueManager(
         tokenStore.activateToken(token)
     }
 
-    // 가용 슬롯만큼 대기열에서 토큰 활성화
+    // 지정된 개수만큼 대기열에서 토큰 활성화 (스케줄러에서 호출)
+    fun activateTokensByCount(maxCount: Int): Int {
+        val availableSlots = calculateAvailableSlots()
+        val countToActivate = minOf(maxCount, availableSlots)
+        var activatedCount = 0
+        
+        if (countToActivate > 0) {
+            val tokensToActivate = getNextTokensFromQueue(countToActivate)
+            tokensToActivate.forEach { tokenString ->
+                try {
+                    activateToken(tokenString)
+                    activatedCount++
+                    println("토큰 스케줄 활성화: $tokenString")
+                } catch (e: Exception) {
+                    println("토큰 활성화 실패: $tokenString, 오류: ${e.message}")
+                }
+            }
+        }
+        return activatedCount
+    }
+
+    // 가용 슬롯만큼 대기열에서 토큰 활성화 (기존 메서드 유지 - 점진적 제거 예정)
+    @Deprecated("스케줄러 기반 활성화로 대체 예정")
     fun processQueueAutomatically(): Int {
         val availableSlots = calculateAvailableSlots()
         var activatedCount = 0

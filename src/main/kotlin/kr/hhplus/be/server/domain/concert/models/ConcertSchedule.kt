@@ -2,7 +2,6 @@ package kr.hhplus.be.server.domain.concert.models
 
 import kr.hhplus.be.server.global.common.BaseEntity
 import kr.hhplus.be.server.global.exception.ParameterValidationException
-import kr.hhplus.be.server.domain.common.ConcertBusinessRules
 import jakarta.persistence.*
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -85,8 +84,6 @@ class ConcertSchedule(
             if (totalSeats <= 0) {
                 throw ParameterValidationException("총 좌석 수는 0보다 커야 합니다: $totalSeats")
             }
-            
-            ConcertBusinessRules.validateSeatCount(totalSeats)
         }
     }
     

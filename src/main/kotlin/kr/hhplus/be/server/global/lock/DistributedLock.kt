@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @Component
 class DistributedLock(
-    private val redisTemplate: RedisTemplate<String, Any>,
+    private val redisTemplate: RedisTemplate<String, Any>?,
     private val redisMessageListenerContainer: RedisMessageListenerContainer?
 ) {
     private val logger = LoggerFactory.getLogger(DistributedLock::class.java)
@@ -317,31 +317,35 @@ class DistributedLock(
     }
     
     private fun tryAcquireLock(key: String, value: String, timeoutMs: Long): Boolean {
-        val result = redisTemplate.opsForValue()
-            .setIfAbsent(key, value, Duration.ofMillis(timeoutMs))
-        return result ?: false
+        return redisTemplate?.let { template ->
+            val result = template.opsForValue()
+                .setIfAbsent(key, value, Duration.ofMillis(timeoutMs))
+            result ?: false
+        } ?: false
     }
     
     private fun releaseLock(key: String, value: String) {
         try {
-            val script = """
-                if redis.call("get", KEYS[1]) == ARGV[1] then
-                    redis.call("del", KEYS[1])
-                    redis.call("publish", "lock:release:" .. KEYS[1], "released")
-                    return 1
-                else
-                    return 0
-                end
-            """.trimIndent()
-            
-            redisTemplate.execute<Long?> { connection ->
-                connection.eval(
-                    script.toByteArray(),
-                    org.springframework.data.redis.connection.ReturnType.INTEGER,
-                    1,
-                    key.toByteArray(),
-                    value.toByteArray()
-                ) as? Long
+            redisTemplate?.let { template ->
+                val script = """
+                    if redis.call("get", KEYS[1]) == ARGV[1] then
+                        redis.call("del", KEYS[1])
+                        redis.call("publish", "lock:release:" .. KEYS[1], "released")
+                        return 1
+                    else
+                        return 0
+                    end
+                """.trimIndent()
+                
+                template.execute<Long?> { connection ->
+                    connection.eval(
+                        script.toByteArray(),
+                        org.springframework.data.redis.connection.ReturnType.INTEGER,
+                        1,
+                        key.toByteArray(),
+                        value.toByteArray()
+                    ) as? Long
+                }
             }
             
         } catch (e: Exception) {
@@ -384,10 +388,12 @@ class DistributedLock(
     
     fun clearAllLocks() {
         try {
-            val keys = redisTemplate.keys("lock:*")
-            if (keys.isNotEmpty()) {
-                redisTemplate.delete(keys)
-                logger.info("🧯 모든 락 정리 완료: {}개", keys.size)
+            redisTemplate?.let { template ->
+                val keys = template.keys("lock:*")
+                if (keys.isNotEmpty()) {
+                    template.delete(keys)
+                    logger.info("🧯 모든 락 정리 완료: {}개", keys.size)
+                }
             }
         } catch (e: Exception) {
             logger.warn("락 정리 중 오류 발생", e)
@@ -396,7 +402,7 @@ class DistributedLock(
     
     fun getLockCount(): Int {
         return try {
-            redisTemplate.keys("lock:*").size
+            redisTemplate?.keys("lock:*")?.size ?: 0
         } catch (e: Exception) {
             0
         }

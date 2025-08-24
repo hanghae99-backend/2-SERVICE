@@ -63,9 +63,6 @@ class Reservation(
         get() = status.description ?: ""
 
     companion object {
-        const val STATUS_TEMPORARY = "TEMPORARY"
-        const val STATUS_CONFIRMED = "CONFIRMED"
-        const val STATUS_CANCELLED = "CANCELLED"
 
         fun createTemporary(
             userId: Long,
@@ -128,7 +125,7 @@ class Reservation(
     }
 
     private fun validateCanConfirm() {
-        if (status.code != STATUS_TEMPORARY) {
+        if (status.code != ReservationStatusType.TEMPORARY) {
             throw IllegalStateException("임시 예약 상태가 아닙니다. 현재 상태: ${status.code}")
         }
         if (isExpired()) {
@@ -137,7 +134,7 @@ class Reservation(
     }
 
     private fun validateCanCancel() {
-        if (status.code == STATUS_CANCELLED) {
+        if (status.code == ReservationStatusType.CANCELLED) {
             throw IllegalStateException("이미 취소된 예약입니다")
         }
     }
@@ -146,7 +143,7 @@ class Reservation(
         return expiresAt?.isBefore(LocalDateTime.now()) ?: false
     }
 
-    fun isTemporary(): Boolean = status.code == STATUS_TEMPORARY
-    fun isConfirmed(): Boolean = status.code == STATUS_CONFIRMED
-    fun isCancelled(): Boolean = status.code == STATUS_CANCELLED
+    fun isTemporary(): Boolean = status.code == ReservationStatusType.TEMPORARY
+    fun isConfirmed(): Boolean = status.code == ReservationStatusType.CONFIRMED
+    fun isCancelled(): Boolean = status.code == ReservationStatusType.CANCELLED
 }

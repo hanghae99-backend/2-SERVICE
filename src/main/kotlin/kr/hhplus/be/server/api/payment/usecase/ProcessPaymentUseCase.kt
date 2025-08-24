@@ -8,6 +8,7 @@ import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.payment.service.PaymentService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.global.lock.LockStrategy
@@ -87,7 +88,7 @@ class ProcessPaymentUseCase(
             throw PaymentProcessException("예약의 사용자가 일치하지 않습니다")
         }
         
-        if (reservation.status.code != "TEMPORARY") {
+        if (reservation.status.code != ReservationStatusType.TEMPORARY) {
             throw PaymentProcessException("임시 예약 상태가 아닙니다: $reservationId, 현재 상태: ${reservation.status.code}")
         }
         

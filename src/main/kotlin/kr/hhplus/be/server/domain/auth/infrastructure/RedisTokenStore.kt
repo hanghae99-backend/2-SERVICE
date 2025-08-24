@@ -5,13 +5,13 @@ import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Component
 import java.time.Duration
 
 @Component
 class RedisTokenStore(
-    private val redisTemplate: StringRedisTemplate,
+    private val redisTemplate: RedisTemplate<String, Any>,
     @Qualifier("redis") private val objectMapper: ObjectMapper
 ) : TokenStore {
     fun flushAll() {
@@ -24,8 +24,7 @@ class RedisTokenStore(
         private const val TOKEN_PREFIX = "waiting_token:"
         private const val USER_PREFIX = "user_tokens:"
         private const val WAITING_QUEUE_ZSET = "waiting_queue_zset"
-        private const val ACTIVE_TOKENS = "active_tokens"
-        private const val ACTIVE_TOKEN_TIMESTAMP_PREFIX = "active_timestamp:"
+        private const val ACTIVE_TOKENS_HASH = "active_tokens_hash"  // Hash로 변경 (key: uuid, value: expireTime)
         private const val QUEUE_SEQUENCE_KEY = "queue_sequence"
         private val TOKEN_TTL = Duration.ofMinutes(30)
         private val ACTIVE_TTL = Duration.ofMinutes(10)
@@ -33,22 +32,21 @@ class RedisTokenStore(
 
     override fun save(token: WaitingToken) {
         val key = TOKEN_PREFIX + token.token
-        val value = objectMapper.writeValueAsString(token)
-
-        redisTemplate.opsForValue().set(key, value, TOKEN_TTL)
+        redisTemplate.opsForValue().set(key, token, TOKEN_TTL)
         redisTemplate.opsForSet().add(USER_PREFIX + token.userId, token.token)
     }
 
     override fun findByToken(token: String): WaitingToken? {
         val value = redisTemplate.opsForValue().get(TOKEN_PREFIX + token) ?: return null
-        return objectMapper.readValue(value, WaitingToken::class.java)
+        return value as? WaitingToken
     }
     
     override fun findActiveTokenByUserId(userId: Long): WaitingToken? {
         val userTokens = redisTemplate.opsForSet().members(USER_PREFIX + userId) ?: return null
         
-        for (tokenStr in userTokens) {
-            if (redisTemplate.opsForSet().isMember(ACTIVE_TOKENS, tokenStr) == true) {
+        for (tokenAny in userTokens) {
+            val tokenStr = tokenAny.toString()
+            if (redisTemplate.opsForHash<String, String>().hasKey(ACTIVE_TOKENS_HASH, tokenStr)) {
                 return findByToken(tokenStr)
             }
         }
@@ -63,8 +61,10 @@ class RedisTokenStore(
             val value = redisTemplate.opsForValue().get(key)
             if (value != null) {
                 try {
-                    val token = objectMapper.readValue(value, WaitingToken::class.java)
-                    tokens.add(token)
+                    val token = value as? WaitingToken
+                    if (token != null) {
+                        tokens.add(token)
+                    }
                 } catch (e: Exception) {
                     // 파싱 실패 시 무시
                 }
@@ -80,8 +80,7 @@ class RedisTokenStore(
         waitingToken?.let {
             redisTemplate.opsForSet().remove(USER_PREFIX + it.userId, token)
             removeFromWaitingQueue(token)
-            redisTemplate.opsForSet().remove(ACTIVE_TOKENS, token)
-            redisTemplate.delete(ACTIVE_TOKEN_TIMESTAMP_PREFIX + token)
+            redisTemplate.opsForHash<String, String>().delete(ACTIVE_TOKENS_HASH, token)
         }
     }
 
@@ -91,7 +90,7 @@ class RedisTokenStore(
 
     override fun getTokenStatus(token: String): TokenStatus {
         return when {
-            redisTemplate.opsForSet().isMember(ACTIVE_TOKENS, token) == true -> TokenStatus.ACTIVE
+            redisTemplate.opsForHash<String, String>().hasKey(ACTIVE_TOKENS_HASH, token) -> TokenStatus.ACTIVE
             redisTemplate.opsForZSet().rank(WAITING_QUEUE_ZSET, token) != null -> TokenStatus.WAITING
             else -> TokenStatus.EXPIRED
         }
@@ -99,23 +98,17 @@ class RedisTokenStore(
 
     override fun activateToken(token: String) {
         removeFromWaitingQueue(token)
-        redisTemplate.opsForSet().add(ACTIVE_TOKENS, token)
-
-        redisTemplate.opsForValue().set(
-            ACTIVE_TOKEN_TIMESTAMP_PREFIX + token,
-            System.currentTimeMillis().toString(),
-            ACTIVE_TTL
-        )
+        val expireTime = System.currentTimeMillis() + ACTIVE_TTL.toMillis()
+        redisTemplate.opsForHash<String, String>().put(ACTIVE_TOKENS_HASH, token, expireTime.toString())
     }
 
     override fun expireToken(token: String) {
         removeFromWaitingQueue(token)
-        redisTemplate.opsForSet().remove(ACTIVE_TOKENS, token)
-        redisTemplate.delete(ACTIVE_TOKEN_TIMESTAMP_PREFIX + token)
+        redisTemplate.opsForHash<String, String>().delete(ACTIVE_TOKENS_HASH, token)
     }
 
     override fun countActiveTokens(): Long {
-        return redisTemplate.opsForSet().size(ACTIVE_TOKENS) ?: 0L
+        return redisTemplate.opsForHash<String, String>().size(ACTIVE_TOKENS_HASH)
     }
 
     // Queue 관리
@@ -136,7 +129,7 @@ class RedisTokenStore(
             redisTemplate.opsForZSet().remove(WAITING_QUEUE_ZSET, token)
         }
 
-        return tokens?.toList() ?: emptyList()
+        return tokens?.map { it.toString() } ?: emptyList()
     }
 
     override fun getQueueSize(): Long {
@@ -165,25 +158,19 @@ class RedisTokenStore(
     }
 
     override fun isTokenActive(token: String): Boolean {
-        return redisTemplate.opsForSet().isMember(ACTIVE_TOKENS, token) == true
+        return redisTemplate.opsForHash<String, String>().hasKey(ACTIVE_TOKENS_HASH, token)
     }
 
     // 콘서트 예약 특화
 
     override fun findExpiredActiveTokens(): List<String> {
-        val activeTokens = redisTemplate.opsForSet().members(ACTIVE_TOKENS) ?: return emptyList()
+        val activeTokens = redisTemplate.opsForHash<String, String>().entries(ACTIVE_TOKENS_HASH)
         val expiredTokens = mutableListOf<String>()
         val currentTime = System.currentTimeMillis()
-        val ttlMillis = ACTIVE_TTL.toMillis()
 
-        activeTokens.forEach { token ->
-            val timestampStr = redisTemplate.opsForValue().get(ACTIVE_TOKEN_TIMESTAMP_PREFIX + token)
-            if (timestampStr != null) {
-                val activatedTime = timestampStr.toLongOrNull() ?: 0L
-                if (currentTime - activatedTime > ttlMillis) {
-                    expiredTokens.add(token)
-                }
-            } else {
+        activeTokens.forEach { (token, expireTimeStr) ->
+            val expireTime = expireTimeStr.toLongOrNull() ?: 0L
+            if (currentTime >= expireTime) {
                 expiredTokens.add(token)
             }
         }

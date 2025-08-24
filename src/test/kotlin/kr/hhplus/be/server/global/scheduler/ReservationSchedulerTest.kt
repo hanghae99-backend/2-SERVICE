@@ -11,6 +11,7 @@ import io.mockk.verify
 import kr.hhplus.be.server.domain.auth.service.QueueManager
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
+import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.global.lock.LockStrategy
@@ -20,12 +21,14 @@ class ReservationSchedulerTest : DescribeSpec({
     val reservationService = mockk<ReservationService>()
     val tokenLifecycleManager = mockk<TokenLifecycleManager>()
     val queueManager = mockk<QueueManager>()
+    val selloutRankingService = mockk<SelloutRankingService>()
     val domainEventPublisher = mockk<DomainEventPublisher>()
     val distributedLock = mockk<DistributedLock>()
     val reservationScheduler = ReservationScheduler(
         reservationService,
         tokenLifecycleManager,
         queueManager,
+        selloutRankingService,
         domainEventPublisher,
         distributedLock
     )
@@ -130,25 +133,23 @@ class ReservationSchedulerTest : DescribeSpec({
         }
     }
     
-    describe("processQueue") {
-        context("대기열 자동 처리를 실행할 때") {
-            it("토큰 생명주기 관리자와 큐 매니저의 메서드를 호출해야 한다") {
+    describe("activateTokensScheduled") {
+        context("토큰 활성화 스케줄러를 실행할 때") {
+            it("큐 매니저의 배치 활성화 메서드를 호출해야 한다") {
                 // given
-                every { tokenLifecycleManager.cleanupExpiredTokens() } returns 3
-                every { queueManager.processQueueAutomatically() } returns 2
+                every { queueManager.activateTokensByCount(any()) } returns 2
                 
                 // when
-                reservationScheduler.processQueue()
+                reservationScheduler.activateTokensScheduled()
                 
                 // then
-                verify { tokenLifecycleManager.cleanupExpiredTokens() }
-                verify { queueManager.processQueueAutomatically() }
+                verify { queueManager.activateTokensByCount(any()) }
                 verify { 
                     distributedLock.executeWithLock<Unit>(
-                        lockKey = "scheduler:queue:process",
+                        lockKey = "scheduler:token:activation",
                         strategy = any(),
-                        lockTimeoutMs = 4000L,
-                        waitTimeoutMs = 1000L,
+                        lockTimeoutMs = 8000L,
+                        waitTimeoutMs = 2000L,
                         retryIntervalMs = any(),
                         maxRetryCount = any(),
                         action = any()
@@ -157,33 +158,31 @@ class ReservationSchedulerTest : DescribeSpec({
             }
         }
         
-        context("대기열 처리 중 예외가 발생할 때") {
+        context("토큰 활성화 중 예외가 발생할 때") {
             it("예외를 처리하고 계속 실행되어야 한다") {
                 // given
-                every { tokenLifecycleManager.cleanupExpiredTokens() } throws RuntimeException("정리 실패")
-                every { queueManager.processQueueAutomatically() } returns 1
+                every { queueManager.activateTokensByCount(any()) } throws RuntimeException("활성화 실패")
                 
                 // when & then
                 try {
-                    reservationScheduler.processQueue()
+                    reservationScheduler.activateTokensScheduled()
                 } catch (e: RuntimeException) {
                     // 예외가 발생하는 것이 정상
                 }
                 
                 // then
-                verify { tokenLifecycleManager.cleanupExpiredTokens() }
+                verify { queueManager.activateTokensByCount(any()) }
                 verify { 
                     distributedLock.executeWithLock<Unit>(
-                        lockKey = "scheduler:queue:process",
+                        lockKey = "scheduler:token:activation",
                         strategy = any(),
-                        lockTimeoutMs = 4000L,
-                        waitTimeoutMs = 1000L,
+                        lockTimeoutMs = 8000L,
+                        waitTimeoutMs = 2000L,
                         retryIntervalMs = any(),
                         maxRetryCount = any(),
                         action = any()
                     )
                 }
-                // 예외가 발생해도 다음 메서드는 호출되지 않을 수 있음
             }
         }
     }

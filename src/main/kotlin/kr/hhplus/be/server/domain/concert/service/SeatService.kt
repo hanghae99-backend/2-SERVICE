@@ -7,7 +7,7 @@ import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatStatusTypePojoRepository
 import kr.hhplus.be.server.global.extension.orElseThrow
-import kr.hhplus.be.server.domain.common.ConcertBusinessRules
+import kr.hhplus.be.server.domain.concert.rules.ConcertBusinessRules
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation

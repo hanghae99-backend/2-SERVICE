@@ -4,7 +4,7 @@ import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistory
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
-import kr.hhplus.be.server.domain.common.BalanceBusinessRules
+import kr.hhplus.be.server.domain.balance.rules.BalanceBusinessRules
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service

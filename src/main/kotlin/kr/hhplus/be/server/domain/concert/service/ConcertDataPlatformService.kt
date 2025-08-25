@@ -1,31 +1,42 @@
 package kr.hhplus.be.server.domain.concert.service
 
 import mu.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import org.springframework.web.client.RestTemplate
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 @Service
-class ConcertDataPlatformService {
+class ConcertDataPlatformService(
+    private val restTemplate: RestTemplate
+) {
     
     private val logger = KotlinLogging.logger {}
     
+    @Value("\${mock-api.base-url:http://localhost:8080}")
+    private lateinit var baseUrl: String
+    
     fun sendReservationData(reservationData: ConcertReservationData) {
         try {
-            // Mock API 호출 - 실제 환경에서는 실제 데이터 플랫폼 엔드포인트로 변경
-            val mockApiUrl = "https://mock-data-platform.example.com/api/reservations"
+            val apiUrl = "$baseUrl/api/test/mock/data-platform/reservations"
             
-            // 실제로는 HTTP 호출, 여기서는 시뮬레이션
-            logger.info { "데이터 플랫폼 전송 시작 - reservationId: ${reservationData.reservationId}" }
+            logger.info { "🚀 데이터 플랫폼 전송 시작 - reservationId: ${reservationData.reservationId}" }
             
-            // Mock API 응답 시뮬레이션
-            Thread.sleep(100) // 네트워크 지연 시뮬레이션
+            val response = restTemplate.postForEntity(
+                apiUrl,
+                reservationData,
+                String::class.java
+            )
             
-            logger.info { "데이터 플랫폼 전송 완료 - reservationId: ${reservationData.reservationId}" }
+            if (response.statusCode.is2xxSuccessful) {
+                logger.info { "✅ 데이터 플랫폼 전송 성공 - reservationId: ${reservationData.reservationId}" }
+            } else {
+                logger.warn { "⚠️ 데이터 플랫폼 응답 오류 - status: ${response.statusCode}" }
+            }
             
         } catch (e: Exception) {
-            logger.error(e) { "데이터 플랫폼 전송 실패 - reservationId: ${reservationData.reservationId}" }
-            // 실패해도 핵심 비즈니스에는 영향 없음
+            logger.error(e) { "❌ 데이터 플랫폼 전송 실패 - reservationId: ${reservationData.reservationId}" }
         }
     }
 }

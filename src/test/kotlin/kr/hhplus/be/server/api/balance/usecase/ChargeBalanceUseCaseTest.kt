@@ -16,7 +16,7 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
-import kr.hhplus.be.server.domain.common.BusinessRuleViolationException
+import kr.hhplus.be.server.global.exception.BusinessRuleViolationException
 import kr.hhplus.be.server.config.TestDataFixture
 import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal

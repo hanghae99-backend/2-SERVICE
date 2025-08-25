@@ -4,12 +4,14 @@ import kr.hhplus.be.server.api.balance.usecase.DeductBalanceUseCase
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
+import kr.hhplus.be.server.domain.concert.event.SeatConfirmedEvent
 import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.payment.service.PaymentService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.global.lock.LockStrategy
 
@@ -26,7 +28,8 @@ class ProcessPaymentUseCase(
     private val seatService: SeatService,
     private val deductBalanceUseCase: DeductBalanceUseCase,
     private val tokenDomainService: TokenDomainService,
-    private val tokenLifecycleManager: TokenLifecycleManager
+    private val tokenLifecycleManager: TokenLifecycleManager,
+    private val eventPublisher: DomainEventPublisher
 ) {
     
     companion object {
@@ -35,7 +38,7 @@ class ProcessPaymentUseCase(
 
 
     @LockGuard(
-        keys = ["'balance:' + #userId", "'reservation:' + #reservationId", "'payment:' + #userId + ':' + #reservationId"],
+        keys = ["'balance:' + #userId", "'reservation:' + #reservationId", "'seat:' + #seatId", "'payment:' + #userId + ':' + #reservationId"],
         strategy = LockStrategy.PUB_SUB,
         waitTimeoutMs = 20000L
     )
@@ -51,12 +54,10 @@ class ProcessPaymentUseCase(
         val payment = paymentService.createReservationPayment(userId, reservationId, seat.price)
         
         return try {
-            // 모든 락을 UseCase에서 획득했으므로 서비스는 락 없이 처리
+            // 1. 밸런스 차감
             deductBalanceUseCase.executeInternal(userId, payment.amount)
             
-            reservationService.confirmReservation(reservationId, payment.paymentId)
-            seatService.confirmSeat(seatId)
-            
+            // 2. 결제 완료 처리
             val completedPayment = paymentService.completePayment(
                 paymentId = payment.paymentId,
                 reservationId = reservationId,
@@ -64,7 +65,29 @@ class ProcessPaymentUseCase(
                 token = token
             )
             
-            logger.info("결제 처리 완료 - userId: {}, paymentId: {}", userId, payment.paymentId)
+            // 3. 예약 확정 처리 (동기적)
+            reservationService.confirmReservation(reservationId, payment.paymentId)
+            
+            // 4. 좌석 확정 처리 (동기적)
+            seatService.confirmSeat(seatId)
+            
+            // 5. 토큰 완료 처리 (동기적)
+            tokenLifecycleManager.completeToken(token)
+            
+            // 6. 좌석 확정 이벤트 발행 (외부 시스템 연동용)
+            val seatDto = seatService.getSeatById(seatId)
+            val seatConfirmedEvent = SeatConfirmedEvent(
+                seatId = seatId,
+                scheduleId = seatDto.scheduleId,
+                seatNumber = seatDto.seatNumber,
+                userId = userId,
+                reservationId = reservationId,
+                paymentId = payment.paymentId
+            )
+            eventPublisher.publish(seatConfirmedEvent)
+
+            logger.info("결제 처리 완료 - userId: {}, paymentId: {}, reservationId: {}, seatId: {}", 
+                userId, payment.paymentId, reservationId, seatId)
             completedPayment
             
         } catch (e: Exception) {
@@ -106,11 +129,20 @@ class ProcessPaymentUseCase(
     ) {
         logger.error("결제 처리 실패 - userId: {}, reservationId: {}, paymentId: {}", userId, reservationId, paymentId, exception)
         
+        // 결제 실패 처리 (동기적)
         paymentService.failPayment(
             paymentId = paymentId,
             reservationId = reservationId,
             reason = exception.message ?: "Unknown error",
             token = token
         )
+        
+        // 토큰 완료 처리 (동기적)
+        try {
+            tokenLifecycleManager.completeToken(token)
+            logger.info("결제 실패 시 토큰 완료 처리 - token: {}", token)
+        } catch (e: Exception) {
+            logger.error("토큰 완료 처리 실패 - token: {}", token, e)
+        }
     }
 }

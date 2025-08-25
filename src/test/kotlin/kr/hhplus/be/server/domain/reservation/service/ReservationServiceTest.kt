@@ -29,21 +29,17 @@ class ReservationServiceTest : DescribeSpec({
     val statusRepository = mockk<ReservationStatusTypePojoRepository>()
     val eventPublisher = mockk<DomainEventPublisher>()
     val seatService = mockk<SeatService>()
-    val selloutRankingService = mockk<SelloutRankingService>()
     
     val reservationService = ReservationService(
         reservationRepository,
         statusRepository,
         eventPublisher,
-        seatService,
-        selloutRankingService
+        seatService
     )
     
     beforeEach {
         clearAllMocks()
         every { eventPublisher.publish(any()) } returns Unit
-        every { selloutRankingService.incrementReservationCount(any()) } just Runs
-        every { selloutRankingService.decrementReservationCount(any()) } just Runs
     }
     
     describe("reserveSeat") {

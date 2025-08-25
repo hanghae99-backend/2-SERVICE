@@ -4,33 +4,44 @@ import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationConfirmedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
+import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
 @Component
-class ReservationEventHandler {
+class ReservationEventHandler(
+    private val selloutRankingService: SelloutRankingService
+) {
     
     private val logger = KotlinLogging.logger {}
     
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handleReservationCreated(event: ReservationCreatedEvent) {
-        logger.info { "Reservation created - ID: ${event.reservationId}, User: ${event.userId}, Seat: ${event.seatNumber}" }
+        try {
+            selloutRankingService.incrementReservationCount(event.concertId)
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to update sellout ranking for concert: ${event.concertId}" }
+        }
     }
     
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handleReservationConfirmed(event: ReservationConfirmedEvent) {
-        logger.info { "Reservation confirmed - ID: ${event.reservationId}, User: ${event.userId}, Payment: ${event.paymentId}" }
+        // 예약 확정 후 부가 작업들
     }
     
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handleReservationCancelled(event: ReservationCancelledEvent) {
-        logger.info { "Reservation cancelled - ID: ${event.reservationId}, Reason: ${event.cancelReason}, Expired: ${event.isExpired}" }
+        try {
+            selloutRankingService.decrementReservationCount(event.concertId)
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to update sellout ranking for concert: ${event.concertId}" }
+        }
     }
     
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handleReservationExpired(event: ReservationExpiredEvent) {
-        logger.info { "Reservation expired - ID: ${event.reservationId}, User: ${event.userId}" }
+        // 예약 만료 후 부가 작업들
     }
 }

@@ -9,7 +9,6 @@ import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusType
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchCondition
 import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
-import kr.hhplus.be.server.domain.reservation.event.ReservationConfirmedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
 import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
@@ -63,7 +62,6 @@ class ReservationService(
         reservation.confirm(paymentId, statusRepository.getConfirmedStatus())
         val savedReservation = reservationRepository.save(reservation)
         
-        publishReservationConfirmedEvent(savedReservation, paymentId)
         return savedReservation
     }
 
@@ -228,14 +226,4 @@ class ReservationService(
         ))
     }
     
-    private fun publishReservationConfirmedEvent(reservation: Reservation, paymentId: Long) {
-        eventPublisher.publish(ReservationConfirmedEvent(
-            reservationId = reservation.reservationId,
-            userId = reservation.userId,
-            concertId = reservation.concertId,
-            seatId = reservation.seatId,
-            paymentId = paymentId,
-            price = reservation.price
-        ))
-    }
 }

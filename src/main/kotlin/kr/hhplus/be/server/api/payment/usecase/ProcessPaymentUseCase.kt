@@ -4,8 +4,8 @@ import kr.hhplus.be.server.api.balance.usecase.DeductBalanceUseCase
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.domain.auth.service.TokenDomainService
 import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
-import kr.hhplus.be.server.domain.concert.event.SeatConfirmedEvent
 import kr.hhplus.be.server.domain.concert.service.SeatService
+import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.payment.service.PaymentService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
@@ -29,13 +29,12 @@ class ProcessPaymentUseCase(
     private val deductBalanceUseCase: DeductBalanceUseCase,
     private val tokenDomainService: TokenDomainService,
     private val tokenLifecycleManager: TokenLifecycleManager,
-    private val eventPublisher: DomainEventPublisher
+    private val concertScheduleRepository: ConcertScheduleRepository
 ) {
     
     companion object {
         private val logger = LoggerFactory.getLogger(ProcessPaymentUseCase::class.java)
     }
-
 
     @LockGuard(
         keys = ["'balance:' + #userId", "'reservation:' + #reservationId", "'seat:' + #seatId", "'payment:' + #userId + ':' + #reservationId"],
@@ -51,6 +50,8 @@ class ProcessPaymentUseCase(
         validateReservation(reservationId, userId)
         
         val seat = seatService.getSeatById(seatId)
+        val schedule = concertScheduleRepository.findById(seat.scheduleId)
+            ?: throw IllegalStateException("스케줄 정보를 찾을 수 없습니다: ${seat.scheduleId}")
         val payment = paymentService.createReservationPayment(userId, reservationId, seat.price)
         
         return try {
@@ -62,7 +63,10 @@ class ProcessPaymentUseCase(
                 paymentId = payment.paymentId,
                 reservationId = reservationId,
                 seatId = seatId,
-                token = token
+                token = token,
+                scheduleId = seat.scheduleId,
+                seatNumber = seat.seatNumber,
+                concertId = schedule.concertId
             )
             
             // 3. 예약 확정 처리 (동기적)
@@ -74,17 +78,6 @@ class ProcessPaymentUseCase(
             // 5. 토큰 완료 처리 (동기적)
             tokenLifecycleManager.completeToken(token)
             
-            // 6. 좌석 확정 이벤트 발행 (외부 시스템 연동용)
-            val seatDto = seatService.getSeatById(seatId)
-            val seatConfirmedEvent = SeatConfirmedEvent(
-                seatId = seatId,
-                scheduleId = seatDto.scheduleId,
-                seatNumber = seatDto.seatNumber,
-                userId = userId,
-                reservationId = reservationId,
-                paymentId = payment.paymentId
-            )
-            eventPublisher.publish(seatConfirmedEvent)
 
             logger.info("결제 처리 완료 - userId: {}, paymentId: {}, reservationId: {}, seatId: {}", 
                 userId, payment.paymentId, reservationId, seatId)

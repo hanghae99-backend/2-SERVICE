@@ -1,8 +1,7 @@
-package kr.hhplus.be.server.domain.reservation.event.handler
+package kr.hhplus.be.server.domain.payment.event.handler
 
-import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
-import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
-import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
+import kr.hhplus.be.server.domain.payment.event.PaymentCompletedEvent
+import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
 import kr.hhplus.be.server.domain.concert.service.ConcertDataPlatformService
 import kr.hhplus.be.server.domain.concert.service.ConcertReservationData
 import kr.hhplus.be.server.domain.concert.service.SeatService
@@ -16,8 +15,7 @@ import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
 @Component
-class ReservationEventHandler(
-    private val selloutRankingService: SelloutRankingService,
+open class PaymentEventHandler(
     private val concertDataPlatformService: ConcertDataPlatformService,
     private val seatService: SeatService,
     private val concertRepository: ConcertRepository,
@@ -28,39 +26,19 @@ class ReservationEventHandler(
     private val logger = KotlinLogging.logger {}
     
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun handleReservationCreated(event: ReservationCreatedEvent) {
-        try {
-            selloutRankingService.incrementReservationCount(event.concertId)
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to update sellout ranking for concert: ${event.concertId}" }
-        }
-        
-        // 데이터 플랫폼 전송 (비동기)
+    fun handlePaymentCompleted(event: PaymentCompletedEvent) {
         sendReservationToDataPlatform(
             reservationId = event.reservationId,
             userId = event.userId,
             concertId = event.concertId,
             seatId = event.seatId,
-            paymentId = 0L // 임시 예약 상태이므로 paymentId 없음
+            paymentId = event.paymentId
         )
     }
     
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun handleReservationCancelled(event: ReservationCancelledEvent) {
-        try {
-            selloutRankingService.decrementReservationCount(event.concertId)
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to update sellout ranking for concert: ${event.concertId}" }
-        }
-        
-        // 데이터 플랫폼 전송 (비동기)
-        sendReservationToDataPlatform(
-            reservationId = event.reservationId,
-            userId = event.userId,
-            concertId = event.concertId,
-            seatId = event.seatId,
-            paymentId = 0L // 취소된 예약이므로 paymentId 없음
-        )
+    fun handlePaymentFailed(event: PaymentFailedEvent) {
+        logger.info { "결제 실패 처리 - paymentId: ${event.paymentId}, reason: ${event.reason}" }
     }
 
     @Async

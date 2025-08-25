@@ -18,6 +18,8 @@ import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.concert.models.Seat
 import kr.hhplus.be.server.domain.concert.service.SeatService
+import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
+import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
 import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.payment.service.PaymentService
 import kr.hhplus.be.server.domain.reservation.models.Reservation
@@ -33,6 +35,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
     val deductBalanceUseCase = mockk<DeductBalanceUseCase>()
     val tokenDomainService = mockk<TokenDomainService>()
     val tokenLifecycleManager = mockk<TokenLifecycleManager>()
+    val concertScheduleRepository = mockk<ConcertScheduleRepository>()
     
     val processPaymentUseCase = ProcessPaymentUseCase(
         paymentService,
@@ -40,7 +43,8 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
         seatService,
         deductBalanceUseCase,
         tokenDomainService,
-        tokenLifecycleManager
+        tokenLifecycleManager,
+        concertScheduleRepository
     )
     
     describe("execute") {
@@ -62,6 +66,11 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 }
                 val mockSeat = mockk<SeatDto> {
                     every { price } returns amount
+                    every { scheduleId } returns 1L
+                    every { seatNumber } returns "A1"
+                }
+                val mockSchedule = mockk<ConcertSchedule> {
+                    every { concertId } returns 1L
                 }
                 val mockConfirmedSeat = mockk<SeatDto>()
                 val mockConfirmedReservation = mockk<Reservation>()
@@ -90,12 +99,14 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { tokenDomainService.validateActiveToken(mockWaitingToken, mockTokenStatus) } returns Unit
                 every { reservationService.getReservationById(reservationId) } returns mockReservation
                 every { seatService.getSeatById(seatId) } returns mockSeat
+                every { concertScheduleRepository.findById(1L) } returns mockSchedule
                 every { paymentService.createReservationPayment(userId, reservationId, amount) } returns mockInitialPayment
                 every { deductBalanceUseCase.executeInternal(userId, amount) } returns mockPoint
                 every { paymentService.failPayment(any(), any(), any(), any()) } returns mockInitialPayment
                 every { reservationService.confirmReservation(reservationId, 1L) } returns mockConfirmedReservation
                 every { seatService.confirmSeat(seatId) } returns mockConfirmedSeat
-                every { paymentService.completePayment(1L, reservationId, seatId, token) } returns mockCompletedPayment
+                every { paymentService.completePayment(1L, reservationId, seatId, token, 1L, "A1", 1L) } returns mockCompletedPayment
+                every { tokenLifecycleManager.completeToken(token) } returns Unit
                 
                 // when
                 val result = processPaymentUseCase.execute(userId, reservationId, seatId, token)
@@ -113,7 +124,8 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 verify { deductBalanceUseCase.executeInternal(userId, amount) }
                 verify { reservationService.confirmReservation(reservationId, 1L) }
                 verify { seatService.confirmSeat(seatId) }
-                verify { paymentService.completePayment(1L, reservationId, seatId, token) }
+                verify { paymentService.completePayment(1L, reservationId, seatId, token, 1L, "A1", 1L) }
+                verify { tokenLifecycleManager.completeToken(token) }
             }
         }
         

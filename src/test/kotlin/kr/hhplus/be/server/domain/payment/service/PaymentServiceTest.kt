@@ -91,7 +91,7 @@ class PaymentServiceTest : DescribeSpec({
                 every { paymentRepository.save(any()) } returns payment
                 
                 // when
-                val result = paymentService.completePayment(paymentId, reservationId, seatId, token)
+                val result = paymentService.completePayment(paymentId, reservationId, seatId, token, 1L, "A1", 1L)
                 
                 // then
                 result shouldNotBe null

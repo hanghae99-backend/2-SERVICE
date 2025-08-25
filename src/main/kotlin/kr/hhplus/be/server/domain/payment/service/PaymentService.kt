@@ -38,17 +38,9 @@ class PaymentService(
         return PaymentDto.fromEntity(savedPayment)
     }
     
-    // 일반 결제 (기존 방식 유지)
-    @Transactional
-    fun createPayment(userId: Long, amount: BigDecimal): PaymentDto {
-        val pendingStatus = paymentStatusTypeRepository.getPendingStatus()
-        val payment = Payment.create(userId, amount, "POINT", pendingStatus)
-        val savedPayment = paymentRepository.save(payment)
-        return PaymentDto.fromEntity(savedPayment)
-    }
 
     @Transactional
-    fun completePayment(paymentId: Long, reservationId: Long, seatId: Long, token: String): PaymentDto {
+    fun completePayment(paymentId: Long, reservationId: Long, seatId: Long, token: String, scheduleId: Long, seatNumber: String, concertId: Long): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
             .orElseThrow { PaymentNotFoundException(paymentId) }
 
@@ -80,7 +72,10 @@ class PaymentService(
                 reservationId = reservationId,
                 seatId = seatId,
                 amount = finalPayment.amount,
-                token = token
+                token = token,
+                scheduleId = scheduleId,
+                seatNumber = seatNumber,
+                concertId = concertId
             )
             domainEventPublisher.publish(paymentCompletedEvent)
 
@@ -95,51 +90,12 @@ class PaymentService(
     private fun processActualPayment(payment: Payment) {
         logger.info("실제 결제 처리 시작 - paymentId: ${payment.paymentId}, amount: ${payment.amount}")
         
-        when (payment.paymentMethod) {
-            "POINT" -> {
-                // 포인트 결제는 이미 차감된 상태이므로 추가 처리 불필요
-                logger.debug("포인트 결제 완료 - paymentId: ${payment.paymentId}")
-            }
-            "CARD" -> {
-                // 실제 환경에서는 PG사 API 호출
-                processCardPayment(payment)
-            }
-            "BANK" -> {
-                // 실제 환경에서는 은행 API 호출  
-                processBankTransfer(payment)
-            }
-            else -> {
-                throw IllegalArgumentException("지원하지 않는 결제 방법입니다: ${payment.paymentMethod}")
-            }
+        // 현재는 포인트 결제만 지원
+        if (payment.paymentMethod != "POINT") {
+            throw IllegalArgumentException("현재는 포인트 결제만 지원합니다: ${payment.paymentMethod}")
         }
-    }
-    
-    private fun processCardPayment(payment: Payment) {
-        // 실제 카드 결제 처리 시뮬레이션
-        logger.info("카드 결제 처리 - paymentId: ${payment.paymentId}, amount: ${payment.amount}")
         
-        // 실제 환경에서는 PG사 API 호출
-        // val pgResult = pgService.processPayment(payment)
-        // if (!pgResult.isSuccess) throw PaymentProcessException("카드 결제 실패")
-        
-        // 시뮬레이션을 위한 처리 시간
-        Thread.sleep(100)
-        
-        logger.info("카드 결제 완료 - paymentId: ${payment.paymentId}")
-    }
-    
-    private fun processBankTransfer(payment: Payment) {
-        // 실제 계좌이체 처리 시뮬레이션
-        logger.info("계좌이체 처리 - paymentId: ${payment.paymentId}, amount: ${payment.amount}")
-        
-        // 실제 환경에서는 은행 API 호출
-        // val bankResult = bankService.transfer(payment)
-        // if (!bankResult.isSuccess) throw PaymentProcessException("계좌이체 실패")
-        
-        // 시뮬레이션을 위한 처리 시간
-        Thread.sleep(200)
-        
-        logger.info("계좌이체 완료 - paymentId: ${payment.paymentId}")
+        logger.debug("포인트 결제 완료 - paymentId: ${payment.paymentId}")
     }
 
     @Transactional
@@ -168,9 +124,6 @@ class PaymentService(
         return PaymentDto.fromEntity(finalPayment)
     }
 
-    fun findByReservationId(reservationId: Long): List<Payment> {
-        return paymentRepository.findByReservationId(reservationId)
-    }
     
     fun getPaymentById(paymentId: Long): PaymentDto {
         val payment = paymentRepository.findById(paymentId)
@@ -179,11 +132,4 @@ class PaymentService(
         return PaymentDto.fromEntity(payment)
     }
 
-    fun validatePaymentAmount(currentBalance: BigDecimal, paymentAmount: BigDecimal) {
-        if (currentBalance < paymentAmount) {
-            throw PaymentProcessException(
-                "잔액이 부족합니다. 현재 잔액: $currentBalance, 필요 금액: $paymentAmount"
-            )
-        }
-    }
 }

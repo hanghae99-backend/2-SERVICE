@@ -16,17 +16,6 @@ data class ReservationCreatedEvent(
     override val eventType: String = "ReservationCreated"
 }
 
-data class ReservationConfirmedEvent(
-    val reservationId: Long,
-    val userId: Long,
-    val concertId: Long,
-    val seatId: Long,
-    val paymentId: Long,
-    val price: BigDecimal
-) : AbstractDomainEvent() {
-    override val eventType: String = "ReservationConfirmed"
-}
-
 data class ReservationCancelledEvent(
     val reservationId: Long,
     val userId: Long,

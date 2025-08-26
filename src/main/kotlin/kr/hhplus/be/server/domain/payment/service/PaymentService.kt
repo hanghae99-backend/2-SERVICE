@@ -13,6 +13,7 @@ import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepo
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
@@ -22,10 +23,33 @@ import java.math.BigDecimal
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
+    private val eventPublisher: DomainEventPublisher
 ) {
     
     companion object {
         private val logger = LoggerFactory.getLogger(PaymentService::class.java)
+    }
+
+    /**
+     * 결제 요청을 생성하고 이벤트를 발행합니다.
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    fun processPayment(userId: Long, reservationId: Long, token: String, amount: BigDecimal): PaymentDto {
+        logger.info("결제 프로세스 시작 - userId: {}, reservationId: {}, amount: {}", userId, reservationId, amount)
+        
+        val payment = createReservationPayment(userId, reservationId, amount)
+        
+        // 결제 요청 이벤트 발행 - 이벤트 핸들러에서 잔고 차감과 예약 확정을 HTTP API로 처리
+        eventPublisher.publish(PaymentCompletedEvent(
+            paymentId = payment.paymentId,
+            userId = userId,
+            reservationId = reservationId,
+            amount = payment.amount,
+            token = token
+        ))
+
+        logger.info("결제 프로세스 시작 완료, 이벤트 발행 - userId: {}, paymentId: {}", userId, payment.paymentId)
+        return payment
     }
 
     // 예약 관련 결제

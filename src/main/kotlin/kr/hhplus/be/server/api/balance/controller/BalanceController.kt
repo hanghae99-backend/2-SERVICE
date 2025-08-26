@@ -7,6 +7,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.api.balance.dto.BalanceDto
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
+import kr.hhplus.be.server.api.balance.dto.request.DeductBalanceRequest
 import kr.hhplus.be.server.api.balance.usecase.ChargeBalanceUseCase
 import kr.hhplus.be.server.api.balance.usecase.DeductBalanceUseCase
 import kr.hhplus.be.server.domain.balance.service.BalanceService
@@ -29,7 +30,7 @@ class BalanceController(
         summary = "잔액 충전",
         description = "사용자의 포인트 잔액을 충전합니다."
     )
-    @PostMapping
+    @PostMapping("/charge")
     fun chargeBalance(
         @Valid @RequestBody 
         @Parameter(description = "잔액 충전 요청", required = true)
@@ -41,6 +42,26 @@ class BalanceController(
             CommonApiResponse.success(
                 data = BalanceDto.ChargeResult.from(point, request.amount),
                 message = "잔액 충전이 완료되었습니다"
+            )
+        )
+    }
+
+    @Operation(
+        summary = "잔액 차감",
+        description = "사용자의 포인트 잔액을 차감합니다."
+    )
+    @PostMapping("/deduct")
+    fun deductBalance(
+        @Valid @RequestBody 
+        @Parameter(description = "잔액 차감 요청", required = true)
+        request: DeductBalanceRequest
+    ): ResponseEntity<CommonApiResponse<BalanceDto.Detail>> {
+        val point = deductBalanceUseCase.execute(request.userId, request.amount, request.description)
+        
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = BalanceDto.Detail.from(point),
+                message = "잔액 차감이 완료되었습니다"
             )
         )
     }

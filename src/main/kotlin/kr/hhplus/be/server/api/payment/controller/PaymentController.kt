@@ -8,8 +8,9 @@ import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.api.payment.dto.request.PaymentRequest
-import kr.hhplus.be.server.api.payment.usecase.ProcessPaymentUseCase
 import kr.hhplus.be.server.domain.payment.service.PaymentService
+import kr.hhplus.be.server.domain.auth.service.TokenDomainService
+import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
@@ -19,8 +20,9 @@ import org.springframework.web.bind.annotation.*
 @Validated
 @Tag(name = "Payment", description = "결제 관리 API")
 class PaymentController(
-    private val processPaymentUseCase: ProcessPaymentUseCase,
-    private val paymentService: PaymentService
+    private val paymentService: PaymentService,
+    private val tokenDomainService: TokenDomainService,
+    private val tokenLifecycleManager: TokenLifecycleManager
 ) {
 
     @Operation(
@@ -33,11 +35,17 @@ class PaymentController(
         @Parameter(description = "결제 요청", required = true)
         request: PaymentRequest
     ): ResponseEntity<CommonApiResponse<PaymentDto>> {
-        val payment = processPaymentUseCase.execute(
+        // 토큰 검증
+        val waitingToken = tokenLifecycleManager.findToken(request.token)
+        val status = tokenLifecycleManager.getTokenStatus(request.token)
+        tokenDomainService.validateActiveToken(waitingToken, status)
+        
+        // 결제 처리
+        val payment = paymentService.processPayment(
             userId = request.userId,
             reservationId = request.reservationId,
-            seatId = request.seatId,
-            token = request.token
+            token = request.token,
+            amount = request.amount
         )
         
         return ResponseEntity.status(201).body(

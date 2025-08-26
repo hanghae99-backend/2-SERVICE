@@ -9,6 +9,7 @@ import kr.hhplus.be.server.global.response.CommonApiResponse
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCancelRequest
+import kr.hhplus.be.server.api.reservation.dto.request.ReservationConfirmRequest
 import kr.hhplus.be.server.api.reservation.usecase.ReserveSeatUseCase
 import kr.hhplus.be.server.api.reservation.usecase.CancelReservationUseCase
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
@@ -47,6 +48,32 @@ class ReservationController(
             CommonApiResponse.success(
                 data = ReservationDto.fromEntity(reservation),
                 message = "좌석 예약 완료"
+            )
+        )
+    }
+
+    @Operation(
+        summary = "예약 확정",
+        description = "임시 예약을 확정 상태로 변경합니다. 결제 완료 후 호출됩니다."
+    )
+    @PutMapping("/{reservationId}/confirm")
+    fun confirmReservation(
+        @PathVariable
+        @Parameter(description = "예약 ID", required = true, example = "1")
+        @Positive(message = "예약 ID는 양수여야 합니다")
+        reservationId: Long,
+        
+        @Valid @RequestBody 
+        @Parameter(description = "예약 확정 요청", required = true)
+        request: ReservationConfirmRequest
+    ): ResponseEntity<CommonApiResponse<ReservationDto>> {
+        reservationService.confirmReservation(reservationId, request.paymentId)
+        val reservation = reservationService.getReservationById(reservationId)
+        
+        return ResponseEntity.ok(
+            CommonApiResponse.success(
+                data = ReservationDto.fromEntity(reservation),
+                message = "예약 확정 완료"
             )
         )
     }

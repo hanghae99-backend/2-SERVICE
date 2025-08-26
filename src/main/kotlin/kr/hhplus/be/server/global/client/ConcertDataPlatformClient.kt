@@ -1,15 +1,13 @@
-package kr.hhplus.be.server.domain.concert.service
+package kr.hhplus.be.server.global.client
 
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Async
-import org.springframework.stereotype.Service
+import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
-import java.math.BigDecimal
-import java.time.LocalDateTime
 
-@Service
-class ConcertDataPlatformService(
+@Component
+class ConcertDataPlatformClient(
     private val restTemplate: RestTemplate
 ) {
     

@@ -3,7 +3,7 @@ package kr.hhplus.be.server.domain.reservation.event.handler
 import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
-import kr.hhplus.be.server.domain.concert.service.ConcertDataPlatformService
+import kr.hhplus.be.server.global.client.ConcertDataPlatformClient
 import kr.hhplus.be.server.global.client.SeatApiClient
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import mu.KotlinLogging
@@ -14,7 +14,7 @@ import org.springframework.transaction.event.TransactionalEventListener
 @Component
 class ReservationEventHandler(
     private val selloutRankingService: SelloutRankingService,
-    private val concertDataPlatformService: ConcertDataPlatformService,
+    private val concertDataPlatformClient: ConcertDataPlatformClient,
     private val seatApiClient: SeatApiClient,
     private val reservationService: ReservationService
 ) {
@@ -42,7 +42,7 @@ class ReservationEventHandler(
             selloutRankingService.incrementReservationCount(event.concertId)
             
             // 5. 데이터 플랫폼 전송 (비동기)
-            concertDataPlatformService.sendReservationData(
+            concertDataPlatformClient.sendReservationData(
                 reservationId = event.reservationId,
                 userId = event.userId,
                 concertId = event.concertId,
@@ -67,7 +67,7 @@ class ReservationEventHandler(
             selloutRankingService.decrementReservationCount(event.concertId)
             
             // 데이터 플랫폼 전송 (비동기)
-            concertDataPlatformService.sendReservationData(
+            concertDataPlatformClient.sendReservationData(
                 reservationId = event.reservationId,
                 userId = event.userId,
                 concertId = event.concertId,

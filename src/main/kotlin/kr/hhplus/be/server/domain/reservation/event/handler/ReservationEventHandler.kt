@@ -4,13 +4,7 @@ import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import kr.hhplus.be.server.domain.concert.service.ConcertDataPlatformService
-import kr.hhplus.be.server.domain.concert.service.ConcertReservationData
-import kr.hhplus.be.server.domain.concert.service.SeatService
-import kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
-import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
-import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
 import mu.KotlinLogging
-import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
@@ -18,90 +12,55 @@ import org.springframework.transaction.event.TransactionalEventListener
 @Component
 class ReservationEventHandler(
     private val selloutRankingService: SelloutRankingService,
-    private val concertDataPlatformService: ConcertDataPlatformService,
-    private val seatService: SeatService,
-    private val concertRepository: ConcertRepository,
-    private val concertScheduleRepository: ConcertScheduleRepository,
-    private val reservationRepository: ReservationRepository
+    private val concertDataPlatformService: ConcertDataPlatformService
 ) {
     
     private val logger = KotlinLogging.logger {}
     
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handleReservationCreated(event: ReservationCreatedEvent) {
-        try {
-            selloutRankingService.incrementReservationCount(event.concertId)
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to update sellout ranking for concert: ${event.concertId}" }
-        }
+        // 매진 순위 업데이트
+        handleSelloutRankingUpdate(event.concertId, increment = true)
         
         // 데이터 플랫폼 전송 (비동기)
-        sendReservationToDataPlatform(
+        concertDataPlatformService.sendReservationData(
             reservationId = event.reservationId,
             userId = event.userId,
             concertId = event.concertId,
             seatId = event.seatId,
-            paymentId = 0L // 임시 예약 상태이므로 paymentId 없음
+            paymentId = 0L, // 임시 예약 상태이므로 paymentId 없음
+            operationType = "RESERVATION_CREATED"
         )
     }
     
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handleReservationCancelled(event: ReservationCancelledEvent) {
-        try {
-            selloutRankingService.decrementReservationCount(event.concertId)
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to update sellout ranking for concert: ${event.concertId}" }
-        }
+        // 매진 순위 업데이트
+        handleSelloutRankingUpdate(event.concertId, increment = false)
         
         // 데이터 플랫폼 전송 (비동기)
-        sendReservationToDataPlatform(
+        concertDataPlatformService.sendReservationData(
             reservationId = event.reservationId,
             userId = event.userId,
             concertId = event.concertId,
             seatId = event.seatId,
-            paymentId = 0L // 취소된 예약이므로 paymentId 없음
+            paymentId = 0L, // 취소된 예약이므로 paymentId 없음
+            operationType = "RESERVATION_CANCELLED"
         )
     }
 
-    @Async
-    fun sendReservationToDataPlatform(
-        reservationId: Long,
-        userId: Long,
-        concertId: Long,
-        seatId: Long,
-        paymentId: Long
-    ) {
+    private fun handleSelloutRankingUpdate(concertId: Long, increment: Boolean) {
         try {
-            val reservation = reservationRepository.findById(reservationId)
-                ?: throw IllegalStateException("예약 정보를 찾을 수 없습니다: $reservationId")
-            
-            val seat = seatService.getSeatById(seatId)
-            val schedule = concertScheduleRepository.findById(seat.scheduleId)
-                ?: throw IllegalStateException("스케줄 정보를 찾을 수 없습니다: ${seat.scheduleId}")
-            
-            val concert = concertRepository.findById(schedule.concertId)
-                ?: throw IllegalStateException("콘서트 정보를 찾을 수 없습니다: ${schedule.concertId}")
-            
-            val reservationData = ConcertReservationData(
-                reservationId = reservationId,
-                userId = userId,
-                concertId = concertId,
-                concertTitle = concert.title,
-                scheduleId = seat.scheduleId,
-                concertDate = schedule.concertDate.atStartOfDay(),
-                venue = schedule.venue,
-                seatId = seatId,
-                seatNumber = seat.seatNumber,
-                price = reservation.price,
-                paymentId = paymentId,
-                reservedAt = reservation.createdAt ?: java.time.LocalDateTime.now()
-            )
-            
-            concertDataPlatformService.sendReservationData(reservationData)
-            logger.info { "데이터 플랫폼 전송 성공 - reservationId: $reservationId" }
-            
+            if (increment) {
+                selloutRankingService.incrementReservationCount(concertId)
+                logger.debug { "매진 순위 증가 성공 - concertId: $concertId" }
+            } else {
+                selloutRankingService.decrementReservationCount(concertId)
+                logger.debug { "매진 순위 감소 성공 - concertId: $concertId" }
+            }
         } catch (e: Exception) {
-            logger.error(e) { "데이터 플랫폼 전송 실패 - reservationId: $reservationId" }
+            val operation = if (increment) "증가" else "감소"
+            logger.error(e) { "매진 순위 업데이트 실패 ($operation) - concertId: $concertId, error: ${e.message}" }
         }
     }
 }

@@ -36,7 +36,7 @@ class ReservationController(
         request: ReservationCreateRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
         tokenLifecycleManager.validateActiveToken(request.token)
-        val reservation = reservationService.reserveSeat(
+        val reservation = reservationService.createReservation(
             userId = request.userId,
             concertId = request.concertId,
             seatId = request.seatId
@@ -92,7 +92,7 @@ class ReservationController(
         request: ReservationCancelRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
         tokenLifecycleManager.validateActiveToken(request.token)
-        val reservation = reservationService.cancelReservation(
+        val reservation = reservationService.cancelReservationByUser(
             reservationId = reservationId,
             userId = request.userId,
             cancelReason = request.cancelReason

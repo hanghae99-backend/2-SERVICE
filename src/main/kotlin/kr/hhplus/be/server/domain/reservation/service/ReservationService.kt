@@ -12,6 +12,8 @@ import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAlreadyConfirmedException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAccessDeniedException
+import kr.hhplus.be.server.global.lock.LockGuard
+import kr.hhplus.be.server.global.lock.LockStrategy
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -31,8 +33,13 @@ class ReservationService(
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
     
+    @LockGuard(
+        keys = ["'seat:' + #seatId", "'user:reservation:' + #userId"],
+        strategy = LockStrategy.PUB_SUB,
+        waitTimeoutMs = 12000L
+    )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
-    fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
+    fun createReservation(userId: Long, concertId: Long, seatId: Long): Reservation {
         val reservation = createTemporaryReservation(userId, concertId, seatId)
         
         eventPublisher.publish(ReservationCreatedEvent(
@@ -53,6 +60,15 @@ class ReservationService(
         val reservation = reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
             
+        return confirmReservationWithLock(reservation, paymentId)
+    }
+    
+    @LockGuard(
+        keys = ["'reservation:' + #reservation.reservationId", "'seat:' + #reservation.seatId"],
+        strategy = LockStrategy.PUB_SUB,
+        waitTimeoutMs = 8000L
+    )
+    private fun confirmReservationWithLock(reservation: Reservation, paymentId: Long): Reservation {
         reservation.confirm(paymentId, statusRepository.getConfirmedStatus())
         val savedReservation = reservationRepository.save(reservation)
         
@@ -60,7 +76,7 @@ class ReservationService(
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
-    fun cancelReservation(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
+    fun cancelReservationByUser(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
         val reservation = reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
         
@@ -68,7 +84,7 @@ class ReservationService(
             throw ReservationAccessDeniedException(userId, reservationId)
         }
         
-        return cancelReservationInternal(reservation, cancelReason ?: "사용자 취소", false)
+        return cancelReservationWithLock(reservation, cancelReason ?: "사용자 취소", false)
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
@@ -76,12 +92,15 @@ class ReservationService(
         val reservation = reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
         
-        val savedReservation = cancelReservationInternal(reservation, cancelReason, true)
-        
-        return savedReservation
+        return cancelReservationWithLock(reservation, cancelReason, true)
     }
-    
-    private fun cancelReservationInternal(reservation: Reservation, cancelReason: String, isExpired: Boolean): Reservation {
+
+    @LockGuard(
+        keys = ["'reservation:' + #reservation.reservationId", "'seat:' + #reservation.seatId"],
+        strategy = LockStrategy.PUB_SUB,
+        waitTimeoutMs = 8000L
+    )
+    private fun cancelReservationWithLock(reservation: Reservation, cancelReason: String, isExpired: Boolean): Reservation {
         reservation.cancel(statusRepository.getCancelledStatus())
         val savedReservation = reservationRepository.save(reservation)
         

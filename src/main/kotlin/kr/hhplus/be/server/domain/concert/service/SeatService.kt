@@ -60,6 +60,13 @@ class SeatService(
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
         return seat.isAvailable()
     }
+
+    fun validateSeatAvailability(seatId: Long) {
+        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
+        if (!seat.isAvailable()) {
+            throw IllegalStateException("예약할 수 없는 좌석입니다. ID: $seatId")
+        }
+    }
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }

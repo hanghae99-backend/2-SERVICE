@@ -124,6 +124,15 @@ class Reservation(
         this.status = cancelledStatus
     }
 
+    fun updateSeatInfo(seatNumber: String, price: BigDecimal) {
+        if (seatNumber.isNotBlank()) {
+            this.seatNumber = seatNumber
+        }
+        if (price > BigDecimal.ZERO) {
+            this.price = price
+        }
+    }
+
     private fun validateCanConfirm() {
         if (status.code != ReservationStatusType.TEMPORARY) {
             throw IllegalStateException("임시 예약 상태가 아닙니다. 현재 상태: ${status.code}")

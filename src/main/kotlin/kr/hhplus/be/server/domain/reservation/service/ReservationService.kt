@@ -1,7 +1,5 @@
 package kr.hhplus.be.server.domain.reservation.service
 
-import kr.hhplus.be.server.global.extension.orElseThrow
-import kr.hhplus.be.server.api.concert.dto.SeatDto
 import kr.hhplus.be.server.domain.reservation.models.Reservation
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
@@ -10,13 +8,10 @@ import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchConditio
 import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAlreadyConfirmedException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAccessDeniedException
-import kr.hhplus.be.server.domain.concert.service.SeatService
-import kr.hhplus.be.server.domain.concert.exception.SeatAlreadyReservedException
-import kr.hhplus.be.server.global.lock.LockGuard
-import kr.hhplus.be.server.global.lock.LockStrategy
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -31,23 +26,25 @@ import java.time.LocalDateTime
 class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
-    private val seatService: SeatService
+    private val eventPublisher: DomainEventPublisher
 ) {
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
     
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(userId: Long, concertId: Long, seatId: Long): Reservation {
-        logger.info("예약 요청 시작 - userId: {}, seatId: {}", userId, seatId)
+        val reservation = createTemporaryReservation(userId, concertId, seatId)
         
-        val seat = seatService.getSeatById(seatId)
+        eventPublisher.publish(ReservationCreatedEvent(
+            reservationId = reservation.reservationId,
+            userId = reservation.userId,
+            concertId = reservation.concertId,
+            seatId = reservation.seatId,
+            seatNumber = reservation.seatNumber,
+            price = reservation.price,
+            expiresAt = reservation.expiresAt
+        ))
         
-        validateExistingReservation(seatId)
-        seatService.reserveSeat(seatId)
-        
-        val reservation = createTemporaryReservation(userId, concertId, seatId, seat)
-        
-        logger.info("예약 생성 성공 - reservationId: {}, userId: {}", reservation.reservationId, userId)
         return reservation
     }
     
@@ -88,6 +85,14 @@ class ReservationService(
         reservation.cancel(statusRepository.getCancelledStatus())
         val savedReservation = reservationRepository.save(reservation)
         
+        eventPublisher.publish(ReservationCancelledEvent(
+            reservationId = savedReservation.reservationId,
+            userId = savedReservation.userId,
+            concertId = savedReservation.concertId,
+            seatId = savedReservation.seatId,
+            cancelReason = cancelReason,
+            isExpired = isExpired
+        ))
         
         return savedReservation
     }
@@ -95,6 +100,15 @@ class ReservationService(
     fun getReservationById(reservationId: Long): Reservation {
         return reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
+    }
+
+    @Transactional
+    fun updateReservationSeatInfo(reservationId: Long, seatNumber: String, price: BigDecimal) {
+        val reservation = reservationRepository.findById(reservationId)
+            ?: throw ReservationNotFoundException(reservationId)
+        
+        reservation.updateSeatInfo(seatNumber, price)
+        reservationRepository.save(reservation)
     }
 
     fun getExpiredReservations(limit: Int = 100): List<ReservationDto> {
@@ -107,34 +121,13 @@ class ReservationService(
     }
 
     
-    private fun validateExistingReservation(seatId: Long) {
-        val activeStatuses = listOf(
-            statusRepository.getTemporaryStatus().code,
-            statusRepository.getConfirmedStatus().code
-        )
-        
-        val existingReservation = reservationRepository.findBySeatIdAndStatusCodeIn(seatId, activeStatuses)
-        
-        if (existingReservation != null) {
-            logger.warn("기존 예약 존재 - reservationId: {}, status: {}", existingReservation.reservationId, existingReservation.status.code)
-            
-            if (existingReservation.isConfirmed()) {
-                throw ReservationAlreadyConfirmedException(existingReservation.reservationId)
-            }
-            
-            if (existingReservation.isTemporary() && !existingReservation.isExpired()) {
-                throw SeatAlreadyReservedException(seatId)
-            }
-        }
-    }
-    
-    private fun createTemporaryReservation(userId: Long, concertId: Long, seatId: Long, seat: SeatDto): Reservation {
+    private fun createTemporaryReservation(userId: Long, concertId: Long, seatId: Long): Reservation {
         val reservation = Reservation.createTemporary(
             userId = userId,
             concertId = concertId,
             seatId = seatId,
-            seatNumber = seat.seatNumber,
-            price = seat.price,
+            seatNumber = "TBD", // 이벤트로 좌석 정보 업데이트 예정
+            price = BigDecimal.ZERO, // 이벤트로 가격 정보 업데이트 예정
             temporaryStatus = statusRepository.getTemporaryStatus()
         )
         

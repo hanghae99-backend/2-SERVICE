@@ -24,6 +24,7 @@ import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.payment.service.PaymentService
 import kr.hhplus.be.server.domain.reservation.models.Reservation
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -36,6 +37,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
     val tokenDomainService = mockk<TokenDomainService>()
     val tokenLifecycleManager = mockk<TokenLifecycleManager>()
     val concertScheduleRepository = mockk<ConcertScheduleRepository>()
+    val eventPublisher = mockk<DomainEventPublisher>()
     
     val processPaymentUseCase = ProcessPaymentUseCase(
         paymentService,
@@ -44,7 +46,8 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
         deductBalanceUseCase,
         tokenDomainService,
         tokenLifecycleManager,
-        concertScheduleRepository
+        concertScheduleRepository,
+        eventPublisher
     )
     
     describe("execute") {
@@ -107,6 +110,7 @@ class ProcessPaymentUseCaseTest : DescribeSpec({
                 every { seatService.confirmSeat(seatId) } returns mockConfirmedSeat
                 every { paymentService.completePayment(1L, reservationId, seatId, token, 1L, "A1", 1L) } returns mockCompletedPayment
                 every { tokenLifecycleManager.completeToken(token) } returns Unit
+                every { eventPublisher.publish(any()) } returns Unit
                 
                 // when
                 val result = processPaymentUseCase.execute(userId, reservationId, seatId, token)

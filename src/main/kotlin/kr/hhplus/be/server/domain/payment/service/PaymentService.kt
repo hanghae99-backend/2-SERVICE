@@ -22,7 +22,6 @@ import java.math.BigDecimal
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
-    private val domainEventPublisher: DomainEventPublisher
 ) {
     
     companion object {
@@ -66,19 +65,6 @@ class PaymentService(
             
             val finalPayment = paymentRepository.save(payment)
 
-            val paymentCompletedEvent = PaymentCompletedEvent(
-                paymentId = finalPayment.paymentId,
-                userId = finalPayment.userId,
-                reservationId = reservationId,
-                seatId = seatId,
-                amount = finalPayment.amount,
-                token = token,
-                scheduleId = scheduleId,
-                seatNumber = seatNumber,
-                concertId = concertId
-            )
-            domainEventPublisher.publish(paymentCompletedEvent)
-
             return PaymentDto.fromEntity(finalPayment)
             
         } catch (e: Exception) {
@@ -112,18 +98,8 @@ class PaymentService(
         
         val finalPayment = paymentRepository.save(payment)
 
-        val paymentFailedEvent = PaymentFailedEvent(
-            paymentId = finalPayment.paymentId,
-            userId = finalPayment.userId,
-            reservationId = reservationId,
-            reason = reason,
-            token = token
-        )
-        domainEventPublisher.publish(paymentFailedEvent)
-
         return PaymentDto.fromEntity(finalPayment)
     }
-
     
     fun getPaymentById(paymentId: Long): PaymentDto {
         val payment = paymentRepository.findById(paymentId)

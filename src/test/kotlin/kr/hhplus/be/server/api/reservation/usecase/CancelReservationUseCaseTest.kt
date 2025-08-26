@@ -15,6 +15,7 @@ import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.reservation.exception.ReservationCancelFailedException
 import kr.hhplus.be.server.domain.auth.exception.TokenActivationException
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import java.math.BigDecimal
 
 class CancelReservationUseCaseTest : DescribeSpec({
@@ -22,11 +23,13 @@ class CancelReservationUseCaseTest : DescribeSpec({
     val reservationService = mockk<ReservationService>()
     val tokenDomainService = mockk<TokenDomainService>(relaxed = true)
     val tokenLifecycleManager = mockk<TokenLifecycleManager>()
+    val eventPublisher = mockk<DomainEventPublisher>()
 
     val cancelReservationUseCase = CancelReservationUseCase(
         reservationService,
         tokenDomainService,
-        tokenLifecycleManager
+        tokenLifecycleManager,
+        eventPublisher
     )
 
     describe("CancelReservationUseCase") {
@@ -50,6 +53,7 @@ class CancelReservationUseCaseTest : DescribeSpec({
                 every {
                     reservationService.cancelReservation(reservationId, userId, cancelReason)
                 } returns reservation
+                every { eventPublisher.publish(any()) } returns Unit
 
                 // when
                 val result = cancelReservationUseCase.execute(reservationId, userId, cancelReason, token)

@@ -27,19 +27,16 @@ class ReservationServiceTest : DescribeSpec({
     
     val reservationRepository = mockk<ReservationRepository>()
     val statusRepository = mockk<ReservationStatusTypePojoRepository>()
-    val eventPublisher = mockk<DomainEventPublisher>()
     val seatService = mockk<SeatService>()
     
     val reservationService = ReservationService(
         reservationRepository,
         statusRepository,
-        eventPublisher,
         seatService
     )
     
     beforeEach {
         clearAllMocks()
-        every { eventPublisher.publish(any()) } returns Unit
     }
     
     describe("reserveSeat") {
@@ -81,7 +78,6 @@ class ReservationServiceTest : DescribeSpec({
                 result.concertId shouldBe concertId
                 result.seatId shouldBe seatId
                 verify { reservationRepository.save(any()) }
-                verify { eventPublisher.publish(any()) }
             }
         }
         
@@ -144,7 +140,6 @@ class ReservationServiceTest : DescribeSpec({
                 result shouldNotBe null
                 result.paymentId shouldBe paymentId
                 verify { reservationRepository.save(any()) }
-                verify { eventPublisher.publish(any()) }
             }
         }
     }
@@ -175,7 +170,6 @@ class ReservationServiceTest : DescribeSpec({
                 // then
                 result shouldNotBe null
                 verify { reservationRepository.save(any()) }
-                verify { eventPublisher.publish(any()) }
             }
         }
     }

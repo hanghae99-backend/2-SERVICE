@@ -10,6 +10,8 @@ import kr.hhplus.be.server.domain.reservation.exception.ReservationAccessDeniedE
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.global.lock.LockStrategy
+import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -20,7 +22,8 @@ import org.springframework.transaction.annotation.Transactional
 class CancelReservationUseCase(
     private val reservationService: ReservationService,
     private val tokenDomainService: TokenDomainService,
-    private val tokenLifecycleManager: TokenLifecycleManager
+    private val tokenLifecycleManager: TokenLifecycleManager,
+    private val eventPublisher: DomainEventPublisher
 ) {
     
     companion object {
@@ -53,6 +56,16 @@ class CancelReservationUseCase(
                 userId = userId,
                 cancelReason = cancelReason ?: "사용자 요청"
             )
+            
+            // 사용자 예약 취소 이벤트 발행
+            eventPublisher.publish(ReservationCancelledEvent(
+                reservationId = cancelledReservation.reservationId,
+                userId = cancelledReservation.userId,
+                concertId = cancelledReservation.concertId,
+                seatId = cancelledReservation.seatId,
+                cancelReason = cancelReason ?: "사용자 요청",
+                isExpired = false
+            ))
             
             logger.info(
                 "예약 취소 완료 - reservationId: {}, userId: {}, status: {}", 

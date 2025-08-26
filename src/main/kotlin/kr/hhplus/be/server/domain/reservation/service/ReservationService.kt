@@ -1,6 +1,5 @@
 package kr.hhplus.be.server.domain.reservation.service
 
-import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.extension.orElseThrow
 import kr.hhplus.be.server.api.concert.dto.SeatDto
 import kr.hhplus.be.server.domain.reservation.models.Reservation
@@ -32,7 +31,6 @@ import java.time.LocalDateTime
 class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
-    private val eventPublisher: DomainEventPublisher,
     private val seatService: SeatService
 ) {
     
@@ -48,7 +46,6 @@ class ReservationService(
         seatService.reserveSeat(seatId)
         
         val reservation = createTemporaryReservation(userId, concertId, seatId, seat)
-        publishReservationCreatedEvent(reservation)
         
         logger.info("예약 생성 성공 - reservationId: {}, userId: {}", reservation.reservationId, userId)
         return reservation
@@ -84,13 +81,6 @@ class ReservationService(
         
         val savedReservation = cancelReservationInternal(reservation, cancelReason, true)
         
-        eventPublisher.publish(ReservationExpiredEvent(
-            reservationId = savedReservation.reservationId,
-            userId = savedReservation.userId,
-            concertId = savedReservation.concertId,
-            seatId = savedReservation.seatId
-        ))
-        
         return savedReservation
     }
     
@@ -98,14 +88,6 @@ class ReservationService(
         reservation.cancel(statusRepository.getCancelledStatus())
         val savedReservation = reservationRepository.save(reservation)
         
-        eventPublisher.publish(ReservationCancelledEvent(
-            reservationId = savedReservation.reservationId,
-            userId = savedReservation.userId,
-            concertId = savedReservation.concertId,
-            seatId = savedReservation.seatId,
-            cancelReason = cancelReason,
-            isExpired = isExpired
-        ))
         
         return savedReservation
     }
@@ -113,35 +95,6 @@ class ReservationService(
     fun getReservationById(reservationId: Long): Reservation {
         return reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
-    }
-    
-    fun getReservationsByCondition(condition: ReservationSearchCondition): List<ReservationDto> {
-        val reservations = when {
-            condition.userId != null && condition.statusList != null -> {
-                reservationRepository.findByUserIdAndStatusCodeInOrderByReservedAtDesc(
-                    condition.userId, condition.statusList
-                ).take(condition.limit)
-            }
-            condition.userId != null -> {
-                reservationRepository.findByUserIdOrderByReservedAtDesc(condition.userId).take(condition.limit)
-            }
-            condition.concertId != null && condition.statusList != null -> {
-                reservationRepository.findByConcertIdAndStatusCodeInOrderByReservedAtDesc(
-                    condition.concertId, condition.statusList
-                ).take(condition.limit)
-            }
-            condition.concertId != null -> {
-                reservationRepository.findByConcertIdOrderByReservedAtDesc(condition.concertId).take(condition.limit)
-            }
-            condition.statusList != null -> {
-                reservationRepository.findByStatusCodeInOrderByReservedAtDesc(condition.statusList).take(condition.limit)
-            }
-            else -> {
-                reservationRepository.findAll().take(condition.limit)
-            }
-        }
-        
-        return reservations.map { ReservationDto.fromEntity(it) }
     }
 
     fun getExpiredReservations(limit: Int = 100): List<ReservationDto> {
@@ -153,32 +106,6 @@ class ReservationService(
         return expiredReservations.map { ReservationDto.fromEntity(it) }
     }
 
-    @LockGuard(
-        key = "'reservation:cleanup'",
-        strategy = LockStrategy.SIMPLE,
-        waitTimeoutMs = 1000L
-    )
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
-    fun cleanupExpiredReservations(): Int {
-        val expiredReservations = reservationRepository.findByExpiresAtBeforeAndStatusCode(
-            LocalDateTime.now(),
-            statusRepository.getTemporaryStatus().code
-        )
-        
-        var cleanedCount = 0
-        expiredReservations.forEach { reservation ->
-            try {
-                if (reservation.isExpired()) {
-                    cancelReservationBySystem(reservation.reservationId, "예약 시간 만료")
-                    cleanedCount++
-                }
-            } catch (e: Exception) {
-                logger.warn("Failed to cleanup expired reservation: {}", reservation.reservationId, e)
-            }
-        }
-        
-        return cleanedCount
-    }
     
     private fun validateExistingReservation(seatId: Long) {
         val activeStatuses = listOf(
@@ -214,16 +141,5 @@ class ReservationService(
         return reservationRepository.save(reservation)
     }
     
-    private fun publishReservationCreatedEvent(reservation: Reservation) {
-        eventPublisher.publish(ReservationCreatedEvent(
-            reservationId = reservation.reservationId,
-            userId = reservation.userId,
-            concertId = reservation.concertId,
-            seatId = reservation.seatId,
-            seatNumber = reservation.seatNumber,
-            price = reservation.price,
-            expiresAt = reservation.expiresAt
-        ))
-    }
     
 }

@@ -21,17 +21,12 @@ class PaymentServiceTest : DescribeSpec({
     
     val paymentRepository = mockk<PaymentRepository>()
     val paymentStatusTypeRepository = mockk<PaymentStatusTypePojoRepository>()
-    val domainEventPublisher = mockk<DomainEventPublisher>()
     
     val paymentService = PaymentService(
         paymentRepository,
-        paymentStatusTypeRepository,
-        domainEventPublisher
+        paymentStatusTypeRepository
     )
     
-    beforeEach {
-        every { domainEventPublisher.publish(any()) } returns Unit
-    }
     
     describe("createReservationPayment") {
         context("유효한 예약에 대해 결제를 생성할 때") {
@@ -97,7 +92,6 @@ class PaymentServiceTest : DescribeSpec({
                 result shouldNotBe null
                 result.paymentId shouldBe paymentId
                 verify { paymentRepository.save(any()) }
-                verify { domainEventPublisher.publish(any()) }
             }
         }
     }

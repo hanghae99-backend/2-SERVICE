@@ -6,6 +6,7 @@ import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.lock.DistributedLock
+import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -69,9 +70,36 @@ class ReservationScheduler(
         ) {
             try {
                 val startTime = System.currentTimeMillis()
-                val cleanedCount = reservationService.cleanupExpiredReservations()
-                val elapsed = System.currentTimeMillis() - startTime
                 
+                // 만료된 예약 목록 먼저 조회 (Service를 통해)
+                val expiredReservations = reservationService.getExpiredReservations()
+                
+                // 각 만료된 예약을 시스템 취소하고 이벤트 발행
+                var cleanedCount = 0
+                expiredReservations.forEach { reservationDto ->
+                    try {
+                        // 시스템 취소 처리
+                        val cancelledReservation = reservationService.cancelReservationBySystem(
+                            reservationDto.reservationId, 
+                            "예약 시간 만료"
+                        )
+                        
+                        // 만료 이벤트 발행
+                        domainEventPublisher.publish(ReservationExpiredEvent(
+                            reservationId = cancelledReservation.reservationId,
+                            userId = cancelledReservation.userId,
+                            concertId = cancelledReservation.concertId,
+                            seatId = cancelledReservation.seatId
+                        ))
+                        
+                        cleanedCount++
+                        
+                    } catch (e: Exception) {
+                        logger.warn("개별 예약 정리 실패 - reservationId: {}", reservationDto.reservationId, e)
+                    }
+                }
+                
+                val elapsed = System.currentTimeMillis() - startTime
                 reservationCleanupCount.addAndGet(cleanedCount)
                 
                 if (cleanedCount > 0) {

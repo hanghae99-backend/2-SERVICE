@@ -18,7 +18,7 @@ class MockApiController {
     
     @PostMapping("/data-platform/reservations")
     fun receiveReservationData(@RequestBody data: ConcertReservationData): ResponseEntity<String> {
-        logger.info("📥 Mock API 데이터 수신 - reservationId: ${data.reservationId}, concert: ${data.concertTitle}")
+        logger.info("📥 Mock API 데이터 수신 - reservationId: ${data.reservationId}, concertId: ${data.concertId}")
         
         receivedData.add(data)
         
@@ -27,6 +27,6 @@ class MockApiController {
     
     @GetMapping("/data-platform/reservations")
     fun getReceivedReservations(): ResponseEntity<List<ConcertReservationData>> {
-        return ResponseEntity.ok(receivedData.sortedByDescending { it.reservedAt })
+        return ResponseEntity.ok(receivedData.sortedByDescending { it.reservationId })
     }
 }

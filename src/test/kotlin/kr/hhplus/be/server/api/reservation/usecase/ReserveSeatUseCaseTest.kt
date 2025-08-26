@@ -21,6 +21,7 @@ import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.config.TestDataFixture
 import kr.hhplus.be.server.domain.reservation.exception.ReservationFailedException
 import kr.hhplus.be.server.api.concert.dto.SeatDto
+import kr.hhplus.be.server.global.event.DomainEventPublisher
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -30,12 +31,14 @@ class ReserveSeatUseCaseTest : DescribeSpec({
     val seatService = mockk<SeatService>()
     val tokenDomainService = mockk<TokenDomainService>()
     val tokenLifecycleManager = mockk<TokenLifecycleManager>()
+    val eventPublisher = mockk<DomainEventPublisher>()
 
     val reserveSeatUseCase = ReserveSeatUseCase(
         reservationService,
         seatService,
         tokenDomainService,
-        tokenLifecycleManager
+        tokenLifecycleManager,
+        eventPublisher
     )
     
     describe("execute") {
@@ -63,6 +66,7 @@ class ReserveSeatUseCaseTest : DescribeSpec({
                 every { tokenDomainService.validateActiveToken(waitingToken, TokenStatus.ACTIVE) } returns Unit
                 every { seatService.getSeatById(seatId) } returns seatDto
                 every { reservationService.reserveSeat(userId, concertId, seatId) } returns reservation
+                every { eventPublisher.publish(any()) } returns Unit
                 
                 // when
                 val result = reserveSeatUseCase.execute(userId, concertId, seatId, token)

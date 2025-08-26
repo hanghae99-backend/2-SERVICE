@@ -10,6 +10,8 @@ import kr.hhplus.be.server.domain.reservation.exception.ReservationFailedExcepti
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.global.lock.LockStrategy
+import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -21,7 +23,8 @@ class ReserveSeatUseCase(
     private val reservationService: ReservationService,
     private val seatService: SeatService,
     private val tokenDomainService: TokenDomainService,
-    private val tokenLifecycleManager: TokenLifecycleManager
+    private val tokenLifecycleManager: TokenLifecycleManager,
+    private val eventPublisher: DomainEventPublisher
 ) {
     
     companion object {
@@ -47,6 +50,17 @@ class ReserveSeatUseCase(
             
             // 예약 생성
             val reservation = reservationService.reserveSeat(userId, concertId, seatId)
+            
+            // 예약 생성 이벤트 발행
+            eventPublisher.publish(ReservationCreatedEvent(
+                reservationId = reservation.reservationId,
+                userId = reservation.userId,
+                concertId = reservation.concertId,
+                seatId = reservation.seatId,
+                seatNumber = reservation.seatNumber,
+                price = reservation.price,
+                expiresAt = reservation.expiresAt
+            ))
             
             logger.info(
                 "좌석 예약 완료 - userId: {}, reservationId: {}, seatId: {}, expiresAt: {}", 
@@ -86,4 +100,5 @@ class ReserveSeatUseCase(
         
         logger.debug("좌석 가용성 검증 완료 - seatId: {}", seatId)
     }
+    
 }

@@ -1,6 +1,7 @@
 package kr.hhplus.be.server.domain.payment.event.handler
 
 import kr.hhplus.be.server.domain.payment.event.PaymentCompletedEvent
+import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
 import kr.hhplus.be.server.domain.concert.service.ConcertDataPlatformService
 import mu.KotlinLogging
 import org.springframework.stereotype.Component

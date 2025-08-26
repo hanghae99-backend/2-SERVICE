@@ -14,6 +14,8 @@ import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import kr.hhplus.be.server.global.event.DomainEventPublisher
 import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.global.lock.LockStrategy
+import kr.hhplus.be.server.domain.payment.event.PaymentCompletedEvent
+import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -29,7 +31,8 @@ class ProcessPaymentUseCase(
     private val deductBalanceUseCase: DeductBalanceUseCase,
     private val tokenDomainService: TokenDomainService,
     private val tokenLifecycleManager: TokenLifecycleManager,
-    private val concertScheduleRepository: ConcertScheduleRepository
+    private val concertScheduleRepository: ConcertScheduleRepository,
+    private val eventPublisher: DomainEventPublisher
 ) {
     
     companion object {
@@ -78,6 +81,18 @@ class ProcessPaymentUseCase(
             // 5. 토큰 완료 처리 (동기적)
             tokenLifecycleManager.completeToken(token)
             
+            // 6. 결제 완료 이벤트 발행
+            eventPublisher.publish(PaymentCompletedEvent(
+                paymentId = completedPayment.paymentId,
+                userId = completedPayment.userId,
+                reservationId = reservationId,
+                seatId = seatId,
+                amount = completedPayment.amount,
+                token = token,
+                scheduleId = seat.scheduleId,
+                seatNumber = seat.seatNumber,
+                concertId = schedule.concertId
+            ))
 
             logger.info("결제 처리 완료 - userId: {}, paymentId: {}, reservationId: {}, seatId: {}", 
                 userId, payment.paymentId, reservationId, seatId)
@@ -130,6 +145,15 @@ class ProcessPaymentUseCase(
             token = token
         )
         
+        // 결제 실패 이벤트 발행
+        eventPublisher.publish(PaymentFailedEvent(
+            paymentId = paymentId,
+            userId = userId,
+            reservationId = reservationId,
+            reason = exception.message ?: "Unknown error",
+            token = token
+        ))
+        
         // 토큰 완료 처리 (동기적)
         try {
             tokenLifecycleManager.completeToken(token)
@@ -138,4 +162,5 @@ class ProcessPaymentUseCase(
             logger.error("토큰 완료 처리 실패 - token: {}", token, e)
         }
     }
+    
 }

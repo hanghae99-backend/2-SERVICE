@@ -2,6 +2,8 @@ package kr.hhplus.be.server.domain.concert.event.listener
 
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
+import kr.hhplus.be.server.global.event.EventErrorHandler
+import kr.hhplus.be.server.global.event.EventErrorHandling
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
@@ -9,21 +11,18 @@ import org.springframework.transaction.event.TransactionalEventListener
 
 @Component
 class ReservationCreatedEventListener(
-    private val selloutRankingService: SelloutRankingService
+    private val selloutRankingService: SelloutRankingService,
+    private val errorHandler: EventErrorHandler
 ) {
     
     private val logger = KotlinLogging.logger {}
     
+    @EventErrorHandling(sendToDLQ = false, critical = false)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handle(event: ReservationCreatedEvent) {
-        try {
-            // 매진 순위 업데이트 (예약 증가)
+        errorHandler.handleEventSafely(event, "ReservationCreatedEvent") {
             selloutRankingService.incrementReservationCount(event.concertId)
-            logger.info { "콘서트 매진 순위 업데이트 완료 - concertId: ${event.concertId}, reservationId: ${event.reservationId}" }
-            
-        } catch (e: Exception) {
-            logger.error(e) { "콘서트 매진 순위 업데이트 실패 - concertId: ${event.concertId}, reservationId: ${event.reservationId}" }
-            // 매진 순위는 비즈니스 핵심 로직이 아니므로 예외를 던지지 않음
+            logger.info { "매진 순위 업데이트 완료 - concertId: ${event.concertId}" }
         }
     }
 }

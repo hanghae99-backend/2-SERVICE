@@ -23,7 +23,7 @@ class ReservationApiClient(
         
         try {
             val response = restTemplate.exchange(
-                "$baseUrl/api/v1/reservations/$reservationId/confirm",
+                "$baseUrl/internal/reservations/$reservationId/confirm",
                 org.springframework.http.HttpMethod.PUT,
                 org.springframework.http.HttpEntity(request),
                 CommonApiResponse::class.java

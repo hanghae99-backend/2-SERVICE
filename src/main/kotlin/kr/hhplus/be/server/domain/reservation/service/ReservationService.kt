@@ -28,7 +28,8 @@ import java.time.LocalDateTime
 class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
-    private val eventPublisher: DomainEventPublisher
+    private val eventPublisher: DomainEventPublisher,
+    private val seatApiClient: kr.hhplus.be.server.global.client.SeatApiClient
 ) {
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
@@ -40,8 +41,19 @@ class ReservationService(
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun createReservation(userId: Long, concertId: Long, seatId: Long): Reservation {
-        val reservation = createTemporaryReservation(userId, concertId, seatId)
+        // 1. 좌석 가용성 검증 (동기 - 실패시 즉시 중단)
+        seatApiClient.validateSeatAvailability(seatId)
         
+        // 2. 좌석 정보 조회 (동기 - 예약에 필요한 정보)
+        val seatInfo = seatApiClient.getSeatInfo(seatId)
+        
+        // 3. 예약 생성 (실제 좌석 정보로)
+        val reservation = createReservationWithSeatInfo(userId, concertId, seatId, seatInfo.seatNumber, seatInfo.price)
+        
+        // 4. 좌석 예약 처리 (동기 - 핵심 비즈니스 로직)
+        seatApiClient.reserveSeat(seatId)
+        
+        // 5. 이벤트 발행 (부가 작업들을 위한)
         eventPublisher.publish(ReservationCreatedEvent(
             reservationId = reservation.reservationId,
             userId = reservation.userId,
@@ -112,7 +124,7 @@ class ReservationService(
             cancelReason = cancelReason,
             isExpired = isExpired
         ))
-        
+
         return savedReservation
     }
     
@@ -121,14 +133,6 @@ class ReservationService(
             ?: throw ReservationNotFoundException(reservationId)
     }
 
-    @Transactional
-    fun updateReservationSeatInfo(reservationId: Long, seatNumber: String, price: BigDecimal) {
-        val reservation = reservationRepository.findById(reservationId)
-            ?: throw ReservationNotFoundException(reservationId)
-        
-        reservation.updateSeatInfo(seatNumber, price)
-        reservationRepository.save(reservation)
-    }
 
     fun getExpiredReservations(limit: Int = 100): List<ReservationDto> {
         val expiredReservations = reservationRepository.findByExpiresAtBeforeAndStatusCode(
@@ -139,6 +143,25 @@ class ReservationService(
         return expiredReservations.map { ReservationDto.fromEntity(it) }
     }
 
+    
+    private fun createReservationWithSeatInfo(
+        userId: Long, 
+        concertId: Long, 
+        seatId: Long, 
+        seatNumber: String, 
+        price: BigDecimal
+    ): Reservation {
+        val reservation = Reservation.createTemporary(
+            userId = userId,
+            concertId = concertId,
+            seatId = seatId,
+            seatNumber = seatNumber,
+            price = price,
+            temporaryStatus = statusRepository.getTemporaryStatus()
+        )
+        
+        return reservationRepository.save(reservation)
+    }
     
     private fun createTemporaryReservation(userId: Long, concertId: Long, seatId: Long): Reservation {
         val reservation = Reservation.createTemporary(

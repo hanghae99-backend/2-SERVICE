@@ -5,15 +5,13 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kr.hhplus.be.server.api.balance.controller.BalanceController
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
 import kr.hhplus.be.server.api.balance.usecase.ChargeBalanceUseCase
-import kr.hhplus.be.server.api.balance.usecase.DeductBalanceUseCase
+import kr.hhplus.be.server.internal.balance.usecase.DeductBalanceUseCase
 import kr.hhplus.be.server.domain.balance.service.BalanceService
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistory
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
-import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
 import kr.hhplus.be.server.global.exception.GlobalExceptionHandler
 import kr.hhplus.be.server.domain.user.exception.UserNotFoundException
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -22,7 +20,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
-import java.time.LocalDateTime
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 
 @WebMvcTest(BalanceController::class)

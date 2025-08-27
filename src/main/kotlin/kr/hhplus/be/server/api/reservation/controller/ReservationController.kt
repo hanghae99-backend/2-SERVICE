@@ -9,8 +9,7 @@ import kr.hhplus.be.server.global.response.CommonApiResponse
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCancelRequest
-import kr.hhplus.be.server.api.reservation.dto.request.ReservationConfirmRequest
-import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
+import kr.hhplus.be.server.domain.auth.service.TokenService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -22,7 +21,7 @@ import org.springframework.web.bind.annotation.*
 @Tag(name = "Reservation", description = "예약 관리 API")
 class ReservationController(
     private val reservationService: ReservationService,
-    private val tokenLifecycleManager: TokenLifecycleManager
+    private val tokenService: TokenService
 ) {
 
     @Operation(
@@ -35,13 +34,13 @@ class ReservationController(
         @Parameter(description = "예약 생성 요청", required = true)
         request: ReservationCreateRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        tokenLifecycleManager.validateActiveToken(request.token)
+        tokenService.validateActiveToken(request.token)
         val reservation = reservationService.createReservation(
             userId = request.userId,
             concertId = request.concertId,
             seatId = request.seatId
         )
-        
+
         return ResponseEntity.status(201).body(
             CommonApiResponse.success(
                 data = ReservationDto.fromEntity(reservation),
@@ -50,31 +49,6 @@ class ReservationController(
         )
     }
 
-    @Operation(
-        summary = "예약 확정",
-        description = "임시 예약을 확정 상태로 변경합니다. 결제 완료 후 호출됩니다."
-    )
-    @PutMapping("/{reservationId}/confirm")
-    fun confirmReservation(
-        @PathVariable
-        @Parameter(description = "예약 ID", required = true, example = "1")
-        @Positive(message = "예약 ID는 양수여야 합니다")
-        reservationId: Long,
-        
-        @Valid @RequestBody 
-        @Parameter(description = "예약 확정 요청", required = true)
-        request: ReservationConfirmRequest
-    ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        reservationService.confirmReservation(reservationId, request.paymentId)
-        val reservation = reservationService.getReservationById(reservationId)
-        
-        return ResponseEntity.ok(
-            CommonApiResponse.success(
-                data = ReservationDto.fromEntity(reservation),
-                message = "예약 확정 완료"
-            )
-        )
-    }
 
     @Operation(
         summary = "예약 취소",
@@ -91,7 +65,7 @@ class ReservationController(
         @Parameter(description = "예약 취소 요청", required = true)
         request: ReservationCancelRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        tokenLifecycleManager.validateActiveToken(request.token)
+        tokenService.validateActiveToken(request.token)
         val reservation = reservationService.cancelReservationByUser(
             reservationId = reservationId,
             userId = request.userId,

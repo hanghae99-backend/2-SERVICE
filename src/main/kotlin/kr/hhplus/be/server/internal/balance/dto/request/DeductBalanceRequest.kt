@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.api.balance.dto.request
+package kr.hhplus.be.server.internal.balance.dto.request
 
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.DecimalMax

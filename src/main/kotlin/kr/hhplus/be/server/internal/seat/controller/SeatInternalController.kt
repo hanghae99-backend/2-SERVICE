@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.api.concert.controller
+package kr.hhplus.be.server.internal.seat.controller
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -12,10 +12,10 @@ import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/v1/seats")
+@RequestMapping("/internal/seats")
 @Validated
-@Tag(name = "Seat", description = "좌석 관리 API")
-class SeatController(
+@Tag(name = "Internal Seat", description = "내부 좌석 관리 API")
+class SeatInternalController(
     private val seatService: SeatService
 ) {
 

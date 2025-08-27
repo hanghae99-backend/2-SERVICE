@@ -33,11 +33,7 @@ class PointHistoryRepositoryImpl(
     }
     
     override fun findChargeAmountByUserIdAndDate(userId: Long, date: LocalDate): BigDecimal? {
-        // 간단한 구현 - 실제로는 JPA 쿼리를 사용해야 함
-        val histories = findByUserIdOrderByCreatedAtDesc(userId)
-        return histories.filter { 
-            it.createdAt?.toLocalDate() == date && it.historyType.code == PointHistoryType.CHARGE
-        }.sumOf { it.amount }
+        return pointHistoryJpaRepository.sumChargeAmountByUserIdAndDate(userId, date)
     }
     
     override fun flush() {

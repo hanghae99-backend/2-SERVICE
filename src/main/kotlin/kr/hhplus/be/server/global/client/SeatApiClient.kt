@@ -20,7 +20,7 @@ class SeatApiClient(
     fun getSeatInfo(seatId: Long): SeatDto {
         try {
             val response = restTemplate.exchange(
-                "$baseUrl/api/v1/seats/$seatId",
+                "$baseUrl/internal/seats/$seatId",
                 HttpMethod.GET,
                 null,
                 object : ParameterizedTypeReference<CommonApiResponse<SeatDto>>() {}
@@ -40,7 +40,7 @@ class SeatApiClient(
     fun reserveSeat(seatId: Long): CommonApiResponse<*> {
         try {
             val response = restTemplate.exchange(
-                "$baseUrl/api/v1/seats/$seatId/reserve",
+                "$baseUrl/internal/seats/$seatId/reserve",
                 HttpMethod.POST,
                 null,
                 CommonApiResponse::class.java
@@ -60,7 +60,7 @@ class SeatApiClient(
     fun validateSeatAvailability(seatId: Long): CommonApiResponse<*> {
         try {
             val response = restTemplate.exchange(
-                "$baseUrl/api/v1/seats/$seatId/validate",
+                "$baseUrl/internal/seats/$seatId/validate",
                 HttpMethod.GET,
                 null,
                 CommonApiResponse::class.java

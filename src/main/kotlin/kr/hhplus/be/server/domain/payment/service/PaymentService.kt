@@ -6,6 +6,7 @@ import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.payment.event.PaymentCompletedEvent
 import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
+import kr.hhplus.be.server.domain.payment.event.PaymentFailureStage
 import kr.hhplus.be.server.domain.payment.exception.PaymentNotFoundException
 import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
 import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
@@ -23,7 +24,10 @@ import java.math.BigDecimal
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
-    private val eventPublisher: DomainEventPublisher
+    private val eventPublisher: DomainEventPublisher,
+    private val balanceApiClient: kr.hhplus.be.server.global.client.BalanceApiClient,
+    private val reservationApiClient: kr.hhplus.be.server.global.client.ReservationApiClient,
+    private val tokenLifecycleManager: kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
 ) {
     
     companion object {
@@ -31,25 +35,72 @@ class PaymentService(
     }
 
     /**
-     * 결제 요청을 생성하고 이벤트를 발행합니다.
+     * 결제를 처리합니다 (동기적 핵심 로직)
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun processPayment(userId: Long, reservationId: Long, token: String, amount: BigDecimal): PaymentDto {
         logger.info("결제 프로세스 시작 - userId: {}, reservationId: {}, amount: {}", userId, reservationId, amount)
         
-        val payment = createReservationPayment(userId, reservationId, amount)
-        
-        // 결제 요청 이벤트 발행 - 이벤트 핸들러에서 잔고 차감과 예약 확정을 HTTP API로 처리
-        eventPublisher.publish(PaymentCompletedEvent(
-            paymentId = payment.paymentId,
-            userId = userId,
-            reservationId = reservationId,
-            amount = payment.amount,
-            token = token
-        ))
+        try {
+            // 1. 결제 생성 (동기)
+            val payment = createReservationPayment(userId, reservationId, amount)
+            
+            // 2. 잔고 차감 (동기 - 실패시 즉시 중단)
+            balanceApiClient.deductBalance(
+                userId = userId,
+                amount = amount,
+                description = "콘서트 티켓 결제 - 예약ID: ${reservationId}"
+            )
+            
+            // 3. 예약 확정 (동기 - 핵심 비즈니스 로직)
+            reservationApiClient.confirmReservation(
+                reservationId = reservationId,
+                paymentId = payment.paymentId
+            )
+            
+            // 4. 토큰 완료 처리 (동기 - 핵심 비즈니스 로직)
+            tokenLifecycleManager.completeToken(token)
+            
+            // 5. 결제 완료 처리
+            val completedStatus = paymentStatusTypeRepository.getCompletedStatus()
+            val paymentEntity = paymentRepository.findById(payment.paymentId)
+                ?: throw PaymentNotFoundException(payment.paymentId)
+            
+            paymentEntity.complete()
+            paymentEntity.updateStatus(completedStatus)
+            val completedPayment = paymentRepository.save(paymentEntity)
+            
+            // 6. 이벤트 발행 (부가 작업들을 위한)
+            eventPublisher.publish(PaymentCompletedEvent(
+                paymentId = completedPayment.paymentId,
+                userId = userId,
+                reservationId = reservationId,
+                amount = completedPayment.amount,
+                token = token
+            ))
 
-        logger.info("결제 프로세스 시작 완료, 이벤트 발행 - userId: {}, paymentId: {}", userId, payment.paymentId)
-        return payment
+            logger.info("결제 프로세스 완료 - userId: {}, paymentId: {}", userId, completedPayment.paymentId)
+            return PaymentDto.fromEntity(completedPayment)
+            
+        } catch (e: Exception) {
+            logger.error("결제 프로세스 실패 - userId: {}, reservationId: {}, error: {}", userId, reservationId, e.message, e)
+            
+            // 실패한 결제 생성 및 실패 이벤트 발행
+            val failedPayment = createFailedPayment(userId, reservationId, amount, e.message ?: "알 수 없는 오류")
+            
+            eventPublisher.publish(PaymentFailedEvent(
+                paymentId = failedPayment.paymentId,
+                userId = userId,
+                reservationId = reservationId,
+                reason = e.message ?: "결제 처리 실패",
+                token = token,
+                amount = amount,
+                needsBalanceRestore = true, // 잔고 차감 후 실패한 경우를 고려
+                failureStage = determineFailureStage(e)
+            ))
+            
+            throw PaymentProcessException("결제 처리 중 오류가 발생했습니다: ${e.message}", e)
+        }
     }
 
     // 예약 관련 결제
@@ -130,6 +181,22 @@ class PaymentService(
             .orElseThrow { PaymentNotFoundException(paymentId) }
 
         return PaymentDto.fromEntity(payment)
+    }
+    
+    private fun createFailedPayment(userId: Long, reservationId: Long, amount: BigDecimal, reason: String): PaymentDto {
+        val failedStatus = paymentStatusTypeRepository.getFailedStatus()
+        val payment = Payment.createForReservation(userId, reservationId, amount, "POINT", failedStatus)
+        val savedPayment = paymentRepository.save(payment)
+        return PaymentDto.fromEntity(savedPayment)
+    }
+    
+    private fun determineFailureStage(exception: Exception): PaymentFailureStage {
+        return when {
+            exception.message?.contains("잔고") == true -> PaymentFailureStage.BALANCE_DEDUCTION
+            exception.message?.contains("예약") == true -> PaymentFailureStage.RESERVATION_CONFIRM
+            exception.message?.contains("토큰") == true -> PaymentFailureStage.TOKEN_COMPLETION
+            else -> PaymentFailureStage.UNKNOWN
+        }
     }
 
 }

@@ -2,9 +2,12 @@ package kr.hhplus.be.server.domain.balance.service
 
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistory
+import kr.hhplus.be.server.domain.balance.models.PointHistoryType
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.balance.rules.BalanceBusinessRules
+import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
+import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -16,7 +19,8 @@ import java.time.LocalDate
 @Transactional(readOnly = true)
 class BalanceService(
     private val pointRepository: PointRepository,
-    private val pointHistoryRepository: PointHistoryRepository
+    private val pointHistoryRepository: PointHistoryRepository,
+    private val reservationRepository: ReservationRepository
 ) {
     
     companion object {
@@ -71,8 +75,50 @@ class BalanceService(
      */
     @ValidateUserId
     fun getActiveReservationCount(userId: Long): Int {
-        // 이 버전에서는 단순하게 0을 반환
-        // 실제 구현에서는 ReservationRepository에서 조회 필요
-        return 0
+        val activeStatusCodes = listOf(
+            ReservationStatusType.TEMPORARY,
+            ReservationStatusType.CONFIRMED
+        )
+        return reservationRepository.findByUserIdAndStatusCodeInOrderByReservedAtDesc(
+            userId = userId,
+            statusCodes = activeStatusCodes
+        ).size
+    }
+    
+    /**
+     * 잔고 복원 (결제 실패 시 사용)
+     */
+    @Transactional
+    @ValidateUserId
+    fun restoreBalance(userId: Long, amount: BigDecimal, description: String): Point {
+        logger.info("잔고 복원 요청 - userId: {}, amount: {}", userId, amount)
+        
+        // 1. 현재 잔고 조회
+        val currentPoint = pointRepository.findByUserId(userId)
+            ?: Point.create(userId, BigDecimal.ZERO)
+        
+        // 2. 잔고 복원
+        currentPoint.charge(amount)
+        val savedPoint = pointRepository.save(currentPoint)
+        
+        // 3. 이력 저장
+        val refundType = PointHistoryType(
+            code = "REFUND",
+            name = "환불",
+            description = "결제 실패로 인한 잔고 복원",
+            category = "REFUND"
+        )
+        val history = PointHistory.refund(
+            userId = userId,
+            amount = amount,
+            refundType = refundType,
+            description = description
+        )
+        pointHistoryRepository.save(history)
+        
+        logger.info("잔고 복원 완료 - userId: {}, amount: {}, newBalance: {}", 
+                   userId, amount, savedPoint.amount)
+        
+        return savedPoint
     }
 }

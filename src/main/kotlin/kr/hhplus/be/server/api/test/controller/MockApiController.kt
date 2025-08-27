@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.api.test.controller
 
 import kr.hhplus.be.server.api.test.dto.MockApiResponse
-import kr.hhplus.be.server.domain.concert.service.ConcertReservationData
+import kr.hhplus.be.server.global.client.ConcertReservationData
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.ResponseEntity

@@ -35,7 +35,7 @@ class ConcertDataPlatformClient(
                 operationType = operationType
             )
             
-            val apiUrl = "$baseUrl/api/test/mock/data-platform/reservations"
+            val apiUrl = "$baseUrl/internal/test/mock/data-platform/reservations"
             
             logger.info { "🚀 데이터 플랫폼 전송 시작 - $operationType: reservationId=$reservationId" }
             
@@ -55,6 +55,44 @@ class ConcertDataPlatformClient(
             logger.error(e) { "❌ 데이터 플랫폼 전송 실패 - $operationType: reservationId=$reservationId" }
         }
     }
+    
+    @Async
+    fun sendPaymentData(
+        paymentId: Long,
+        userId: Long,
+        reservationId: Long?,
+        amount: java.math.BigDecimal,
+        operationType: String = "PAYMENT"
+    ) {
+        try {
+            val paymentData = ConcertPaymentData(
+                paymentId = paymentId,
+                userId = userId,
+                reservationId = reservationId,
+                amount = amount,
+                operationType = operationType
+            )
+            
+            val apiUrl = "$baseUrl/internal/test/mock/data-platform/payments"
+            
+            logger.info { "🚀 데이터 플랫폼 결제 정보 전송 시작 - $operationType: paymentId=$paymentId" }
+            
+            val response = restTemplate.postForEntity(
+                apiUrl,
+                paymentData,
+                String::class.java
+            )
+            
+            if (response.statusCode.is2xxSuccessful) {
+                logger.info { "✅ 데이터 플랫폼 결제 정보 전송 성공 - $operationType: paymentId=$paymentId" }
+            } else {
+                logger.warn { "⚠️ 데이터 플랫폼 결제 응답 오류 - status: ${response.statusCode}" }
+            }
+            
+        } catch (e: Exception) {
+            logger.error(e) { "❌ 데이터 플랫폼 결제 정보 전송 실패 - $operationType: paymentId=$paymentId" }
+        }
+    }
 }
 
 data class ConcertReservationData(
@@ -63,5 +101,13 @@ data class ConcertReservationData(
     val concertId: Long,
     val seatId: Long,
     val paymentId: Long,
+    val operationType: String
+)
+
+data class ConcertPaymentData(
+    val paymentId: Long,
+    val userId: Long,
+    val reservationId: Long?,
+    val amount: java.math.BigDecimal,
     val operationType: String
 )

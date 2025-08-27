@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.global.client
 
-import kr.hhplus.be.server.api.balance.dto.request.DeductBalanceRequest
+import kr.hhplus.be.server.internal.balance.dto.request.DeductBalanceRequest
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -24,7 +24,7 @@ class BalanceApiClient(
         
         try {
             val response = restTemplate.postForEntity(
-                "$baseUrl/api/v1/balance/deduct",
+                "$baseUrl/internal/balance/deduct",
                 request,
                 CommonApiResponse::class.java
             )

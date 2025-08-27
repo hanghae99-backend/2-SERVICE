@@ -3,8 +3,9 @@ package kr.hhplus.be.server.domain.concert.event.listener
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import mu.KotlinLogging
-import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
+import org.springframework.transaction.event.TransactionPhase
+import org.springframework.transaction.event.TransactionalEventListener
 
 @Component
 class ReservationCreatedEventListener(
@@ -13,7 +14,7 @@ class ReservationCreatedEventListener(
     
     private val logger = KotlinLogging.logger {}
     
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handle(event: ReservationCreatedEvent) {
         try {
             // 매진 순위 업데이트 (예약 증가)

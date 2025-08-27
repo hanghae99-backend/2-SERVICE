@@ -24,7 +24,6 @@ class ReservationCancelledEventListener(
                 userId = event.userId,
                 concertId = event.concertId,
                 seatId = event.seatId,
-                paymentId = 0L,
                 operationType = "RESERVATION_CANCELLED"
             )
             

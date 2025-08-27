@@ -22,7 +22,6 @@ class ConcertDataPlatformClient(
         userId: Long,
         concertId: Long,
         seatId: Long,
-        paymentId: Long,
         operationType: String = "RESERVATION"
     ) {
         try {
@@ -31,7 +30,6 @@ class ConcertDataPlatformClient(
                 userId = userId,
                 concertId = concertId,
                 seatId = seatId,
-                paymentId = paymentId,
                 operationType = operationType
             )
             
@@ -100,7 +98,6 @@ data class ConcertReservationData(
     val userId: Long,
     val concertId: Long,
     val seatId: Long,
-    val paymentId: Long,
     val operationType: String
 )
 

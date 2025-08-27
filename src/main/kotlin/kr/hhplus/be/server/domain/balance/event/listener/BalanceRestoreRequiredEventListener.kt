@@ -3,8 +3,9 @@ package kr.hhplus.be.server.domain.balance.event.listener
 import kr.hhplus.be.server.domain.payment.event.BalanceRestoreRequiredEvent
 import kr.hhplus.be.server.domain.balance.service.BalanceService
 import mu.KotlinLogging
-import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
+import org.springframework.transaction.event.TransactionPhase
+import org.springframework.transaction.event.TransactionalEventListener
 
 @Component
 class BalanceRestoreRequiredEventListener(
@@ -13,7 +14,7 @@ class BalanceRestoreRequiredEventListener(
     
     private val logger = KotlinLogging.logger {}
     
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handle(event: BalanceRestoreRequiredEvent) {
         try {
             // 잔고 복원 처리

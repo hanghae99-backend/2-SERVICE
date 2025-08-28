@@ -1,6 +1,6 @@
-package kr.hhplus.be.server.domain.reservation.event.listener
+package kr.hhplus.be.server.domain.reservation.eventListener
 
-import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
+import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.global.client.ConcertDataPlatformClient
 import kr.hhplus.be.server.global.event.EventErrorHandler
 import kr.hhplus.be.server.global.event.EventErrorHandling
@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 
 @Component
-class ReservationCancelledEventListener(
+class ReservationCreatedEventListener(
     private val concertDataPlatformClient: ConcertDataPlatformClient,
     private val errorHandler: EventErrorHandler
 ) {
@@ -20,16 +20,16 @@ class ReservationCancelledEventListener(
     @EventErrorHandling(sendToDLQ = false, critical = false)
     @Async
     @EventListener
-    fun handle(event: ReservationCancelledEvent) {
-        errorHandler.handleEventSafely(event, "ReservationCancelledEvent") {
+    fun handle(event: ReservationCreatedEvent) {
+        errorHandler.handleEventSafely(event, "ReservationCreatedEvent") {
             concertDataPlatformClient.sendReservationData(
                 reservationId = event.reservationId,
                 userId = event.userId,
                 concertId = event.concertId,
                 seatId = event.seatId,
-                operationType = "RESERVATION_CANCELLED"
+                operationType = "RESERVATION_CREATED"
             )
-            logger.info { "데이터 플랫폼 예약 취소 정보 전송 완료: ${event.reservationId}" }
+            logger.info { "데이터 플랫폼 예약 생성 정보 전송 완료: ${event.reservationId}" }
         }
     }
 }

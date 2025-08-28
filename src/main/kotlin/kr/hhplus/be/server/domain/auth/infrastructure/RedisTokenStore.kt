@@ -177,4 +177,11 @@ class RedisTokenStore(
 
         return expiredTokens
     }
+    
+    override fun removeExpiredTokens() {
+        val expiredTokens = findExpiredActiveTokens()
+        expiredTokens.forEach { token ->
+            expireToken(token)
+        }
+    }
 }

@@ -13,8 +13,7 @@ import jakarta.validation.constraints.NotBlank
 import kr.hhplus.be.server.api.auth.dto.TokenIssueDetail
 import kr.hhplus.be.server.api.auth.dto.TokenQueueDetail
 import kr.hhplus.be.server.api.auth.dto.request.TokenIssueRequest
-import kr.hhplus.be.server.api.auth.usecase.TokenIssueUseCase
-import kr.hhplus.be.server.api.auth.usecase.TokenQueueStatusUseCase
+import kr.hhplus.be.server.api.auth.service.TokenFacade
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -25,8 +24,7 @@ import org.springframework.web.bind.annotation.*
 @Validated
 @Tag(name = "대기열 토큰", description = "대기열 토큰 관리 API")
 class TokenController(
-    private val tokenIssueUseCase: TokenIssueUseCase,
-    private val tokenQueueStatusUseCase: TokenQueueStatusUseCase
+    private val tokenFacade: TokenFacade
 ) {
     
     @Operation(
@@ -39,7 +37,7 @@ class TokenController(
         @Parameter(description = "토큰 발급 요청", required = true) 
         request: TokenIssueRequest
     ): ResponseEntity<CommonApiResponse<TokenIssueDetail>> {
-        val response = tokenIssueUseCase.execute(request.userId)
+        val response = tokenFacade.issueToken(request.userId)
         
         return ResponseEntity.status(201).body(
             CommonApiResponse.success(
@@ -60,7 +58,7 @@ class TokenController(
         @NotBlank(message = "토큰은 필수입니다")
         token: String
     ): ResponseEntity<CommonApiResponse<TokenQueueDetail>> {
-        val response = tokenQueueStatusUseCase.execute(token)
+        val response = tokenFacade.getTokenStatus(token)
         
         return ResponseEntity.ok(
             CommonApiResponse.success(

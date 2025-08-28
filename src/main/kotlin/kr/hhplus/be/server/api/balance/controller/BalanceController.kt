@@ -7,7 +7,6 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive
 import kr.hhplus.be.server.api.balance.dto.BalanceDto
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
-import kr.hhplus.be.server.api.balance.usecase.ChargeBalanceUseCase
 import kr.hhplus.be.server.domain.balance.service.BalanceService
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
@@ -19,8 +18,7 @@ import org.springframework.web.bind.annotation.*
 @Validated
 @Tag(name = "Balance", description = "잔액 관리 API")
 class BalanceController(
-    private val balanceService: BalanceService,
-    private val chargeBalanceUseCase: ChargeBalanceUseCase
+    private val balanceService: BalanceService
 ) {
 
     @Operation(
@@ -33,7 +31,7 @@ class BalanceController(
         @Parameter(description = "잔액 충전 요청", required = true)
         request: ChargeBalanceRequest
     ): ResponseEntity<CommonApiResponse<BalanceDto.ChargeResult>> {
-        val point = chargeBalanceUseCase.execute(request.userId, request.amount)
+        val point = balanceService.chargeBalance(request.userId, request.amount)
         
         return ResponseEntity.ok(
             CommonApiResponse.success(

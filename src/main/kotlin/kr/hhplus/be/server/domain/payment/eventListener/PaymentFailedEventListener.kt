@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.domain.payment.event.listener
+package kr.hhplus.be.server.domain.payment.eventListener
 
 import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
 import kr.hhplus.be.server.global.client.ConcertDataPlatformClient

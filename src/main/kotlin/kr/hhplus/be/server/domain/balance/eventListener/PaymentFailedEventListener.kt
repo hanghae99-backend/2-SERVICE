@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.domain.balance.event.listener
+package kr.hhplus.be.server.domain.balance.eventListener
 
 import kr.hhplus.be.server.domain.balance.service.BalanceService
 import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent

@@ -35,9 +35,9 @@ class ReservationService(
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
     
     @LockGuard(
-        keys = ["'seat:' + #seatId", "'user:reservation:' + #userId"],
+        key = "'seat:' + #seatId",
         strategy = LockStrategy.PUB_SUB,
-        waitTimeoutMs = 12000L
+        waitTimeoutMs = 8000L
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun createReservation(userId: Long, concertId: Long, seatId: Long): Reservation {
@@ -72,15 +72,10 @@ class ReservationService(
         val reservation = reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
             
-        return confirmReservationWithLock(reservation, paymentId)
+        return confirmReservation(reservation, paymentId)
     }
     
-    @LockGuard(
-        keys = ["'reservation:' + #reservation.reservationId", "'seat:' + #reservation.seatId"],
-        strategy = LockStrategy.PUB_SUB,
-        waitTimeoutMs = 8000L
-    )
-    private fun confirmReservationWithLock(reservation: Reservation, paymentId: Long): Reservation {
+    private fun confirmReservation(reservation: Reservation, paymentId: Long): Reservation {
         reservation.confirm(paymentId, statusRepository.getConfirmedStatus())
         val savedReservation = reservationRepository.save(reservation)
         
@@ -96,7 +91,7 @@ class ReservationService(
             throw ReservationAccessDeniedException(userId, reservationId)
         }
         
-        return cancelReservationWithLock(reservation, cancelReason ?: "사용자 취소", false)
+        return cancelReservation(reservation, cancelReason ?: "사용자 취소", false)
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
@@ -104,15 +99,10 @@ class ReservationService(
         val reservation = reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
         
-        return cancelReservationWithLock(reservation, cancelReason, true)
+        return cancelReservation(reservation, cancelReason, true)
     }
 
-    @LockGuard(
-        keys = ["'reservation:' + #reservation.reservationId", "'seat:' + #reservation.seatId"],
-        strategy = LockStrategy.PUB_SUB,
-        waitTimeoutMs = 8000L
-    )
-    private fun cancelReservationWithLock(reservation: Reservation, cancelReason: String, isExpired: Boolean): Reservation {
+    private fun cancelReservation(reservation: Reservation, cancelReason: String, isExpired: Boolean): Reservation {
         reservation.cancel(statusRepository.getCancelledStatus())
         val savedReservation = reservationRepository.save(reservation)
         

@@ -31,4 +31,5 @@ interface TokenStore {
 
     // 콘서트 예약 특화
     fun findExpiredActiveTokens(): List<String>
+    fun removeExpiredTokens()
 }

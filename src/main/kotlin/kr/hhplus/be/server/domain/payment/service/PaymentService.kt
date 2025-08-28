@@ -28,8 +28,7 @@ class PaymentService(
     private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
     private val eventPublisher: DomainEventPublisher,
     private val balanceApiClient: kr.hhplus.be.server.global.client.BalanceApiClient,
-    private val reservationApiClient: kr.hhplus.be.server.global.client.ReservationApiClient,
-    private val tokenManager: kr.hhplus.be.server.domain.auth.service.TokenManager
+    private val reservationApiClient: kr.hhplus.be.server.global.client.ReservationApiClient
 ) {
     
     companion object {
@@ -61,7 +60,7 @@ class PaymentService(
                 paymentId = payment.paymentId
             )
             
-            tokenManager.completeToken(token)
+            // 토큰 완료 처리는 이벤트로 분리됨
 
             val completedStatus = paymentStatusTypeRepository.getCompletedStatus()
             val paymentEntity = paymentRepository.findById(payment.paymentId)

@@ -9,6 +9,7 @@ import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
 import kr.hhplus.be.server.domain.payment.event.PaymentFailureStage
 import kr.hhplus.be.server.domain.payment.exception.PaymentNotFoundException
 import kr.hhplus.be.server.domain.payment.exception.PaymentProcessException
+import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
 import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
 import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
 import kr.hhplus.be.server.global.lock.LockGuard
@@ -83,6 +84,16 @@ class PaymentService(
             
         } catch (e: Exception) {
             logger.error("결제 프로세스 실패 - userId: {}, reservationId: {}, error: {}", userId, reservationId, e.message, e)
+            
+            // 예약 관련 오류를 특별히 처리 - 타입 체크 우선
+            if (e is ReservationNotFoundException) {
+                throw e  // 원본 예외를 그대로 다시 던짐
+            }
+            
+            // 메시지 기반 체크 (레거시 호환성)
+            if (e.message?.contains("예약을 찾을 수 없습니다") == true) {
+                throw ReservationNotFoundException(reservationId)
+            }
             
             val failedPayment = createFailedPayment(userId, reservationId, amount, e.message ?: "알 수 없는 오류")
             

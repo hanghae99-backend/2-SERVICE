@@ -6,6 +6,7 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import org.springframework.stereotype.Repository
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 @Repository
 class PointHistoryRepositoryImpl(
@@ -33,7 +34,9 @@ class PointHistoryRepositoryImpl(
     }
     
     override fun findChargeAmountByUserIdAndDate(userId: Long, date: LocalDate): BigDecimal? {
-        return pointHistoryJpaRepository.sumChargeAmountByUserIdAndDate(userId, date)
+        val startOfDay = date.atStartOfDay()
+        val endOfDay = date.plusDays(1).atStartOfDay()
+        return pointHistoryJpaRepository.sumChargeAmountByUserIdAndDate(userId, startOfDay, endOfDay)
     }
     
     override fun flush() {

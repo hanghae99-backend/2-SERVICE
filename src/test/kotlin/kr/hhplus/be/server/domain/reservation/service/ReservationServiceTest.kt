@@ -8,9 +8,9 @@ import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kr.hhplus.be.server.api.concert.dto.SeatDto
+import io.mockk.just
+import io.mockk.Runs
 import kr.hhplus.be.server.domain.concert.exception.SeatAlreadyReservedException
-import kr.hhplus.be.server.domain.concert.service.SeatService
 import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
 import kr.hhplus.be.server.domain.reservation.models.Reservation
 import kr.hhplus.be.server.domain.reservation.models.ReservationStatusType
@@ -19,27 +19,29 @@ import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusType
 import kr.hhplus.be.server.config.TestDataFixture
 import kr.hhplus.be.server.config.TestDataConstants
 import kr.hhplus.be.server.global.event.DomainEventPublisher
-import io.mockk.just
-import io.mockk.Runs
+import kr.hhplus.be.server.global.client.SeatApiClient
+import kr.hhplus.be.server.api.concert.dto.SeatDto
 import java.math.BigDecimal
 
 class ReservationServiceTest : DescribeSpec({
     
     val reservationRepository = mockk<ReservationRepository>()
     val statusRepository = mockk<ReservationStatusTypePojoRepository>()
-    val seatService = mockk<SeatService>()
+    val eventPublisher = mockk<DomainEventPublisher>()
+    val seatApiClient = mockk<SeatApiClient>()
     
     val reservationService = ReservationService(
         reservationRepository,
         statusRepository,
-        seatService
+        eventPublisher,
+        seatApiClient
     )
     
     beforeEach {
         clearAllMocks()
     }
     
-    describe("reserveSeat") {
+    describe("createReservation") {
         context("예약 가능한 좌석을 예약할 때") {
             it("예약이 성공적으로 생성되어야 한다") {
                 // given
@@ -48,29 +50,26 @@ class ReservationServiceTest : DescribeSpec({
                 val seatId = 1L
                 val price = BigDecimal("50000")
 
-                val seatDto = mockk<SeatDto> {
-                    every { this@mockk.seatId } returns seatId
-                    every { this@mockk.price } returns price
-                    every { this@mockk.seatNumber } returns "A1"
-                }
                 val temporaryStatus = TestDataFixture.createReservationStatusType()
-                val confirmStatus = TestDataFixture.createReservationStatusType(
+                val reservation = Reservation.createTemporary(userId, concertId, seatId, "A1", price, temporaryStatus)
+
+                every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, any()) } returns null
+                every { statusRepository.getTemporaryStatus() } returns temporaryStatus
+                every { statusRepository.getConfirmedStatus() } returns TestDataFixture.createReservationStatusType(
                     code = TestDataConstants.ReservationStatusType.CONFIRMED.code,
                     name = TestDataConstants.ReservationStatusType.CONFIRMED.name,
                     description = TestDataConstants.ReservationStatusType.CONFIRMED.description
                 )
-
-                val reservation = Reservation.createTemporary(userId, concertId, seatId, "A1", price, temporaryStatus)
-
-                every { seatService.getSeatById(seatId) } returns seatDto
-                every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, any()) } returns null
-                every { statusRepository.getTemporaryStatus() } returns temporaryStatus
+                val seatInfo = SeatDto(seatId = seatId, scheduleId = 1L, seatNumber = "A1", price = price, statusCode = "AVAILABLE")
+                
                 every { reservationRepository.save(any()) } returns reservation
-                every { seatService.reserveSeat(seatId) } returns seatDto
-                every { statusRepository.getConfirmedStatus() } returns confirmStatus
+                every { seatApiClient.validateSeatAvailability(seatId) } returns mockk()
+                every { seatApiClient.getSeatInfo(seatId) } returns seatInfo
+                every { seatApiClient.reserveSeat(seatId) } returns mockk()
+                every { eventPublisher.publish(any()) } just Runs
 
                 // when
-                val result = reservationService.reserveSeat(userId, concertId, seatId)
+                val result = reservationService.createReservation(userId, concertId, seatId)
 
                 // then
                 result shouldNotBe null
@@ -78,6 +77,7 @@ class ReservationServiceTest : DescribeSpec({
                 result.concertId shouldBe concertId
                 result.seatId shouldBe seatId
                 verify { reservationRepository.save(any()) }
+                verify { eventPublisher.publish(any()) }
             }
         }
         
@@ -89,15 +89,10 @@ class ReservationServiceTest : DescribeSpec({
                 val seatId = 1L
                 val price = BigDecimal("50000")
                 
-                val seatDto = mockk<SeatDto> {
-                    every { this@mockk.seatId } returns seatId
-                    every { this@mockk.price } returns price
-                    every { this@mockk.seatNumber } returns "A1"
-                }
                 val temporaryStatus = TestDataFixture.createReservationStatusType()
                 val existingReservation = Reservation.createTemporary(userId, concertId, seatId, "A1", price, temporaryStatus)
+                val seatInfo = SeatDto(seatId = seatId, scheduleId = 1L, seatNumber = "A1", price = price, statusCode = "AVAILABLE")
                 
-                every { seatService.getSeatById(seatId) } returns seatDto
                 every { statusRepository.getTemporaryStatus() } returns temporaryStatus
                 every { statusRepository.getConfirmedStatus() } returns TestDataFixture.createReservationStatusType(
                     code = TestDataConstants.ReservationStatusType.CONFIRMED.code,
@@ -105,10 +100,12 @@ class ReservationServiceTest : DescribeSpec({
                     description = TestDataConstants.ReservationStatusType.CONFIRMED.description
                 )
                 every { reservationRepository.findBySeatIdAndStatusCodeIn(seatId, any()) } returns existingReservation
+                every { seatApiClient.validateSeatAvailability(seatId) } throws SeatAlreadyReservedException(seatId)
+                every { seatApiClient.getSeatInfo(seatId) } returns seatInfo
                 
                 // when & then
                 shouldThrow<SeatAlreadyReservedException> {
-                    reservationService.reserveSeat(userId, concertId, seatId)
+                    reservationService.createReservation(userId, concertId, seatId)
                 }
             }
         }
@@ -144,7 +141,7 @@ class ReservationServiceTest : DescribeSpec({
         }
     }
     
-    describe("cancelReservation") {
+    describe("cancelReservationByUser") {
         context("유효한 예약을 취소할 때") {
             it("예약이 성공적으로 취소되어야 한다") {
                 // given
@@ -163,13 +160,15 @@ class ReservationServiceTest : DescribeSpec({
                 every { reservationRepository.findById(reservationId) } returns reservation
                 every { statusRepository.getCancelledStatus() } returns cancelledStatus
                 every { reservationRepository.save(any()) } returns reservation
+                every { eventPublisher.publish(any()) } just Runs
                 
                 // when
-                val result = reservationService.cancelReservation(reservationId, userId, cancelReason)
+                val result = reservationService.cancelReservationByUser(reservationId, userId, cancelReason)
                 
                 // then
                 result shouldNotBe null
                 verify { reservationRepository.save(any()) }
+                verify { eventPublisher.publish(any()) }
             }
         }
     }

@@ -10,14 +10,14 @@ import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
 
 @Component
-class SeatApiClient(
+open class SeatApiClient(
     private val restTemplate: RestTemplate,
     @Value("\${app.api.base-url:http://localhost:8080}")
     private val baseUrl: String
 ) {
     private val logger = KotlinLogging.logger {}
 
-    fun getSeatInfo(seatId: Long): SeatDto {
+    open fun getSeatInfo(seatId: Long): SeatDto {
         try {
             val response = restTemplate.exchange(
                 "$baseUrl/internal/seats/$seatId",
@@ -37,7 +37,7 @@ class SeatApiClient(
         }
     }
 
-    fun reserveSeat(seatId: Long): CommonApiResponse<*> {
+    open fun reserveSeat(seatId: Long): CommonApiResponse<*> {
         try {
             val response = restTemplate.exchange(
                 "$baseUrl/internal/seats/$seatId/reserve",
@@ -57,7 +57,7 @@ class SeatApiClient(
         }
     }
 
-    fun validateSeatAvailability(seatId: Long): CommonApiResponse<*> {
+    open fun validateSeatAvailability(seatId: Long): CommonApiResponse<*> {
         try {
             val response = restTemplate.exchange(
                 "$baseUrl/internal/seats/$seatId/validate",

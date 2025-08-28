@@ -244,6 +244,32 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(e.status).body(errorResponse)
     }
 
+    @ExceptionHandler(kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException::class)
+    fun handleReservationNotFoundException(e: kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 예약 없음: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "예약을 찾을 수 없습니다",
+            errorCode = e.getFullErrorCode()
+        )
+        
+        return ResponseEntity.status(e.httpStatus).body(errorResponse)
+    }
+
+    @ExceptionHandler(kr.hhplus.be.server.domain.payment.exception.PaymentException::class)
+    fun handlePaymentException(e: kr.hhplus.be.server.domain.payment.exception.PaymentException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 결제 예외: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "결제 처리 중 오류가 발생했습니다",
+            errorCode = e.getFullErrorCode()
+        )
+        
+        return ResponseEntity.status(e.httpStatus).body(errorResponse)
+    }
+
     // === 보안 관련 예외 ===
     @ExceptionHandler(AccessDeniedException::class)
     fun handleAccessDeniedException(e: AccessDeniedException): ResponseEntity<CommonApiResponse<Nothing>> {

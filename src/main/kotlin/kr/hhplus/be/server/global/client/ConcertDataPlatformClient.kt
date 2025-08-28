@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
 
 @Component
-class ConcertDataPlatformClient(
+open class ConcertDataPlatformClient(
     private val restTemplate: RestTemplate
 ) {
     
@@ -17,7 +17,7 @@ class ConcertDataPlatformClient(
     private lateinit var baseUrl: String
     
     @Async
-    fun sendReservationData(
+    open fun sendReservationData(
         reservationId: Long,
         userId: Long,
         concertId: Long,
@@ -55,7 +55,7 @@ class ConcertDataPlatformClient(
     }
     
     @Async
-    fun sendPaymentData(
+    open fun sendPaymentData(
         paymentId: Long,
         userId: Long,
         reservationId: Long?,

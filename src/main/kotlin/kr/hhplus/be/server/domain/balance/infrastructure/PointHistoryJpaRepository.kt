@@ -19,10 +19,12 @@ interface PointHistoryJpaRepository : JpaRepository<PointHistory, Long> {
         FROM PointHistory ph 
         WHERE ph.userId = :userId 
         AND ph.historyType.code = 'CHARGE'
-        AND DATE(ph.createdAt) = :date
+        AND ph.createdAt >= :startOfDay
+        AND ph.createdAt < :endOfDay
     """)
     fun sumChargeAmountByUserIdAndDate(
         @Param("userId") userId: Long, 
-        @Param("date") date: LocalDate
+        @Param("startOfDay") startOfDay: LocalDateTime,
+        @Param("endOfDay") endOfDay: LocalDateTime
     ): BigDecimal
 }

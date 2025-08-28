@@ -9,7 +9,7 @@ import org.springframework.web.client.RestTemplate
 import java.math.BigDecimal
 
 @Component
-class BalanceApiClient(
+open class BalanceApiClient(
     private val restTemplate: RestTemplate,
     @Value("\${app.api.base-url:http://localhost:8080}")
     private val baseUrl: String
@@ -19,7 +19,7 @@ class BalanceApiClient(
     /**
      * 잔고 차감 API 호출
      */
-    fun deductBalance(userId: Long, amount: BigDecimal, description: String): CommonApiResponse<*> {
+    open fun deductBalance(userId: Long, amount: BigDecimal, description: String): CommonApiResponse<*> {
         val request = DeductBalanceRequest(userId, amount, description)
         
         try {

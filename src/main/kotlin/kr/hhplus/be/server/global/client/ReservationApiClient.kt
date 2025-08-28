@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
 
 @Component
-class ReservationApiClient(
+open class ReservationApiClient(
     private val restTemplate: RestTemplate,
     @Value("\${app.api.base-url:http://localhost:8080}")
     private val baseUrl: String
@@ -18,7 +18,7 @@ class ReservationApiClient(
     /**
      * 예약 확정 API 호출
      */
-    fun confirmReservation(reservationId: Long, paymentId: Long): CommonApiResponse<*> {
+    open fun confirmReservation(reservationId: Long, paymentId: Long): CommonApiResponse<*> {
         val request = ReservationConfirmRequest(paymentId = paymentId)
         
         try {

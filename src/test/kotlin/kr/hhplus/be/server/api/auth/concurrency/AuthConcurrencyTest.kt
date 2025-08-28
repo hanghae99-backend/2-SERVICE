@@ -8,7 +8,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kr.hhplus.be.server.api.auth.dto.request.TokenIssueRequest
 import kr.hhplus.be.server.config.ConcurrencyTest
-import kr.hhplus.be.server.domain.auth.service.TokenLifecycleManager
+import kr.hhplus.be.server.domain.auth.service.TokenManager
 import kr.hhplus.be.server.domain.user.infrastructure.UserJpaRepository
 import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.global.lock.DistributedLock
@@ -33,7 +33,7 @@ class AuthConcurrencyTest(
     private val objectMapper: ObjectMapper,
     private val distributedLock: DistributedLock,
     private val redisTemplate: RedisTemplate<String, Any>,
-    private val tokenLifecycleManager: TokenLifecycleManager
+    private val tokenLifecycleManager: TokenManager
 ) : DescribeSpec({
 
     extension(SpringExtension)

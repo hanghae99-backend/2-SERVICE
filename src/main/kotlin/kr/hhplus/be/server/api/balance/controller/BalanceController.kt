@@ -25,7 +25,7 @@ class BalanceController(
         summary = "잔액 충전",
         description = "사용자의 포인트 잔액을 충전합니다."
     )
-    @PostMapping("/charge")
+    @PostMapping
     fun chargeBalance(
         @Valid @RequestBody 
         @Parameter(description = "잔액 충전 요청", required = true)

@@ -12,7 +12,7 @@ import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
 import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
 import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
-import kr.hhplus.be.server.global.event.DomainEventPublisher
+import org.springframework.context.ApplicationEventPublisher
 import kr.hhplus.be.server.global.client.BalanceApiClient
 import kr.hhplus.be.server.global.client.ReservationApiClient
 import kr.hhplus.be.server.config.TestDataFixture
@@ -23,13 +23,13 @@ class PaymentServiceTest : DescribeSpec({
     
     val paymentRepository = mockk<PaymentRepository>()
     val paymentStatusTypeRepository = mockk<PaymentStatusTypePojoRepository>()
-    val eventPublisher = mockk<DomainEventPublisher>()
+    val applicationEventPublisher = mockk<ApplicationEventPublisher>()
     val balanceApiClient = mockk<BalanceApiClient>()
     val reservationApiClient = mockk<ReservationApiClient>()
     val paymentService = PaymentService(
         paymentRepository,
         paymentStatusTypeRepository,
-        eventPublisher,
+        applicationEventPublisher,
         balanceApiClient,
         reservationApiClient
     )

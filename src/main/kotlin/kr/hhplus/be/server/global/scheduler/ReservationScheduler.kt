@@ -4,7 +4,7 @@ import kr.hhplus.be.server.domain.auth.service.TokenManager
 import kr.hhplus.be.server.domain.auth.service.QueueService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
-import kr.hhplus.be.server.global.event.DomainEventPublisher
+import org.springframework.context.ApplicationEventPublisher
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.global.lock.LockStrategy
 import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
@@ -23,7 +23,7 @@ class ReservationScheduler(
     private val tokenManager: TokenManager,
     private val queueService: QueueService,
     private val selloutRankingService: SelloutRankingService,
-    private val domainEventPublisher: DomainEventPublisher,
+    private val applicationEventPublisher: ApplicationEventPublisher,
     private val distributedLock: DistributedLock
 ) {
     
@@ -61,7 +61,7 @@ class ReservationScheduler(
                             "예약 시간 만료"
                         )
                         
-                        domainEventPublisher.publish(
+                        applicationEventPublisher.publishEvent(
                             ReservationExpiredEvent(
                                 reservationId = cancelledReservation.reservationId,
                                 userId = cancelledReservation.userId,

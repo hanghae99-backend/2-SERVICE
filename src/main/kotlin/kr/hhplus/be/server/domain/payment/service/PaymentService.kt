@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.payment.service
 
 import kr.hhplus.be.server.global.extension.orElseThrow
-import kr.hhplus.be.server.global.event.DomainEventPublisher
+import org.springframework.context.ApplicationEventPublisher
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.payment.event.PaymentCompletedEvent
@@ -27,7 +27,7 @@ import java.math.BigDecimal
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
-    private val eventPublisher: DomainEventPublisher,
+    private val applicationEventPublisher: ApplicationEventPublisher,
     private val balanceApiClient: kr.hhplus.be.server.global.client.BalanceApiClient,
     private val reservationApiClient: kr.hhplus.be.server.global.client.ReservationApiClient
 ) {
@@ -71,7 +71,7 @@ class PaymentService(
             paymentEntity.updateStatus(completedStatus)
             val completedPayment = paymentRepository.save(paymentEntity)
             
-            eventPublisher.publish(PaymentCompletedEvent(
+            applicationEventPublisher.publishEvent(PaymentCompletedEvent(
                 paymentId = completedPayment.paymentId,
                 userId = userId,
                 reservationId = reservationId,
@@ -97,7 +97,7 @@ class PaymentService(
             
             val failedPayment = createFailedPayment(userId, reservationId, amount, e.message ?: "알 수 없는 오류")
             
-            eventPublisher.publish(PaymentFailedEvent(
+            applicationEventPublisher.publishEvent(PaymentFailedEvent(
                 paymentId = failedPayment.paymentId,
                 userId = userId,
                 reservationId = reservationId,

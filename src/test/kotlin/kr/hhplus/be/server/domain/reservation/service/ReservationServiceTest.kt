@@ -18,7 +18,7 @@ import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
 import kr.hhplus.be.server.config.TestDataFixture
 import kr.hhplus.be.server.config.TestDataConstants
-import kr.hhplus.be.server.global.event.DomainEventPublisher
+import org.springframework.context.ApplicationEventPublisher
 import kr.hhplus.be.server.global.client.SeatApiClient
 import kr.hhplus.be.server.api.concert.dto.SeatDto
 import java.math.BigDecimal
@@ -27,13 +27,13 @@ class ReservationServiceTest : DescribeSpec({
     
     val reservationRepository = mockk<ReservationRepository>()
     val statusRepository = mockk<ReservationStatusTypePojoRepository>()
-    val eventPublisher = mockk<DomainEventPublisher>()
+    val applicationEventPublisher = mockk<ApplicationEventPublisher>()
     val seatApiClient = mockk<SeatApiClient>()
     
     val reservationService = ReservationService(
         reservationRepository,
         statusRepository,
-        eventPublisher,
+        applicationEventPublisher,
         seatApiClient
     )
     
@@ -66,7 +66,7 @@ class ReservationServiceTest : DescribeSpec({
                 every { seatApiClient.validateSeatAvailability(seatId) } returns mockk()
                 every { seatApiClient.getSeatInfo(seatId) } returns seatInfo
                 every { seatApiClient.reserveSeat(seatId) } returns mockk()
-                every { eventPublisher.publish(any()) } just Runs
+                every { applicationEventPublisher.publishEvent(any()) } just Runs
 
                 // when
                 val result = reservationService.createReservation(userId, concertId, seatId)
@@ -77,7 +77,7 @@ class ReservationServiceTest : DescribeSpec({
                 result.concertId shouldBe concertId
                 result.seatId shouldBe seatId
                 verify { reservationRepository.save(any()) }
-                verify { eventPublisher.publish(any()) }
+                verify { applicationEventPublisher.publishEvent(any()) }
             }
         }
         
@@ -160,7 +160,7 @@ class ReservationServiceTest : DescribeSpec({
                 every { reservationRepository.findById(reservationId) } returns reservation
                 every { statusRepository.getCancelledStatus() } returns cancelledStatus
                 every { reservationRepository.save(any()) } returns reservation
-                every { eventPublisher.publish(any()) } just Runs
+                every { applicationEventPublisher.publishEvent(any()) } just Runs
                 
                 // when
                 val result = reservationService.cancelReservationByUser(reservationId, userId, cancelReason)
@@ -168,7 +168,7 @@ class ReservationServiceTest : DescribeSpec({
                 // then
                 result shouldNotBe null
                 verify { reservationRepository.save(any()) }
-                verify { eventPublisher.publish(any()) }
+                verify { applicationEventPublisher.publishEvent(any()) }
             }
         }
     }

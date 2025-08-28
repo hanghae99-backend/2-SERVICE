@@ -8,7 +8,7 @@ import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchConditio
 import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
-import kr.hhplus.be.server.global.event.DomainEventPublisher
+import org.springframework.context.ApplicationEventPublisher
 import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAlreadyConfirmedException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAccessDeniedException
@@ -28,7 +28,7 @@ import java.time.LocalDateTime
 class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
-    private val eventPublisher: DomainEventPublisher,
+    private val applicationEventPublisher: ApplicationEventPublisher,
     private val seatApiClient: kr.hhplus.be.server.global.client.SeatApiClient
 ) {
     
@@ -54,7 +54,7 @@ class ReservationService(
         seatApiClient.reserveSeat(seatId)
         
         // 5. 이벤트 발행 (부가 작업들을 위한)
-        eventPublisher.publish(ReservationCreatedEvent(
+        applicationEventPublisher.publishEvent(ReservationCreatedEvent(
             reservationId = reservation.reservationId,
             userId = reservation.userId,
             concertId = reservation.concertId,
@@ -106,7 +106,7 @@ class ReservationService(
         reservation.cancel(statusRepository.getCancelledStatus())
         val savedReservation = reservationRepository.save(reservation)
         
-        eventPublisher.publish(ReservationCancelledEvent(
+        applicationEventPublisher.publishEvent(ReservationCancelledEvent(
             reservationId = savedReservation.reservationId,
             userId = savedReservation.userId,
             concertId = savedReservation.concertId,

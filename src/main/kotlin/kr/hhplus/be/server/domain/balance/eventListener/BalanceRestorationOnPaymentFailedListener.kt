@@ -11,7 +11,7 @@ import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
 @Component
-class PaymentFailedEventListener(
+class BalanceRestorationOnPaymentFailedListener(
     private val balanceService: BalanceService,
     private val errorHandler: EventErrorHandler
 ) {

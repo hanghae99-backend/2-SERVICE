@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 
 @Component
-class PaymentFailedEventListener(
+class DataPlatformPaymentFailedListener(
     private val concertDataPlatformClient: ConcertDataPlatformClient,
     private val errorHandler: EventErrorHandler
 ) {

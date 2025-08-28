@@ -9,11 +9,11 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
-class PaymentCompletedEventListener(
+class TokenCompletionOnPaymentCompletedListener(
     private val tokenManager: TokenManager
 ) {
 
-    private val logger = LoggerFactory.getLogger(PaymentCompletedEventListener::class.java)
+    private val logger = LoggerFactory.getLogger(TokenCompletionOnPaymentCompletedListener::class.java)
 
     @Async
     @EventListener

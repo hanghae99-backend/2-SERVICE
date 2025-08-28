@@ -10,7 +10,7 @@ import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
 @Component
-class ReservationCreatedEventListener(
+class SelloutRankingOnReservationCreatedListener(
     private val selloutRankingService: SelloutRankingService,
     private val errorHandler: EventErrorHandler
 ) {

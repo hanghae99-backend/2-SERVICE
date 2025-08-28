@@ -1,51 +1,37 @@
 package kr.hhplus.be.server.domain.payment.event.listener
 
 import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
-import kr.hhplus.be.server.domain.payment.event.PaymentFailureStage
-import kr.hhplus.be.server.domain.payment.event.BalanceRestoreRequiredEvent
-import kr.hhplus.be.server.global.event.DomainEventPublisher
+import kr.hhplus.be.server.global.client.ConcertDataPlatformClient
+import kr.hhplus.be.server.global.event.EventErrorHandler
+import kr.hhplus.be.server.global.event.EventErrorHandling
 import mu.KotlinLogging
+import org.springframework.context.event.EventListener
+import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
-import org.springframework.transaction.event.TransactionPhase
-import org.springframework.transaction.event.TransactionalEventListener
 
-/**
- * 결제 실패 시 보상 트랜잭션을 처리하는 리스너
- * 잔고 복원 이벤트 발행을 담당
- */
 @Component
 class PaymentFailedEventListener(
-    private val eventPublisher: DomainEventPublisher
+    private val concertDataPlatformClient: ConcertDataPlatformClient,
+    private val errorHandler: EventErrorHandler
 ) {
+
     private val logger = KotlinLogging.logger {}
-    
-    
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+
+    @EventErrorHandling(sendToDLQ = false, critical = false)
+    @Async
+    @EventListener
     fun handle(event: PaymentFailedEvent) {
-        try {
-            // 잔고 복원이 필요한 경우 이벤트 발행
-            when (event.failureStage) {
-                PaymentFailureStage.RESERVATION_CONFIRM -> {
-                    if (event.needsBalanceRestore && event.amount != null) {
-                        eventPublisher.publish(
-                            BalanceRestoreRequiredEvent(
-                                userId = event.userId,
-                                amount = event.amount,
-                                paymentId = event.paymentId,
-                                reservationId = event.reservationId,
-                                reason = "예약 확정 실패로 인한 잔고 복원: ${event.reason}"
-                            )
-                        )
-                    }
-                }
-                else -> {
-                    logger.warn { "복구 불가 실패: payment=${event.paymentId}, stage=${event.failureStage}" }
-                }
+        errorHandler.handleEventSafely(event, "PaymentFailedEvent") {
+            event.amount?.let { amount ->
+                concertDataPlatformClient.sendPaymentData(
+                    paymentId = event.paymentId,
+                    userId = event.userId,
+                    reservationId = event.reservationId,
+                    amount = amount,
+                    operationType = "PAYMENT_FAILED"
+                )
             }
-            
-            
-        } catch (e: Exception) {
-            logger.error(e) { "결제 실패 이벤트 처리 실패: payment=${event.paymentId}" }
+            logger.info { "데이터 플랫폼 결제 실패 정보 전송 완료: ${event.paymentId}" }
         }
     }
 }

@@ -32,16 +32,3 @@ enum class PaymentFailureStage {
     TOKEN_COMPLETION,     // 토큰 완료 실패
     UNKNOWN              // 알 수 없는 단계
 }
-
-/**
- * 잔고 복원 이벤트 - 결제 실패 시 차감된 잔고를 복원하기 위한 이벤트
- */
-data class BalanceRestoreRequiredEvent(
-    val userId: Long,
-    val amount: BigDecimal,
-    val paymentId: Long,
-    val reservationId: Long,
-    val reason: String
-) : AbstractDomainEvent() {
-    override val eventType: String = "BalanceRestoreRequired"
-}

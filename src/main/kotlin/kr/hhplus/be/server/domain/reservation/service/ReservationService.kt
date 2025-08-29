@@ -4,19 +4,14 @@ import kr.hhplus.be.server.domain.reservation.models.Reservation
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusTypePojoRepository
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
-import kr.hhplus.be.server.api.reservation.dto.request.ReservationSearchCondition
 import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
-import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
 import org.springframework.context.ApplicationEventPublisher
 import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
-import kr.hhplus.be.server.domain.reservation.exception.ReservationAlreadyConfirmedException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAccessDeniedException
 import kr.hhplus.be.server.global.lock.LockGuard
 import kr.hhplus.be.server.global.lock.LockStrategy
 import org.slf4j.LoggerFactory
-import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -41,19 +36,25 @@ class ReservationService(
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun createReservation(userId: Long, concertId: Long, seatId: Long): Reservation {
-        // 1. 좌석 가용성 검증 (동기 - 실패시 즉시 중단)
         seatApiClient.validateSeatAvailability(seatId)
-        
-        // 2. 좌석 정보 조회 (동기 - 예약에 필요한 정보)
         val seatInfo = seatApiClient.getSeatInfo(seatId)
         
-        // 3. 예약 생성 (실제 좌석 정보로)
-        val reservation = createReservationWithSeatInfo(userId, concertId, seatId, seatInfo.seatNumber, seatInfo.price)
-        
-        // 4. 좌석 예약 처리 (동기 - 핵심 비즈니스 로직)
         seatApiClient.reserveSeat(seatId)
         
-        // 5. 이벤트 발행 (부가 작업들을 위한)
+        val reservation = try {
+            createReservationWithSeatInfo(userId, concertId, seatId, seatInfo.seatNumber, seatInfo.price)
+        } catch (e: Exception) {
+            logger.error("예약 생성 실패 - seatId: $seatId", e)
+            applicationEventPublisher.publishEvent(ReservationCancelledEvent(
+                userId = userId,
+                concertId = concertId,
+                seatId = seatId,
+                cancelReason = e.message ?: "Unknown error",
+                isFailed = true
+            ))
+            throw e
+        }
+
         applicationEventPublisher.publishEvent(ReservationCreatedEvent(
             reservationId = reservation.reservationId,
             userId = reservation.userId,

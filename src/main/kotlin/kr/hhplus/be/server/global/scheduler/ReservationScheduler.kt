@@ -7,7 +7,7 @@ import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import org.springframework.context.ApplicationEventPublisher
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.global.lock.LockStrategy
-import kr.hhplus.be.server.domain.reservation.event.ReservationExpiredEvent
+import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
@@ -62,11 +62,13 @@ class ReservationScheduler(
                         )
                         
                         applicationEventPublisher.publishEvent(
-                            ReservationExpiredEvent(
+                            ReservationCancelledEvent(
                                 reservationId = cancelledReservation.reservationId,
                                 userId = cancelledReservation.userId,
                                 concertId = cancelledReservation.concertId,
-                                seatId = cancelledReservation.seatId
+                                seatId = cancelledReservation.seatId,
+                                cancelReason = "예약 시간 만료",
+                                isExpired = true
                             )
                         )
                         cleanedCount++

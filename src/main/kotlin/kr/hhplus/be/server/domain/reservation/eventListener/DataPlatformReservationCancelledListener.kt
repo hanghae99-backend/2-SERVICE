@@ -23,10 +23,10 @@ class DataPlatformReservationCancelledListener(
     fun handle(event: ReservationCancelledEvent) {
         errorHandler.handleEventSafely(event, "ReservationCancelledEvent") {
             concertDataPlatformClient.sendReservationData(
-                reservationId = event.reservationId,
+                reservationId = event.reservationId ?: 0L,
                 userId = event.userId,
                 concertId = event.concertId,
-                seatId = event.seatId,
+                seatId = event.seatId ?: 0L,
                 operationType = "RESERVATION_CANCELLED"
             )
             logger.info { "데이터 플랫폼 예약 취소 정보 전송 완료: ${event.reservationId}" }

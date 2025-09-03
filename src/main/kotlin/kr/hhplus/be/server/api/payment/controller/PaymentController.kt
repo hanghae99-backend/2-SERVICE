@@ -9,7 +9,6 @@ import kr.hhplus.be.server.global.response.CommonApiResponse
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.api.payment.dto.request.PaymentRequest
 import kr.hhplus.be.server.domain.payment.service.PaymentService
-import kr.hhplus.be.server.domain.auth.service.TokenValidator
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
@@ -19,8 +18,7 @@ import org.springframework.web.bind.annotation.*
 @Validated
 @Tag(name = "Payment", description = "결제 관리 API")
 class PaymentController(
-    private val paymentService: PaymentService,
-    private val tokenValidator: TokenValidator
+    private val paymentService: PaymentService
 ) {
 
     @Operation(
@@ -33,9 +31,6 @@ class PaymentController(
         @Parameter(description = "결제 요청", required = true)
         request: PaymentRequest
     ): ResponseEntity<CommonApiResponse<PaymentDto>> {
-        // 토큰 검증
-        tokenValidator.validateActiveToken(request.token)
-        
         // 결제 처리
         val payment = paymentService.processPayment(
             userId = request.userId,

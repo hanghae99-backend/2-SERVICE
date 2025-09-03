@@ -24,10 +24,20 @@ class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
     private val applicationEventPublisher: ApplicationEventPublisher,
-    private val seatApiClient: kr.hhplus.be.server.global.client.SeatApiClient
+    private val seatApiClient: kr.hhplus.be.server.global.client.SeatApiClient,
+    private val activeTokenService: kr.hhplus.be.server.domain.auth.service.ActiveTokenService
 ) {
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
+    
+    fun createReservation(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
+        // 토큰 검증
+        if (!activeTokenService.isTokenActive(token)) {
+            throw IllegalArgumentException("유효하지 않은 토큰입니다")
+        }
+        
+        return createReservation(userId, concertId, seatId)
+    }
     
     @LockGuard(
         key = "'seat:' + #seatId",
@@ -83,6 +93,15 @@ class ReservationService(
         return savedReservation
     }
 
+    fun cancelReservationByUser(reservationId: Long, userId: Long, cancelReason: String?, token: String): Reservation {
+        // 토큰 검증
+        if (!activeTokenService.isTokenActive(token)) {
+            throw IllegalArgumentException("유효하지 않은 토큰입니다")
+        }
+        
+        return cancelReservationByUser(reservationId, userId, cancelReason)
+    }
+    
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun cancelReservationByUser(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
         val reservation = reservationRepository.findById(reservationId)

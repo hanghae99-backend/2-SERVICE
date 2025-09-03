@@ -29,7 +29,8 @@ class PaymentService(
     private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val balanceApiClient: kr.hhplus.be.server.global.client.BalanceApiClient,
-    private val reservationApiClient: kr.hhplus.be.server.global.client.ReservationApiClient
+    private val reservationApiClient: kr.hhplus.be.server.global.client.ReservationApiClient,
+    private val activeTokenService: kr.hhplus.be.server.domain.auth.service.ActiveTokenService
 ) {
     
     companion object {
@@ -46,6 +47,11 @@ class PaymentService(
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun processPayment(userId: Long, reservationId: Long, token: String, amount: BigDecimal): PaymentDto {
         logger.info("결제 프로세스 시작 - userId: {}, reservationId: {}, amount: {}", userId, reservationId, amount)
+        
+        // 토큰 검증
+        if (!activeTokenService.isTokenActive(token)) {
+            throw IllegalArgumentException("유효하지 않은 토큰입니다")
+        }
         
         try {
             val payment = createReservationPayment(userId, reservationId, amount)

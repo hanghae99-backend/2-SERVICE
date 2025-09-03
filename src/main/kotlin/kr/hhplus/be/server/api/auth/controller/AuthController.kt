@@ -2,18 +2,13 @@ package kr.hhplus.be.server.api.auth.controller
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
-import io.swagger.v3.oas.annotations.media.Content
-import io.swagger.v3.oas.annotations.media.ExampleObject
-import io.swagger.v3.oas.annotations.media.Schema
-import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import kr.hhplus.be.server.api.auth.dto.TokenIssueDetail
 import kr.hhplus.be.server.api.auth.dto.TokenQueueDetail
 import kr.hhplus.be.server.api.auth.dto.request.TokenIssueRequest
-import kr.hhplus.be.server.api.auth.service.TokenFacade
+import kr.hhplus.be.server.domain.auth.service.AuthService
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -23,8 +18,8 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/v1/tokens")
 @Validated
 @Tag(name = "대기열 토큰", description = "대기열 토큰 관리 API")
-class TokenController(
-    private val tokenFacade: TokenFacade
+class AuthController(
+    private val authService: AuthService
 ) {
     
     @Operation(
@@ -37,7 +32,7 @@ class TokenController(
         @Parameter(description = "토큰 발급 요청", required = true) 
         request: TokenIssueRequest
     ): ResponseEntity<CommonApiResponse<TokenIssueDetail>> {
-        val response = tokenFacade.issueToken(request.userId)
+        val response = authService.issueToken(request.userId)
         
         return ResponseEntity.status(201).body(
             CommonApiResponse.success(
@@ -58,7 +53,7 @@ class TokenController(
         @NotBlank(message = "토큰은 필수입니다")
         token: String
     ): ResponseEntity<CommonApiResponse<TokenQueueDetail>> {
-        val response = tokenFacade.getTokenStatus(token)
+        val response = authService.getTokenStatusDetail(token)
         
         return ResponseEntity.ok(
             CommonApiResponse.success(

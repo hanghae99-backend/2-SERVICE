@@ -1,6 +1,6 @@
 package kr.hhplus.be.server.domain.auth.eventListener
 
-import kr.hhplus.be.server.domain.auth.service.TokenManager
+import kr.hhplus.be.server.domain.auth.service.ActiveTokenService
 import kr.hhplus.be.server.domain.payment.event.PaymentCompletedEvent
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional
 
 @Component
 class TokenCompletionOnPaymentCompletedListener(
-    private val tokenManager: TokenManager
+    private val activeTokenService: ActiveTokenService
 ) {
 
     private val logger = LoggerFactory.getLogger(TokenCompletionOnPaymentCompletedListener::class.java)
@@ -22,7 +22,7 @@ class TokenCompletionOnPaymentCompletedListener(
         logger.info("결제 완료 이벤트 처리 시작: paymentId=${event.paymentId}")
 
         try {
-            tokenManager.completeToken(event.token)
+            activeTokenService.completeToken(event.token)
             logger.info("토큰 완료 처리: token=${event.token}")
 
         } catch (e: Exception) {

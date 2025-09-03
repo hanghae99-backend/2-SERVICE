@@ -26,4 +26,13 @@ class KafkaConfig {
                 "cleanup.policy" to "delete"
             ))
     }
+    
+    @Bean
+    fun paymentEventsTopic(): NewTopic {
+        return NewTopic("payment-events", 3, 1)
+            .configs(mapOf(
+                "retention.ms" to "604800000",  // 7일
+                "cleanup.policy" to "delete"
+            ))
+    }
 }

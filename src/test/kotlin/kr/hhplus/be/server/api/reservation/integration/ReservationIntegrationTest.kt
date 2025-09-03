@@ -4,8 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.core.spec.IsolationMode
 import io.kotest.extensions.spring.SpringExtension
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
+import kr.hhplus.be.server.api.reservation.dto.request.ReservationCancelRequest
 import kr.hhplus.be.server.config.IntegrationTest
+import kr.hhplus.be.server.config.MockTestConfiguration
 import kr.hhplus.be.server.domain.auth.factory.TokenFactory
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
 import kr.hhplus.be.server.global.lock.DistributedLock
@@ -16,6 +20,7 @@ import kr.hhplus.be.server.domain.concert.models.Concert
 import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
 import kr.hhplus.be.server.domain.concert.models.Seat
 import kr.hhplus.be.server.domain.user.models.User
+import kr.hhplus.be.server.api.concert.dto.SeatDto
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -27,10 +32,11 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.context.WebApplicationContext
+import org.springframework.context.annotation.Import
 import java.math.BigDecimal
-import java.time.LocalDate
 
 @IntegrationTest
+@Import(MockTestConfiguration::class)
 class ReservationIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
@@ -71,6 +77,15 @@ class ReservationIntegrationTest(
             val jdbcTemplate = webApplicationContext.getBean(JdbcTemplate::class.java)
             TestDataCleanupHelper.cleanupAll(redisTemplate, jdbcTemplate)
             
+            // MockSeatApiClient 초기화 - 빈이 존재하는 경우에만
+            try {
+                val mockSeatApiClient = webApplicationContext.getBean(kr.hhplus.be.server.config.mock.MockSeatApiClient::class.java)
+                mockSeatApiClient.clear()
+            } catch (e: Exception) {
+                // MockSeatApiClient 빈이 없는 경우 무시
+                println("모크 좌석 API 클라이언트를 찾을 수 없습니다: ${e.message}")
+            }
+            
             // 영속성 컨텍스트 클리어
             entityManager.flush()
             entityManager.clear()
@@ -94,17 +109,73 @@ class ReservationIntegrationTest(
             testConcert = concertEnv.concert
             testSchedule = concertEnv.schedule
             testSeat = concertEnv.seats.first()
-
-            // 토큰 생성 및 활성화
-            val token = TestDataFixture.createAndActivateToken(webApplicationContext, testUser.userId)
-            testToken = token.token
             
-            // DB에 즉시 반영
-            entityManager.flush()
+            // MockSeatApiClient에 좌석 데이터 동기화 - 빈이 존재하는 경우에만
+            try {
+                val mockSeatApiClient = webApplicationContext.getBean(kr.hhplus.be.server.config.mock.MockSeatApiClient::class.java)
+                concertEnv.seats.forEach { seat ->
+                    mockSeatApiClient.setSeatData(
+                        seat.seatId,
+                        SeatDto(
+                            seatId = seat.seatId,
+                            scheduleId = seat.scheduleId,
+                            seatNumber = seat.seatNumber,
+                            price = seat.price,
+                            statusCode = seat.status.code
+                        )
+                    )
+                }
+                println("좌석 데이터 동기화 완료: ${concertEnv.seats.size}개 좌석, seatId 범위: ${concertEnv.seats.first().seatId} ~ ${concertEnv.seats.last().seatId}")
+            } catch (e: Exception) {
+                println("모크 좌석 API 클라이언트에 데이터 동기화 실패: ${e.message}")
+            }
+
+            // 토큰 생성 및 활성화 - 직접 생성 with 디버깅
+            val tokenFactory = webApplicationContext.getBean(kr.hhplus.be.server.domain.auth.factory.TokenFactory::class.java)
+            val tokenStore = webApplicationContext.getBean(kr.hhplus.be.server.domain.auth.repositories.TokenStore::class.java)
+            val waitingToken = tokenFactory.createWaitingToken(testUser.userId)
+            println("생성된 토큰: ${waitingToken.token}, 사용자 ID: ${testUser.userId}")
+            
+            tokenStore.save(waitingToken)
+            println("토큰 저장 완료")
+            
+            tokenStore.activateToken(waitingToken.token)
+            println("토큰 활성화 완료")
+            
+            // 토큰 검증
+            val savedToken = tokenStore.findByToken(waitingToken.token)
+            val isValid = tokenStore.validate(waitingToken.token)
+            val status = tokenStore.getTokenStatus(waitingToken.token)
+            println("저장된 토큰 조회: $savedToken")
+            println("토큰 유효성: $isValid")
+            println("토큰 상태: $status")
         }
         
         // 트랜잭션 후 영속성 컨텍스트 클리어
         entityManager.clear()
+        
+        // 토큰 생성 및 활성화 - 트랜잭션 밖에서 수행
+        val tokenFactory = webApplicationContext.getBean(kr.hhplus.be.server.domain.auth.factory.TokenFactory::class.java)
+        val tokenStore = webApplicationContext.getBean(kr.hhplus.be.server.domain.auth.repositories.TokenStore::class.java)
+        val waitingToken = tokenFactory.createWaitingToken(testUser.userId)
+        println("생성된 토큰: ${waitingToken.token}, 사용자 ID: ${testUser.userId}")
+        
+        tokenStore.save(waitingToken)
+        println("토큰 저장 완료")
+        
+        tokenStore.activateToken(waitingToken.token)
+        println("토큰 활성화 완료")
+        
+        // 토큰 검증
+        val savedToken = tokenStore.findByToken(waitingToken.token)
+        val isValid = tokenStore.validate(waitingToken.token)
+        val status = tokenStore.getTokenStatus(waitingToken.token)
+        println("저장된 토큰 조회: $savedToken")
+        println("토큰 유효성: $isValid")
+        println("토큰 상태: $status")
+        
+        testToken = waitingToken.token
+        
         Thread.sleep(100)
     }
 
@@ -121,7 +192,7 @@ class ReservationIntegrationTest(
         Thread.sleep(200)
     }
 
-    describe("예약 생성 API") {
+    describe("예약 생성 API - POST /api/v1/reservations") {
         context("유효한 좌석을 예약할 때") {
             it("예약이 성공적으로 생성되어야 한다") {
                 // given
@@ -140,14 +211,16 @@ class ReservationIntegrationTest(
                 )
                 .andExpect(status().isCreated)
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("좌석 예약 완료"))
                 .andExpect(jsonPath("$.data.reservationId").exists())
                 .andExpect(jsonPath("$.data.userId").value(testUser.userId))
                 .andExpect(jsonPath("$.data.seatNumber").value("A1"))
+                .andExpect(jsonPath("$.data.statusCode").value("TEMPORARY"))
             }
         }
 
         context("이미 예약된 좌석을 예약하려고 할 때") {
-            it("충돌 상황을 적절히 처리해야 한다") {
+            it("중복 예약을 방지해야 한다") {
                 // given - 먼저 예약 생성
                 val firstRequest = ReservationCreateRequest(
                     userId = testUser.userId,
@@ -156,11 +229,13 @@ class ReservationIntegrationTest(
                     token = testToken
                 )
                 
-                mockMvc.perform(
+                val firstResult = mockMvc.perform(
                     post("/api/v1/reservations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(firstRequest))
-                ).andExpect(status().isCreated)
+                ).andReturn()
+                
+                firstResult.response.status shouldBe 201
 
                 // 첫 번째 예약이 완료될 시간을 줌
                 Thread.sleep(500)
@@ -174,9 +249,9 @@ class ReservationIntegrationTest(
                     pointAmount = TestDataConstants.Point.DEFAULT_AMOUNT
                 )
                 
-                val anotherToken = tokenFactory.createWaitingToken(anotherUser.userId)
-                tokenStore.save(anotherToken)
-                tokenStore.activateToken(anotherToken.token)
+                val anotherWaitingToken = tokenFactory.createWaitingToken(anotherUser.userId)
+                tokenStore.save(anotherWaitingToken)
+                tokenStore.activateToken(anotherWaitingToken.token)
 
                 // 토큰이 제대로 활성화될 시간을 줌
                 Thread.sleep(200)
@@ -186,42 +261,173 @@ class ReservationIntegrationTest(
                     userId = anotherUser.userId,
                     concertId = testConcert.concertId,
                     seatId = testSeat.seatId,
-                    token = anotherToken.token
+                    token = anotherWaitingToken.token
                 )
 
-                try {
-                    val result = mockMvc.perform(
-                        post("/api/v1/reservations")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(secondRequest))
-                    )
+                val secondResult = mockMvc.perform(
+                    post("/api/v1/reservations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(secondRequest))
+                ).andReturn()
 
-                    val response = result.andReturn().response
-                    val status = response.status
-                    val content = response.contentAsString
-                    
-                    println("두 번째 예약 시도 응답: Status=$status, Content=$content")
-                    
-                    // 실패 응답(4xx, 5xx)이 와야 정상
-                    assert(status >= 400) { "이미 예약된 좌석에 대한 예약 시도는 실패해야 합니다. 실제 응답: $status" }
-                    
-                    // 구체적인 상태 코드 확인 (선택적)
-                    when (status) {
-                        400 -> println("비즈니스 로직 오류로 인한 Bad Request")
-                        409 -> println("좌석 충돌로 인한 Conflict")
-                        429 -> println("분산락 타임아웃으로 인한 Too Many Requests")
-                        500 -> {
-                            println("서버 내부 오류 발생")
-                            println("응답 내용: $content")
-                            // 500 에러도 예상 가능한 결과로 처리 (락 경합 상황에서 발생할 수 있음)
-                        }
-                        else -> println("기타 오류 응답: $status")
-                    }
-                    
-                } catch (e: Exception) {
-                    println("두 번째 예약 시도 중 예외 발생: ${e.message}")
-                    // 예외 발생도 중복 예약 방지가 제대로 작동하는 것으로 간주
-                }
+                val status = secondResult.response.status
+                status shouldBeGreaterThan 399  // 4xx 또는 5xx 에러
+                
+                println("두 번째 예약 시도 결과: Status=$status")
+                println("응답 내용: ${secondResult.response.contentAsString}")
+            }
+        }
+
+        context("잘못된 토큰으로 예약을 시도할 때") {
+            it("404 Not Found를 반환해야 한다") {
+                // given
+                val request = ReservationCreateRequest(
+                    userId = testUser.userId,
+                    concertId = testConcert.concertId,
+                    seatId = testSeat.seatId,
+                    token = "invalid-token"
+                )
+
+                // when & then
+                mockMvc.perform(
+                    post("/api/v1/reservations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isNotFound)
+            }
+        }
+    }
+
+    describe("예약 조회 API - GET /api/v1/reservations/{id}") {
+        context("존재하는 예약을 조회할 때") {
+            it("예약 정보를 반환해야 한다") {
+                // given - 먼저 예약 생성
+                val createRequest = ReservationCreateRequest(
+                    userId = testUser.userId,
+                    concertId = testConcert.concertId,
+                    seatId = testSeat.seatId,
+                    token = testToken
+                )
+
+                val createResult = mockMvc.perform(
+                    post("/api/v1/reservations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest))
+                ).andReturn()
+                
+                val responseBody = objectMapper.readTree(createResult.response.contentAsString)
+                val reservationId = responseBody.get("data").get("reservationId").asLong()
+
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/reservations/$reservationId")
+                )
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("예약 정보 조회 완료"))
+                .andExpect(jsonPath("$.data.reservationId").value(reservationId))
+                .andExpect(jsonPath("$.data.userId").value(testUser.userId))
+            }
+        }
+
+        context("존재하지 않는 예약을 조회할 때") {
+            it("404 Not Found를 반환해야 한다") {
+                // given
+                val invalidId = 99999L
+
+                // when & then
+                mockMvc.perform(
+                    get("/api/v1/reservations/$invalidId")
+                )
+                .andExpect(status().isNotFound)
+            }
+        }
+    }
+
+    describe("예약 취소 API - DELETE /api/v1/reservations/{id}") {
+        context("자신의 예약을 취소할 때") {
+            it("예약이 취소되어야 한다") {
+                // given - 먼저 예약 생성
+                val createRequest = ReservationCreateRequest(
+                    userId = testUser.userId,
+                    concertId = testConcert.concertId,
+                    seatId = testSeat.seatId,
+                    token = testToken
+                )
+
+                val createResult = mockMvc.perform(
+                    post("/api/v1/reservations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest))
+                ).andReturn()
+                
+                val responseBody = objectMapper.readTree(createResult.response.contentAsString)
+                val reservationId = responseBody.get("data").get("reservationId").asLong()
+
+                val cancelRequest = ReservationCancelRequest(
+                    userId = testUser.userId,
+                    cancelReason = "개인 사정으로 인한 취소",
+                    token = testToken
+                )
+
+                // when & then
+                mockMvc.perform(
+                    delete("/api/v1/reservations/$reservationId")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cancelRequest))
+                )
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("예약 취소 완료"))
+                .andExpect(jsonPath("$.data.statusCode").value("CANCELLED"))
+            }
+        }
+
+        context("다른 사용자의 예약을 취소하려고 할 때") {
+            it("403 Forbidden을 반환해야 한다") {
+                // given - 먼저 예약 생성
+                val createRequest = ReservationCreateRequest(
+                    userId = testUser.userId,
+                    concertId = testConcert.concertId,
+                    seatId = testSeat.seatId,
+                    token = testToken
+                )
+
+                val createResult = mockMvc.perform(
+                    post("/api/v1/reservations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest))
+                ).andReturn()
+                
+                val responseBody = objectMapper.readTree(createResult.response.contentAsString)
+                val reservationId = responseBody.get("data").get("reservationId").asLong()
+
+                // 다른 사용자로 취소 시도
+                val anotherUserId = testUserId + 2000
+                val anotherUser = TestDataFixture.createTestUser(
+                    context = webApplicationContext,
+                    userId = anotherUserId,
+                    withPoints = false
+                )
+                
+                val anotherTokenForCancel = tokenFactory.createWaitingToken(anotherUser.userId)
+                tokenStore.save(anotherTokenForCancel)
+                tokenStore.activateToken(anotherTokenForCancel.token)
+
+                val cancelRequest = ReservationCancelRequest(
+                    userId = anotherUser.userId,
+                    cancelReason = null,
+                    token = anotherTokenForCancel.token
+                )
+
+                // when & then
+                mockMvc.perform(
+                    delete("/api/v1/reservations/$reservationId")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cancelRequest))
+                )
+                .andExpect(status().isForbidden)
             }
         }
     }

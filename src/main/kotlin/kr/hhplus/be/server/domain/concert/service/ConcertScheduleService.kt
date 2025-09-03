@@ -6,7 +6,7 @@ import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
 import kr.hhplus.be.server.domain.concert.models.Seat
 import kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
 import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
-import kr.hhplus.be.server.domain.common.ConcertBusinessRules
+import kr.hhplus.be.server.domain.concert.rules.ConcertBusinessRules
 import kr.hhplus.be.server.global.exception.ParameterValidationException
 import kr.hhplus.be.server.global.properties.ConcertProperties
 import org.springframework.stereotype.Service

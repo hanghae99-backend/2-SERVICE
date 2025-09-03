@@ -5,15 +5,11 @@ import io.kotest.core.spec.style.DescribeSpec
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kr.hhplus.be.server.api.balance.controller.BalanceController
 import kr.hhplus.be.server.api.balance.dto.request.ChargeBalanceRequest
-import kr.hhplus.be.server.api.balance.usecase.ChargeBalanceUseCase
-import kr.hhplus.be.server.api.balance.usecase.DeductBalanceUseCase
 import kr.hhplus.be.server.domain.balance.service.BalanceService
 import kr.hhplus.be.server.domain.balance.models.Point
 import kr.hhplus.be.server.domain.balance.models.PointHistory
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
-import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
 import kr.hhplus.be.server.global.exception.GlobalExceptionHandler
 import kr.hhplus.be.server.domain.user.exception.UserNotFoundException
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -22,16 +18,13 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.math.BigDecimal
-import java.time.LocalDateTime
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 
 @WebMvcTest(BalanceController::class)
 class BalanceControllerTest : DescribeSpec({
     
     val balanceService = mockk<BalanceService>()
-    val chargeBalanceUseCase = mockk<ChargeBalanceUseCase>()
-    val deductBalanceUseCase = mockk<DeductBalanceUseCase>()
-    val balanceController = BalanceController(balanceService, chargeBalanceUseCase, deductBalanceUseCase)
+    val balanceController = BalanceController(balanceService)
     val mockMvc = MockMvcBuilders.standaloneSetup(balanceController)
         .setControllerAdvice(GlobalExceptionHandler())
         .build()
@@ -46,7 +39,7 @@ class BalanceControllerTest : DescribeSpec({
                 val request = ChargeBalanceRequest(userId, amount)
                 val point = Point.create(userId, BigDecimal("15000"))
                 
-                every { chargeBalanceUseCase.execute(userId, amount) } returns point
+                every { balanceService.chargeBalance(userId, amount) } returns point
                 
                 // when & then
                 mockMvc.perform(
@@ -59,7 +52,7 @@ class BalanceControllerTest : DescribeSpec({
                     .andExpect(jsonPath("$.data.chargedAmount").value(amount))
                     .andExpect(jsonPath("$.message").value("잔액 충전이 완료되었습니다"))
                 
-                verify { chargeBalanceUseCase.execute(userId, amount) }
+                verify { balanceService.chargeBalance(userId, amount) }
             }
         }
         
@@ -70,7 +63,7 @@ class BalanceControllerTest : DescribeSpec({
                 val amount = BigDecimal("10000")
                 val request = ChargeBalanceRequest(userId, amount)
                 
-                every { chargeBalanceUseCase.execute(userId, amount) } throws 
+                every { balanceService.chargeBalance(userId, amount) } throws 
                     UserNotFoundException("존재하지 않는 사용자입니다: $userId")
                 
                 // when & then
@@ -81,7 +74,7 @@ class BalanceControllerTest : DescribeSpec({
                 )
                     .andExpect(status().isNotFound)
                 
-                verify { chargeBalanceUseCase.execute(userId, amount) }
+                verify { balanceService.chargeBalance(userId, amount) }
             }
         }
         

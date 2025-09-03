@@ -12,7 +12,9 @@ import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
 import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
 import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
-import kr.hhplus.be.server.global.event.DomainEventPublisher
+import org.springframework.context.ApplicationEventPublisher
+import kr.hhplus.be.server.global.client.BalanceApiClient
+import kr.hhplus.be.server.global.client.ReservationApiClient
 import kr.hhplus.be.server.config.TestDataFixture
 import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal
@@ -21,17 +23,17 @@ class PaymentServiceTest : DescribeSpec({
     
     val paymentRepository = mockk<PaymentRepository>()
     val paymentStatusTypeRepository = mockk<PaymentStatusTypePojoRepository>()
-    val domainEventPublisher = mockk<DomainEventPublisher>()
-    
+    val applicationEventPublisher = mockk<ApplicationEventPublisher>()
+    val balanceApiClient = mockk<BalanceApiClient>()
+    val reservationApiClient = mockk<ReservationApiClient>()
     val paymentService = PaymentService(
         paymentRepository,
         paymentStatusTypeRepository,
-        domainEventPublisher
+        applicationEventPublisher,
+        balanceApiClient,
+        reservationApiClient
     )
     
-    beforeEach {
-        every { domainEventPublisher.publish(any()) } returns Unit
-    }
     
     describe("createReservationPayment") {
         context("유효한 예약에 대해 결제를 생성할 때") {
@@ -91,13 +93,12 @@ class PaymentServiceTest : DescribeSpec({
                 every { paymentRepository.save(any()) } returns payment
                 
                 // when
-                val result = paymentService.completePayment(paymentId, reservationId, seatId, token)
+                val result = paymentService.completePayment(paymentId, reservationId, seatId, token, 1L, "A1", 1L)
                 
                 // then
                 result shouldNotBe null
                 result.paymentId shouldBe paymentId
                 verify { paymentRepository.save(any()) }
-                verify { domainEventPublisher.publish(any()) }
             }
         }
     }

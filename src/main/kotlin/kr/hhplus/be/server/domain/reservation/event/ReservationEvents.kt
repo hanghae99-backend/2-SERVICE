@@ -16,33 +16,15 @@ data class ReservationCreatedEvent(
     override val eventType: String = "ReservationCreated"
 }
 
-data class ReservationConfirmedEvent(
-    val reservationId: Long,
-    val userId: Long,
-    val concertId: Long,
-    val seatId: Long,
-    val paymentId: Long,
-    val price: BigDecimal
-) : AbstractDomainEvent() {
-    override val eventType: String = "ReservationConfirmed"
-}
-
 data class ReservationCancelledEvent(
-    val reservationId: Long,
+    val reservationId: Long? = null,  // ReservationFailedEvent는 reservationId가 없을 수 있음
     val userId: Long,
     val concertId: Long,
     val seatId: Long,
     val cancelReason: String,
-    val isExpired: Boolean = false
+    val isExpired: Boolean = false,
+    val isFailed: Boolean = false    // 예약 생성 실패인지 구분
 ) : AbstractDomainEvent() {
     override val eventType: String = "ReservationCancelled"
 }
 
-data class ReservationExpiredEvent(
-    val reservationId: Long,
-    val userId: Long,
-    val concertId: Long,
-    val seatId: Long
-) : AbstractDomainEvent() {
-    override val eventType: String = "ReservationExpired"
-}

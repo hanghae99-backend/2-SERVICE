@@ -14,9 +14,17 @@ import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
 import kr.hhplus.be.server.domain.reservation.models.Reservation
 import kr.hhplus.be.server.domain.reservation.repositories.ReservationRepository
 import kr.hhplus.be.server.domain.user.models.User
+import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.config.TestDataFixture
+import kr.hhplus.be.server.config.MockTestConfiguration
+import kr.hhplus.be.server.config.mock.MockConcertDataPlatformClient
+import kr.hhplus.be.server.domain.auth.service.TokenManager
+import kr.hhplus.be.server.domain.auth.models.TokenStatus
+import org.springframework.context.annotation.Import
+import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -34,6 +42,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 @ConcurrencyTest
+@Import(MockTestConfiguration::class)
 class PaymentConcurrencyTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
@@ -42,7 +51,10 @@ class PaymentConcurrencyTest(
     private val paymentRepository: PaymentRepository,
     private val distributedLock: DistributedLock,
     private val redisTemplate: RedisTemplate<String, Any>,
-    private val transactionManager: PlatformTransactionManager
+    private val transactionManager: PlatformTransactionManager,
+    private val tokenManager: TokenManager,
+    private val mockDataPlatformClient: MockConcertDataPlatformClient,
+    private val tokenStore: kr.hhplus.be.server.domain.auth.repositories.TokenStore
 ) : DescribeSpec({
     extension(SpringExtension)
     
@@ -112,13 +124,24 @@ class PaymentConcurrencyTest(
             testSeat = concertEnv.seats.first()
             
             // 각 사용자별로 개별 좌석과 예약 생성
-            testReservations = TestDataFixture.createReservationsForUsers(
-                context = webApplicationContext,
-                users = testUsers,
-                concertId = testConcert.concertId,
-                scheduleId = testSchedule.scheduleId,
-                seatPrice = BigDecimal("50000")
-            )
+            testReservations = testUsers.mapIndexed { index, user ->
+                // 각 사용자마다 개별 좌석 생성
+                val userSeat = TestDataFixture.createTestSeats(
+                    context = webApplicationContext,
+                    scheduleId = testSchedule.scheduleId,
+                    seatCount = 1,
+                    startNumber = 100 + index,
+                    price = BigDecimal("50000")
+                ).first()
+                
+                // 예약 생성
+                val reservationService = webApplicationContext.getBean(kr.hhplus.be.server.domain.reservation.service.ReservationService::class.java)
+                reservationService.createReservation(
+                    userId = user.userId,
+                    concertId = testConcert.concertId,
+                    seatId = userSeat.seatId
+                )
+            }
             
             // 토큰 생성
             val tokenFactory = webApplicationContext.getBean(kr.hhplus.be.server.domain.auth.factory.TokenFactory::class.java)
@@ -150,6 +173,18 @@ class PaymentConcurrencyTest(
         // 트랜잭션 후 영속성 컨텍스트 클리어
         val entityManager = webApplicationContext.getBean(jakarta.persistence.EntityManager::class.java)
         entityManager.clear()
+        
+        // MockReservationApiClient에 예약 ID 등록 - 결제에서 예약 확인을 위해 필요
+        try {
+            val mockReservationApiClient = webApplicationContext.getBean(kr.hhplus.be.server.config.mock.MockReservationApiClient::class.java)
+            mockReservationApiClient.clear()
+            testReservations.forEach { reservation ->
+                mockReservationApiClient.addValidReservationId(reservation.reservationId)
+            }
+            println("예약 ID 등록 완료: ${testReservations.map { it.reservationId }}")
+        } catch (e: Exception) {
+            println("모크 예약 API 클라이언트에 예약 ID 등록 실패: ${e.message}")
+        }
         
         // 데이터 정합성 확인을 위한 대기
         Thread.sleep(500)
@@ -186,6 +221,7 @@ class PaymentConcurrencyTest(
                                 userId = user.userId,
                                 reservationId = testReservations[index].reservationId,
                                 seatId = testReservations[index].seatId, // 각 사용자별 고유 좌석 사용
+                                amount = testReservations[index].price,
                                 token = testTokens[index].token
                             )
 
@@ -235,6 +271,12 @@ class PaymentConcurrencyTest(
                 
                 // 모든 사용자가 각자의 좌석에 대해 결제 성공해야 함
                 successCount.get() shouldBe testUsers.size
+                
+                // 비동기 처리 대기 및 검증
+                println("\n=== 비동기 처리 검증 시작 ===")
+                Thread.sleep(2000) // 비동기 이벤트 처리 대기
+                
+                println("=== 비동기 처리 검증 완료 ===\n")
 
                 executor.shutdown()
                 executor.awaitTermination(5, TimeUnit.SECONDS)

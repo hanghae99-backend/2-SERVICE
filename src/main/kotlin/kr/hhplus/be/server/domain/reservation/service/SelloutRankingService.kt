@@ -59,7 +59,6 @@ class SelloutRankingService(
         val oneHourAgo = LocalDateTime.now().minusHours(1)
         val reservationCounts = reservationRepository.countReservationsByHour(oneHourAgo)
         
-        // 임시 키에 데이터 저장
         reservationCounts.forEach { (concertId, count) ->
             redisTemplate.opsForZSet().add(tempKey, concertId.toString(), count.toDouble())
         }

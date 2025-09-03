@@ -194,13 +194,14 @@ class BalanceConcurrencyTest(
         }
 
         context("동일한 사용자가 동시에 여러 번 충전을 요청할 때") {
-            it("분산락으로 순차적으로 처리되어야 한다") {
+            it("분산락으로 인해 하나의 요청만 성공하고 나머지는 429 에러를 반환해야 한다") {
                 // given
                 val requestCount = 5
                 val chargeAmount = BigDecimal("10000")
                 val executor = Executors.newFixedThreadPool(requestCount)
                 val latch = CountDownLatch(requestCount)
                 val successCount = AtomicInteger(0)
+                val tooManyRequestsCount = AtomicInteger(0)
 
                 // when
                 val futures = (0 until requestCount).map {
@@ -220,11 +221,16 @@ class BalanceConcurrencyTest(
                                     .content(objectMapper.writeValueAsString(request))
                             ).andReturn()
 
-                            if (result.response.status == 200) {
-                                successCount.incrementAndGet()
-                                "SUCCESS"
-                            } else {
-                                "FAILURE: ${result.response.status}"
+                            when (result.response.status) {
+                                200 -> {
+                                    successCount.incrementAndGet()
+                                    "SUCCESS"
+                                }
+                                429 -> {
+                                    tooManyRequestsCount.incrementAndGet()
+                                    "TOO_MANY_REQUESTS"
+                                }
+                                else -> "FAILURE: ${result.response.status}"
                             }
                         } catch (e: Exception) {
                             "ERROR: ${e.message}"
@@ -237,13 +243,15 @@ class BalanceConcurrencyTest(
                 // then
                 println("=== 동일 사용자 동시 충전 결과 ===")
                 println("성공: ${successCount.get()}")
+                println("429 에러: ${tooManyRequestsCount.get()}")
                 results.forEach { println(it) }
 
-                // 모든 요청이 성공해야 함 (분산락으로 순차 처리)
-                successCount.get() shouldBe requestCount
+                // 분산락의 정상 동작: 하나만 성공, 나머지는 429 에러
+                successCount.get() shouldBe 1
+                tooManyRequestsCount.get() shouldBe (requestCount - 1)
 
-                // 최종 잔액 검증
-                val expectedBalance = 10000 + (10000 * requestCount)  // 10000 + (10000 * 5) = 60000
+                // 최종 잔액 검증: 초기 잔액 + 한 번의 충전만 반영되어야 함
+                val expectedBalance = 10000 + 10000  // 10000 + (10000 * 1)
                 val result = mockMvc.perform(
                     get("/api/v1/balance/{userId}", testUser.userId)
                 ).andReturn()

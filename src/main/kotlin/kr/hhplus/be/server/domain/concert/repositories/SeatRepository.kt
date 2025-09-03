@@ -4,9 +4,8 @@ import kr.hhplus.be.server.domain.concert.models.Seat
 
 interface SeatRepository {
     fun save(seat: Seat): Seat
-    fun saveAll(seats: List<Seat>): List<Seat> // 추가
+    fun saveAll(seats: List<Seat>): List<Seat>
     fun findById(id: Long): Seat?
-    fun findByIdWithPessimisticLock(id: Long): Seat? // 추가
     fun findByScheduleId(scheduleId: Long): List<Seat>
     fun findByScheduleIdAndStatusCode(scheduleId: Long, statusCode: String): List<Seat>
     fun findByScheduleIdAndStatusCodeOrderBySeatNumberAsc(scheduleId: Long, statusCode: String): List<Seat> // 추가

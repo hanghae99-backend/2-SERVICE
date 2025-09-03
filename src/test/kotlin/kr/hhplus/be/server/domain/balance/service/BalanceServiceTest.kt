@@ -12,6 +12,7 @@ import kr.hhplus.be.server.domain.balance.models.PointHistory
 import kr.hhplus.be.server.domain.balance.models.PointHistoryType
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
+import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
 import kr.hhplus.be.server.config.TestDataFixture
 import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal
@@ -22,10 +23,12 @@ class BalanceServiceTest : DescribeSpec({
     
     val pointRepository = mockk<PointRepository>()
     val pointHistoryRepository = mockk<PointHistoryRepository>()
+    val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
     
     val balanceService = BalanceService(
         pointRepository,
-        pointHistoryRepository
+        pointHistoryRepository,
+        pointHistoryTypeRepository
     )
     
     describe("getBalance") {

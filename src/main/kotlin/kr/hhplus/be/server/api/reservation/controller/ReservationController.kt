@@ -9,8 +9,7 @@ import kr.hhplus.be.server.global.response.CommonApiResponse
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCreateRequest
 import kr.hhplus.be.server.api.reservation.dto.request.ReservationCancelRequest
-import kr.hhplus.be.server.api.reservation.usecase.ReserveSeatUseCase
-import kr.hhplus.be.server.api.reservation.usecase.CancelReservationUseCase
+import kr.hhplus.be.server.domain.auth.service.TokenValidator
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -22,8 +21,7 @@ import org.springframework.web.bind.annotation.*
 @Tag(name = "Reservation", description = "예약 관리 API")
 class ReservationController(
     private val reservationService: ReservationService,
-    private val reserveSeatUseCase: ReserveSeatUseCase,
-    private val cancelReservationUseCase: CancelReservationUseCase
+    private val tokenValidator: TokenValidator
 ) {
 
     @Operation(
@@ -36,13 +34,13 @@ class ReservationController(
         @Parameter(description = "예약 생성 요청", required = true)
         request: ReservationCreateRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        val reservation = reserveSeatUseCase.execute(
+        tokenValidator.validateActiveToken(request.token)
+        val reservation = reservationService.createReservation(
             userId = request.userId,
             concertId = request.concertId,
-            seatId = request.seatId,
-            token = request.token
+            seatId = request.seatId
         )
-        
+
         return ResponseEntity.status(201).body(
             CommonApiResponse.success(
                 data = ReservationDto.fromEntity(reservation),
@@ -50,6 +48,7 @@ class ReservationController(
             )
         )
     }
+
 
     @Operation(
         summary = "예약 취소",
@@ -66,11 +65,11 @@ class ReservationController(
         @Parameter(description = "예약 취소 요청", required = true)
         request: ReservationCancelRequest
     ): ResponseEntity<CommonApiResponse<ReservationDto>> {
-        val reservation = cancelReservationUseCase.execute(
+        tokenValidator.validateActiveToken(request.token)
+        val reservation = reservationService.cancelReservationByUser(
             reservationId = reservationId,
             userId = request.userId,
-            cancelReason = request.cancelReason,
-            token = request.token
+            cancelReason = request.cancelReason
         )
         
         return ResponseEntity.ok(

@@ -6,6 +6,7 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import org.springframework.stereotype.Repository
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 @Repository
 class PointHistoryRepositoryImpl(
@@ -33,11 +34,9 @@ class PointHistoryRepositoryImpl(
     }
     
     override fun findChargeAmountByUserIdAndDate(userId: Long, date: LocalDate): BigDecimal? {
-        // 간단한 구현 - 실제로는 JPA 쿼리를 사용해야 함
-        val histories = findByUserIdOrderByCreatedAtDesc(userId)
-        return histories.filter { 
-            it.createdAt?.toLocalDate() == date && it.historyType.code == PointHistoryType.CHARGE
-        }.sumOf { it.amount }
+        val startOfDay = date.atStartOfDay()
+        val endOfDay = date.plusDays(1).atStartOfDay()
+        return pointHistoryJpaRepository.sumChargeAmountByUserIdAndDate(userId, startOfDay, endOfDay)
     }
     
     override fun flush() {

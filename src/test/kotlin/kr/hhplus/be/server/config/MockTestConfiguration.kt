@@ -3,9 +3,18 @@ package kr.hhplus.be.server.config
 import kr.hhplus.be.server.domain.auth.models.TokenStatus
 import kr.hhplus.be.server.domain.auth.models.WaitingToken
 import kr.hhplus.be.server.domain.auth.repositories.TokenStore
+import kr.hhplus.be.server.global.client.BalanceApiClient
+import kr.hhplus.be.server.global.client.ReservationApiClient
+import kr.hhplus.be.server.global.client.ConcertDataPlatformClient
+import kr.hhplus.be.server.global.client.SeatApiClient
+import kr.hhplus.be.server.config.mock.MockBalanceApiClient
+import kr.hhplus.be.server.config.mock.MockReservationApiClient
+import kr.hhplus.be.server.config.mock.MockConcertDataPlatformClient
+import kr.hhplus.be.server.config.mock.MockSeatApiClient
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
+import java.math.BigDecimal
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -20,6 +29,30 @@ class MockTestConfiguration {
     @Primary
     fun mockTokenStore(): TokenStore {
         return InMemoryTokenStore()
+    }
+    
+    @Bean
+    @Primary
+    fun mockBalanceApiClient(): BalanceApiClient {
+        return MockBalanceApiClient()
+    }
+    
+    @Bean
+    @Primary
+    fun mockReservationApiClient(): ReservationApiClient {
+        return MockReservationApiClient()
+    }
+    
+    @Bean
+    @Primary
+    fun mockConcertDataPlatformClient(): ConcertDataPlatformClient {
+        return MockConcertDataPlatformClient()
+    }
+    
+    @Bean
+    @Primary
+    fun mockSeatApiClient(): SeatApiClient {
+        return MockSeatApiClient()
     }
 }
 
@@ -156,6 +189,13 @@ class InMemoryTokenStore : TokenStore {
         return expiredTokens
     }
     
+    override fun removeExpiredTokens() {
+        val expiredTokens = findExpiredActiveTokens()
+        expiredTokens.forEach { token ->
+            expireToken(token)
+        }
+    }
+    
     private fun updateQueuePositions() {
         queuePositions.clear()
         waitingQueue.forEachIndexed { index, token ->
@@ -177,3 +217,4 @@ class InMemoryTokenStore : TokenStore {
     fun getActiveTokensCount(): Int = activeTokens.size
     fun getAllTokens(): Map<String, WaitingToken> = tokens.toMap()
 }
+

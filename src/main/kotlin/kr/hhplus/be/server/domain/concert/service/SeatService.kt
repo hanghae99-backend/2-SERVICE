@@ -7,7 +7,9 @@ import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatRepository
 import kr.hhplus.be.server.domain.concert.repositories.SeatStatusTypePojoRepository
 import kr.hhplus.be.server.global.extension.orElseThrow
-import kr.hhplus.be.server.domain.common.ConcertBusinessRules
+import kr.hhplus.be.server.domain.concert.rules.ConcertBusinessRules
+import kr.hhplus.be.server.global.lock.LockGuard
+import kr.hhplus.be.server.global.lock.LockStrategy
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
@@ -60,6 +62,18 @@ class SeatService(
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
         return seat.isAvailable()
     }
+
+    fun validateSeatAvailability(seatId: Long) {
+        val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
+        if (!seat.isAvailable()) {
+            throw IllegalStateException("예약할 수 없는 좌석입니다. ID: $seatId")
+        }
+    }
+    @LockGuard(
+        key = "'seat:' + #seatId",
+        strategy = LockStrategy.PUB_SUB,
+        waitTimeoutMs = 3000L
+    )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
@@ -75,6 +89,11 @@ class SeatService(
         return SeatDto.from(savedSeat)
     }
     
+    @LockGuard(
+        key = "'seat:' + #seatId",
+        strategy = LockStrategy.PUB_SUB,
+        waitTimeoutMs = 3000L
+    )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun confirmSeat(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId).orElseThrow { SeatNotFoundException(seatId) }
@@ -85,6 +104,11 @@ class SeatService(
         return SeatDto.from(savedSeat)
     }
 
+    @LockGuard(
+        key = "'seat:' + #seatId",
+        strategy = LockStrategy.PUB_SUB,
+        waitTimeoutMs = 3000L
+    )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun releaseSeat(seatId: Long): SeatDto {
         val seat = seatRepository.findById(seatId)

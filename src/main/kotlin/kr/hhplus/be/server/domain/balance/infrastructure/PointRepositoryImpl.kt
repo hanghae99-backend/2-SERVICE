@@ -21,10 +21,6 @@ class PointRepositoryImpl(
         return pointJpaRepository.findByUserId(userId)
     }
     
-    override fun findByUserIdWithPessimisticLock(userId: Long): Point? {
-        return pointJpaRepository.findByUserIdWithPessimisticLock(userId).orElse(null)
-    }
-    
     override fun delete(point: Point) {
         pointJpaRepository.delete(point)
     }

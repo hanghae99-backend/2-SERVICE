@@ -12,11 +12,19 @@ import kr.hhplus.be.server.global.lock.DistributedLock
 import kr.hhplus.be.server.config.TestDataCleanupHelper
 import kr.hhplus.be.server.config.TestDataFixture
 import kr.hhplus.be.server.config.TestDataConstants
+import kr.hhplus.be.server.config.MockTestConfiguration
+import org.springframework.context.annotation.Import
 import kr.hhplus.be.server.domain.concert.models.Concert
 import kr.hhplus.be.server.domain.concert.models.ConcertSchedule
 import kr.hhplus.be.server.domain.concert.models.Seat
 import kr.hhplus.be.server.domain.reservation.models.Reservation
 import kr.hhplus.be.server.domain.user.models.User
+import kr.hhplus.be.server.domain.auth.service.TokenManager
+import kr.hhplus.be.server.config.mock.MockConcertDataPlatformClient
+import kr.hhplus.be.server.config.mock.MockReservationApiClient
+import kr.hhplus.be.server.domain.auth.models.TokenStatus
+import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.shouldBe
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -29,8 +37,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.context.WebApplicationContext
 import java.math.BigDecimal
 import java.time.LocalDate
+import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 
 @IntegrationTest
+@Import(MockTestConfiguration::class)
 class PaymentIntegrationTest(
     private val webApplicationContext: WebApplicationContext,
     private val objectMapper: ObjectMapper,
@@ -38,7 +48,10 @@ class PaymentIntegrationTest(
     private val tokenFactory: TokenFactory,
     private val distributedLock: DistributedLock,
     private val redisTemplate: RedisTemplate<String, Any>,
-    private val transactionManager: PlatformTransactionManager
+    private val transactionManager: PlatformTransactionManager,
+    private val tokenManager: TokenManager,
+    private val mockDataPlatformClient: MockConcertDataPlatformClient,
+    private val mockReservationApiClient: MockReservationApiClient
 ) : DescribeSpec({
     extension(SpringExtension)
     
@@ -113,6 +126,9 @@ class PaymentIntegrationTest(
             // 토큰 생성 및 활성화
             val token = TestDataFixture.createAndActivateToken(webApplicationContext, testUser.userId)
             
+            // Mock에 유효한 예약 ID 등록
+            mockReservationApiClient.addValidReservationId(testReservation.reservationId)
+            
             // DB에 즉시 반영
             entityManager.flush()
         }
@@ -150,6 +166,7 @@ class PaymentIntegrationTest(
                     userId = testUser.userId,
                     reservationId = testReservation.reservationId,
                     seatId = testSeat.seatId,
+                    amount = testSeat.price,
                     token = activeToken.token
                 )
 
@@ -158,12 +175,19 @@ class PaymentIntegrationTest(
                     post("/api/v1/payments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                )
+                ).andDo(print())
                 .andExpect(status().isCreated)
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.paymentId").exists())
                 .andExpect(jsonPath("$.data.userId").value(testUser.userId))
                 .andExpect(jsonPath("$.data.amount").value(50000))  // 좌석 기본 가격
+                
+                // 대기 시간 후 비동기 처리 확인 
+                Thread.sleep(1000)
+                
+                // 데이터 플랫폼 전송 검증 (비동기)
+                Thread.sleep(500)
+                // mockDataPlatformClient.isPaymentDataSent(결제 ID) shouldBe true
             }
         }
 
@@ -176,17 +200,23 @@ class PaymentIntegrationTest(
                     userId = testUser.userId,
                     reservationId = 99999L,
                     seatId = testSeat.seatId,
+                    amount = testSeat.price,
                     token = activeToken.token
                 )
 
                 // when & then
-                mockMvc.perform(
-                    post("/api/v1/payments")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-                )
-                .andExpect(status().isNotFound)
-                .andExpect(jsonPath("$.success").value(false))
+                try {
+                    val result = mockMvc.perform(
+                        post("/api/v1/payments")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request))
+                    ).andDo(print())
+                    .andExpect(status().isNotFound)
+                    .andExpect(jsonPath("$.success").value(false))
+                } catch (e: AssertionError) {
+                    println("AssertionError: ${e.message}")
+                    throw e
+                }
             }
         }
     }

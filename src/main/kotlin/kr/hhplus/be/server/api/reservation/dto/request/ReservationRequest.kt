@@ -54,11 +54,6 @@ data class ReservationCancelRequest(
  */
 @Schema(description = "예약 확정 요청")
 data class ReservationConfirmRequest(
-    @field:NotNull(message = "예약 ID는 필수입니다")
-    @field:Positive(message = "예약 ID는 양수여야 합니다")
-    @Schema(description = "예약 ID", example = "1", required = true)
-    val reservationId: Long,
-    
     @field:NotNull(message = "결제 ID는 필수입니다")
     @field:Positive(message = "결제 ID는 양수여야 합니다")
     @Schema(description = "결제 ID", example = "1", required = true)

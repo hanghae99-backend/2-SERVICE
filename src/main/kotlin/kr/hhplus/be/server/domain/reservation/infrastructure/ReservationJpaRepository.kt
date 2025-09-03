@@ -10,14 +10,9 @@ import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 import jakarta.persistence.LockModeType
 import java.time.LocalDateTime
-import java.util.Optional
 
 @Repository
 interface ReservationJpaRepository : JpaRepository<Reservation, Long> {
-    
-    @Query("SELECT r FROM Reservation r WHERE r.reservationId = :id")
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    fun findByIdWithPessimisticLock(@Param("id") id: Long): Optional<Reservation>
     
     // 사용자별 조회
     fun findByUserIdOrderByReservedAtDesc(userId: Long): List<Reservation>

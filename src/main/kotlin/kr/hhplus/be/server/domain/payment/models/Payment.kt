@@ -1,8 +1,8 @@
 package kr.hhplus.be.server.domain.payment.models
 
+import kr.hhplus.be.server.domain.payment.exception.PaymentAlreadyProcessedException
 import kr.hhplus.be.server.global.common.BaseEntity
 import kr.hhplus.be.server.global.exception.ParameterValidationException
-import kr.hhplus.be.server.domain.common.PaymentAlreadyProcessedException
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime

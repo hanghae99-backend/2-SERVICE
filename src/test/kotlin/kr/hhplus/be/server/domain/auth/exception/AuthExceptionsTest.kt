@@ -271,8 +271,6 @@ class AuthExceptionsTest : DescribeSpec({
                 val tokenActivation = TokenActivationException()
                 
                 // then - RuntimeException을 상속하므로 컴파일 타임에 항상 true
-                // 이 테스트는 컴파일 타임에 보장되므로 실제로는 불필요하지만,
-                // 문서화 목적으로 유지
                 tokenNotFound::class.java.superclass shouldBe RuntimeException::class.java
                 tokenExpired::class.java.superclass shouldBe RuntimeException::class.java
                 invalidToken::class.java.superclass shouldBe RuntimeException::class.java

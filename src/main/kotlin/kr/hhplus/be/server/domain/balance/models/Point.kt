@@ -4,7 +4,7 @@ import kr.hhplus.be.server.global.common.BaseEntity
 import jakarta.persistence.*
 import kr.hhplus.be.server.domain.balance.exception.InvalidAmountException
 import kr.hhplus.be.server.domain.balance.exception.InsufficientBalanceException
-import kr.hhplus.be.server.domain.common.BalanceBusinessRules
+import kr.hhplus.be.server.domain.balance.rules.BalanceBusinessRules
 import java.math.BigDecimal
 import java.time.LocalDateTime
 

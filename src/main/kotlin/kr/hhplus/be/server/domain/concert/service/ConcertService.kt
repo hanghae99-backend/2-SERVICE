@@ -1,7 +1,6 @@
 package kr.hhplus.be.server.domain.concert.service
 
 import kr.hhplus.be.server.api.concert.dto.*
-import kr.hhplus.be.server.domain.concert.aop.IncrementViewCount
 import kr.hhplus.be.server.domain.concert.exception.ConcertNotFoundException
 import kr.hhplus.be.server.domain.concert.repositories.ConcertRepository
 import kr.hhplus.be.server.domain.concert.repositories.ConcertScheduleRepository
@@ -43,7 +42,6 @@ class ConcertService(
         }
     }
     
-    @IncrementViewCount(concertIdParam = "concertId")
     @Cacheable(value = ["concerts"], key = "#concertId")
     fun getConcertById(concertId: Long): ConcertDto {
         val concert = concertRepository.findById(concertId)

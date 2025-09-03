@@ -1,12 +1,10 @@
 package kr.hhplus.be.server.global.exception
 
-import kr.hhplus.be.server.domain.common.DomainExceptionFactory
 import kr.hhplus.be.server.global.lock.ConcurrentAccessException
 import kr.hhplus.be.server.global.response.CommonApiResponse
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -244,6 +242,32 @@ class GlobalExceptionHandler {
         )
         
         return ResponseEntity.status(e.status).body(errorResponse)
+    }
+
+    @ExceptionHandler(kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException::class)
+    fun handleReservationNotFoundException(e: kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 예약 없음: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "예약을 찾을 수 없습니다",
+            errorCode = e.getFullErrorCode()
+        )
+        
+        return ResponseEntity.status(e.httpStatus).body(errorResponse)
+    }
+
+    @ExceptionHandler(kr.hhplus.be.server.domain.payment.exception.PaymentException::class)
+    fun handlePaymentException(e: kr.hhplus.be.server.domain.payment.exception.PaymentException): ResponseEntity<CommonApiResponse<Nothing>> {
+        val requestInfo = getCurrentRequestInfo()
+        logger.warn("[{}] 결제 예외: {}", requestInfo, e.message)
+        
+        val errorResponse = CommonApiResponse.error<Nothing>(
+            message = e.message ?: "결제 처리 중 오류가 발생했습니다",
+            errorCode = e.getFullErrorCode()
+        )
+        
+        return ResponseEntity.status(e.httpStatus).body(errorResponse)
     }
 
     // === 보안 관련 예외 ===

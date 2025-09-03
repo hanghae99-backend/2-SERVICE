@@ -45,3 +45,10 @@ class InvalidPaymentStatusTransitionException(paymentId: Long, from: String, to:
         errorCode = "INVALID_STATUS_TRANSITION",
         httpStatus = HttpStatus.BAD_REQUEST
     )
+
+class PaymentAlreadyProcessedException(paymentId: Long, currentStatus: String)
+    : PaymentException(
+        message = "이미 처리된 결제입니다. ID: $paymentId, 상태: $currentStatus",
+        errorCode = "ALREADY_PROCESSED",
+        httpStatus = HttpStatus.CONFLICT
+    )

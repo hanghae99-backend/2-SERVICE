@@ -21,7 +21,7 @@ class Reservation(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    var  reservationId: Long = 0,
+    var reservationId: Long = 0,
 
     @Column(name = "user_id", nullable = false)
     var userId: Long,
@@ -122,6 +122,15 @@ class Reservation(
     fun cancel(cancelledStatus: ReservationStatusType) {
         validateCanCancel()
         this.status = cancelledStatus
+    }
+
+    fun updateSeatInfo(seatNumber: String, price: BigDecimal) {
+        if (seatNumber.isNotBlank()) {
+            this.seatNumber = seatNumber
+        }
+        if (price > BigDecimal.ZERO) {
+            this.price = price
+        }
     }
 
     private fun validateCanConfirm() {

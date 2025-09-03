@@ -20,10 +20,6 @@ class ReservationRepositoryImpl(
         return reservationJpaRepository.findById(id).orElse(null)
     }
     
-    override fun findByIdWithPessimisticLock(id: Long): Reservation? {
-        return reservationJpaRepository.findByIdWithPessimisticLock(id).orElse(null)
-    }
-    
     override fun findByUserIdOrderByReservedAtDesc(userId: Long): List<Reservation> {
         return reservationJpaRepository.findByUserIdOrderByReservedAtDesc(userId)
     }

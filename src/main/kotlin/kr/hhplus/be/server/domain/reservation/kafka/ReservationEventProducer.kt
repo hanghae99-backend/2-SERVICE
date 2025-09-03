@@ -18,10 +18,7 @@ class ReservationEventProducer(
     
     fun sendReservationCreatedEvent(event: ReservationCreatedEvent) {
         try {
-            kafkaTemplate.send(RESERVATION_EVENTS_TOPIC, "created", event.reservationId.toString(), event)
-                .thenAccept { result ->
-                    logger.info { "예약 생성 이벤트 전송 완료: reservationId=${event.reservationId}, offset=${result.recordMetadata.offset()}" }
-                }
+            kafkaTemplate.send(RESERVATION_EVENTS_TOPIC, event.reservationId.toString(), event)
                 .exceptionally { throwable ->
                     logger.error(throwable) { "예약 생성 이벤트 전송 실패: reservationId=${event.reservationId}" }
                     null
@@ -35,10 +32,7 @@ class ReservationEventProducer(
     fun sendReservationCancelledEvent(event: ReservationCancelledEvent) {
         try {
             val key = event.reservationId?.toString() ?: event.userId.toString()
-            kafkaTemplate.send(RESERVATION_EVENTS_TOPIC, "cancelled", key, event)
-                .thenAccept { result ->
-                    logger.info { "예약 취소 이벤트 전송 완료: reservationId=${event.reservationId}, offset=${result.recordMetadata.offset()}" }
-                }
+            kafkaTemplate.send(RESERVATION_EVENTS_TOPIC, key, event)
                 .exceptionally { throwable ->
                     logger.error(throwable) { "예약 취소 이벤트 전송 실패: reservationId=${event.reservationId}" }
                     null

@@ -18,10 +18,7 @@ class PaymentEventProducer(
     
     fun sendPaymentCompletedEvent(event: PaymentCompletedEvent) {
         try {
-            kafkaTemplate.send(PAYMENT_EVENTS_TOPIC, "completed", event.paymentId.toString(), event)
-                .thenAccept { result ->
-                    logger.info { "결제 완료 이벤트 전송 완료: paymentId=${event.paymentId}, offset=${result.recordMetadata.offset()}" }
-                }
+            kafkaTemplate.send(PAYMENT_EVENTS_TOPIC, event.paymentId.toString(), event)
                 .exceptionally { throwable ->
                     logger.error(throwable) { "결제 완료 이벤트 전송 실패: paymentId=${event.paymentId}" }
                     null
@@ -35,10 +32,7 @@ class PaymentEventProducer(
     fun sendPaymentFailedEvent(event: PaymentFailedEvent) {
         try {
             val key = event.paymentId?.toString() ?: event.userId.toString()
-            kafkaTemplate.send(PAYMENT_EVENTS_TOPIC, "failed", key, event)
-                .thenAccept { result ->
-                    logger.info { "결제 실패 이벤트 전송 완료: paymentId=${event.paymentId}, offset=${result.recordMetadata.offset()}" }
-                }
+            kafkaTemplate.send(PAYMENT_EVENTS_TOPIC, key, event)
                 .exceptionally { throwable ->
                     logger.error(throwable) { "결제 실패 이벤트 전송 실패: paymentId=${event.paymentId}" }
                     null

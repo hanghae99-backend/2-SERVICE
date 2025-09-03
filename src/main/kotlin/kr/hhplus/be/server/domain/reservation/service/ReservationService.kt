@@ -30,6 +30,7 @@ class ReservationService(
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
     
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun createReservation(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
         // 토큰 검증
         if (!activeTokenService.isTokenActive(token)) {
@@ -93,6 +94,7 @@ class ReservationService(
         return savedReservation
     }
 
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun cancelReservationByUser(reservationId: Long, userId: Long, cancelReason: String?, token: String): Reservation {
         // 토큰 검증
         if (!activeTokenService.isTokenActive(token)) {

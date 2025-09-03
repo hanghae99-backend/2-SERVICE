@@ -36,8 +36,7 @@ class ReservationEventConsumer(
                 else -> logger.warn { "알 수 없는 예약 이벤트 타입: ${event::class.simpleName}" }
             }
             
-            val count = processedCount.incrementAndGet()
-            logger.debug { "예약 이벤트 처리 완료: count=$count, partition=$partition, offset=$offset" }
+            processedCount.incrementAndGet()
             
         } catch (e: Exception) {
             logger.error(e) { "예약 이벤트 처리 실패: partition=$partition, offset=$offset" }
@@ -46,10 +45,7 @@ class ReservationEventConsumer(
     }
     
     private fun handleReservationCreated(event: ReservationCreatedEvent, partition: Int, offset: Long) {
-        logger.info { "예약 생성 이벤트 수신: reservationId=${event.reservationId}, partition=$partition, offset=$offset" }
-        
         try {
-            // 데이터 플랫폼 전송
             concertDataPlatformClient.sendReservationData(
                 reservationId = event.reservationId,
                 userId = event.userId,
@@ -57,8 +53,6 @@ class ReservationEventConsumer(
                 seatId = event.seatId,
                 operationType = "RESERVATION_CREATED"
             )
-            logger.info { "데이터 플랫폼 예약 생성 정보 전송 완료: ${event.reservationId}" }
-            
         } catch (e: Exception) {
             logger.error(e) { "예약 생성 이벤트 처리 실패: reservationId=${event.reservationId}" }
             throw e
@@ -66,21 +60,14 @@ class ReservationEventConsumer(
     }
     
     private fun handleReservationCancelled(event: ReservationCancelledEvent, partition: Int, offset: Long) {
-        logger.info { "예약 취소 이벤트 수신: reservationId=${event.reservationId}, partition=$partition, offset=$offset" }
-        
         try {
-            // 좌석 해제는 ConcertSeatEventConsumer에서 처리
-            
-            // 데이터 플랫폼 전송
             concertDataPlatformClient.sendReservationData(
-                reservationId = event.reservationId,
+                reservationId = event.reservationId ?: 0L,
                 userId = event.userId,
                 concertId = event.concertId,
                 seatId = event.seatId,
                 operationType = "RESERVATION_CANCELLED"
             )
-            logger.info { "데이터 플랫폼 예약 취소 정보 전송 완료: ${event.reservationId}" }
-            
         } catch (e: Exception) {
             logger.error(e) { "예약 취소 이벤트 처리 실패: reservationId=${event.reservationId}" }
             throw e

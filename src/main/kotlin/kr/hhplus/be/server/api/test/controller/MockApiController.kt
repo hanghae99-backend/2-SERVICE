@@ -2,6 +2,7 @@ package kr.hhplus.be.server.api.test.controller
 
 import kr.hhplus.be.server.api.test.dto.MockApiResponse
 import kr.hhplus.be.server.global.client.ConcertReservationData
+import kr.hhplus.be.server.global.client.ConcertPaymentData
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.ResponseEntity
@@ -15,6 +16,7 @@ class MockApiController {
     
     private val logger = LoggerFactory.getLogger(MockApiController::class.java)
     private val receivedData = mutableListOf<ConcertReservationData>()
+    private val receivedPaymentData = mutableListOf<ConcertPaymentData>()
     
     @PostMapping("/data-platform/reservations")
     fun receiveReservationData(@RequestBody data: ConcertReservationData): ResponseEntity<String> {
@@ -28,5 +30,19 @@ class MockApiController {
     @GetMapping("/data-platform/reservations")
     fun getReceivedReservations(): ResponseEntity<List<ConcertReservationData>> {
         return ResponseEntity.ok(receivedData.sortedByDescending { it.reservationId })
+    }
+    
+    @PostMapping("/data-platform/payments")
+    fun receivePaymentData(@RequestBody data: ConcertPaymentData): ResponseEntity<String> {
+        logger.info("📥 Mock API 결제 데이터 수신 - paymentId: ${data.paymentId}, amount: ${data.amount}")
+        
+        receivedPaymentData.add(data)
+        
+        return ResponseEntity.ok("결제 데이터 수신 완료")
+    }
+    
+    @GetMapping("/data-platform/payments")
+    fun getReceivedPayments(): ResponseEntity<List<ConcertPaymentData>> {
+        return ResponseEntity.ok(receivedPaymentData.sortedByDescending { it.paymentId })
     }
 }

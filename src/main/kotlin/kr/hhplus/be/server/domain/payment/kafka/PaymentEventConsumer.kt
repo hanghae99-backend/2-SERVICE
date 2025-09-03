@@ -36,8 +36,7 @@ class PaymentEventConsumer(
                 else -> logger.warn { "알 수 없는 결제 이벤트 타입: ${event::class.simpleName}" }
             }
             
-            val count = processedCount.incrementAndGet()
-            logger.debug { "결제 이벤트 처리 완료: count=$count, partition=$partition, offset=$offset" }
+            processedCount.incrementAndGet()
             
         } catch (e: Exception) {
             logger.error(e) { "결제 이벤트 처리 실패: partition=$partition, offset=$offset" }
@@ -46,10 +45,7 @@ class PaymentEventConsumer(
     }
     
     private fun handlePaymentCompleted(event: PaymentCompletedEvent, partition: Int, offset: Long) {
-        logger.info { "결제 완료 이벤트 수신: paymentId=${event.paymentId}, partition=$partition, offset=$offset" }
-        
         try {
-            // 데이터 플랫폼 전송
             concertDataPlatformClient.sendPaymentData(
                 paymentId = event.paymentId,
                 userId = event.userId,
@@ -57,8 +53,6 @@ class PaymentEventConsumer(
                 amount = event.amount,
                 operationType = "PAYMENT_COMPLETED"
             )
-            logger.info { "데이터 플랫폼 결제 완료 정보 전송 완료: ${event.paymentId}" }
-            
         } catch (e: Exception) {
             logger.error(e) { "결제 완료 이벤트 처리 실패: paymentId=${event.paymentId}" }
             throw e
@@ -66,19 +60,14 @@ class PaymentEventConsumer(
     }
     
     private fun handlePaymentFailed(event: PaymentFailedEvent, partition: Int, offset: Long) {
-        logger.info { "결제 실패 이벤트 수신: paymentId=${event.paymentId}, partition=$partition, offset=$offset" }
-        
         try {
-            // 데이터 플랫폼 전송
             concertDataPlatformClient.sendPaymentData(
                 paymentId = event.paymentId,
                 userId = event.userId,
                 reservationId = event.reservationId,
-                amount = event.amount,
+                amount = event.amount ?: java.math.BigDecimal.ZERO,
                 operationType = "PAYMENT_FAILED"
             )
-            logger.info { "데이터 플랫폼 결제 실패 정보 전송 완료: ${event.paymentId}" }
-            
         } catch (e: Exception) {
             logger.error(e) { "결제 실패 이벤트 처리 실패: paymentId=${event.paymentId}" }
             throw e

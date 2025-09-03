@@ -6,7 +6,7 @@ import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusType
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
 import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
-import org.springframework.context.ApplicationEventPublisher
+import kr.hhplus.be.server.domain.reservation.kafka.ReservationEventProducer
 import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAccessDeniedException
 import kr.hhplus.be.server.global.lock.LockGuard
@@ -23,7 +23,7 @@ import java.time.LocalDateTime
 class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
-    private val applicationEventPublisher: ApplicationEventPublisher,
+    private val reservationEventProducer: ReservationEventProducer,
     private val seatApiClient: kr.hhplus.be.server.global.client.SeatApiClient,
     private val activeTokenService: kr.hhplus.be.server.domain.auth.service.ActiveTokenService
 ) {
@@ -55,7 +55,7 @@ class ReservationService(
             createReservationWithSeatInfo(userId, concertId, seatId, seatInfo.seatNumber, seatInfo.price)
         } catch (e: Exception) {
             logger.error("예약 생성 실패 - seatId: $seatId", e)
-            applicationEventPublisher.publishEvent(ReservationCancelledEvent(
+            reservationEventProducer.sendReservationCancelledEvent(ReservationCancelledEvent(
                 userId = userId,
                 concertId = concertId,
                 seatId = seatId,
@@ -65,7 +65,7 @@ class ReservationService(
             throw e
         }
 
-        applicationEventPublisher.publishEvent(ReservationCreatedEvent(
+        reservationEventProducer.sendReservationCreatedEvent(ReservationCreatedEvent(
             reservationId = reservation.reservationId,
             userId = reservation.userId,
             concertId = reservation.concertId,
@@ -126,7 +126,7 @@ class ReservationService(
         reservation.cancel(statusRepository.getCancelledStatus())
         val savedReservation = reservationRepository.save(reservation)
         
-        applicationEventPublisher.publishEvent(ReservationCancelledEvent(
+        reservationEventProducer.sendReservationCancelledEvent(ReservationCancelledEvent(
             reservationId = savedReservation.reservationId,
             userId = savedReservation.userId,
             concertId = savedReservation.concertId,

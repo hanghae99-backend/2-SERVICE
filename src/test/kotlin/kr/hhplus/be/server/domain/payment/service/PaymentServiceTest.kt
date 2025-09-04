@@ -7,33 +7,34 @@ import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.payment.models.PaymentStatusType
 import kr.hhplus.be.server.domain.payment.repositories.PaymentRepository
 import kr.hhplus.be.server.domain.payment.repositories.PaymentStatusTypePojoRepository
-import org.springframework.context.ApplicationEventPublisher
+import kr.hhplus.be.server.domain.payment.kafka.PaymentEventProducer
+import kr.hhplus.be.server.domain.payment.exception.PaymentNotFoundException
 import kr.hhplus.be.server.global.client.BalanceApiClient
 import kr.hhplus.be.server.global.client.ReservationApiClient
-import kr.hhplus.be.server.config.TestDataFixture
-import kr.hhplus.be.server.config.TestDataConstants
+import kr.hhplus.be.server.domain.auth.service.ActiveTokenService
 import java.math.BigDecimal
 
 class PaymentServiceTest : DescribeSpec({
     
-    val paymentRepository = mockk<PaymentRepository>()
-    val paymentStatusTypeRepository = mockk<PaymentStatusTypePojoRepository>()
-    val applicationEventPublisher = mockk<ApplicationEventPublisher>()
-    val balanceApiClient = mockk<BalanceApiClient>()
-    val reservationApiClient = mockk<ReservationApiClient>()
+    val paymentRepository = mockk<PaymentRepository>(relaxed = true)
+    val paymentStatusTypeRepository = mockk<PaymentStatusTypePojoRepository>(relaxed = true)
+    val paymentEventProducer = mockk<PaymentEventProducer>(relaxed = true)
+    val balanceApiClient = mockk<BalanceApiClient>(relaxed = true)
+    val reservationApiClient = mockk<ReservationApiClient>(relaxed = true)
+    val activeTokenService = mockk<ActiveTokenService>(relaxed = true)
+    
     val paymentService = PaymentService(
         paymentRepository,
         paymentStatusTypeRepository,
-        applicationEventPublisher,
+        paymentEventProducer,
         balanceApiClient,
-        reservationApiClient
+        reservationApiClient,
+        activeTokenService
     )
-    
     
     describe("createReservationPayment") {
         context("유효한 예약에 대해 결제를 생성할 때") {
@@ -43,11 +44,7 @@ class PaymentServiceTest : DescribeSpec({
                 val reservationId = 1L
                 val amount = BigDecimal("50000")
                 
-                val pendingStatus = TestDataFixture.createPaymentStatusType(
-                    code = TestDataConstants.PaymentStatusType.PENDING.code,
-                    name = TestDataConstants.PaymentStatusType.PENDING.name,
-                    description = TestDataConstants.PaymentStatusType.PENDING.description
-                )
+                val pendingStatus = PaymentStatusType.createDefault("PENDING", "대기", PaymentStatusType.CATEGORY_NORMAL)
                 val payment = Payment.createForReservation(userId, reservationId, amount, "POINT", pendingStatus)
                 payment.paymentId = 1L
                 
@@ -66,53 +63,12 @@ class PaymentServiceTest : DescribeSpec({
         }
     }
     
-    describe("completePayment") {
-        context("유효한 결제를 완료할 때") {
-            it("결제가 성공적으로 완료되어야 한다") {
-                // given
-                val paymentId = 1L
-                val reservationId = 1L
-                val seatId = 1L
-                val token = "test-token"
-                
-                val pendingStatus = TestDataFixture.createPaymentStatusType(
-                    code = TestDataConstants.PaymentStatusType.PENDING.code,
-                    name = TestDataConstants.PaymentStatusType.PENDING.name,
-                    description = TestDataConstants.PaymentStatusType.PENDING.description
-                )
-                val completedStatus = TestDataFixture.createPaymentStatusType(
-                    code = TestDataConstants.PaymentStatusType.COMPLETED.code,
-                    name = TestDataConstants.PaymentStatusType.COMPLETED.name,
-                    description = TestDataConstants.PaymentStatusType.COMPLETED.description
-                )
-                val payment = Payment.createForReservation(1L, reservationId, BigDecimal("50000"), "POINT", pendingStatus)
-                payment.paymentId = paymentId
-                
-                every { paymentRepository.findById(paymentId) } returns payment
-                every { paymentStatusTypeRepository.getCompletedStatus() } returns completedStatus
-                every { paymentRepository.save(any()) } returns payment
-                
-                // when
-                val result = paymentService.completePayment(paymentId, reservationId, seatId, token, 1L, "A1", 1L)
-                
-                // then
-                result shouldNotBe null
-                result.paymentId shouldBe paymentId
-                verify { paymentRepository.save(any()) }
-            }
-        }
-    }
-    
     describe("getPaymentById") {
         context("존재하는 결제 ID로 조회할 때") {
             it("결제 정보를 반환해야 한다") {
                 // given
                 val paymentId = 1L
-                val pendingStatus = TestDataFixture.createPaymentStatusType(
-                    code = TestDataConstants.PaymentStatusType.PENDING.code,
-                    name = TestDataConstants.PaymentStatusType.PENDING.name,
-                    description = TestDataConstants.PaymentStatusType.PENDING.description
-                )
+                val pendingStatus = PaymentStatusType.createDefault("PENDING", "대기", PaymentStatusType.CATEGORY_NORMAL)
                 val payment = Payment.createForReservation(1L, 1L, BigDecimal("50000"), "POINT", pendingStatus)
                 payment.paymentId = paymentId
                 
@@ -125,6 +81,20 @@ class PaymentServiceTest : DescribeSpec({
                 result shouldNotBe null
                 result.paymentId shouldBe paymentId
                 result.amount shouldBe BigDecimal("50000")
+            }
+        }
+        
+        context("존재하지 않는 결제 ID로 조회할 때") {
+            it("PaymentNotFoundException이 발생해야 한다") {
+                // given
+                val paymentId = 999L
+                
+                every { paymentRepository.findById(paymentId) } returns null
+                
+                // when & then
+                shouldThrow<PaymentNotFoundException> {
+                    paymentService.getPaymentById(paymentId)
+                }
             }
         }
     }

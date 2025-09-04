@@ -262,4 +262,174 @@ class SeatServiceTest : DescribeSpec({
             }
         }
     }
+    
+    describe("getSeatLayout") {
+        context("스케줄의 좌석 배치를 조회할 때") {
+            it("모든 좌석을 LAYOUT 상태로 반환해야 한다") {
+                // given
+                val scheduleId = 1L
+                val schedule = ConcertSchedule(
+                    scheduleId = scheduleId,
+                    concertId = 1L,
+                    concertDate = LocalDateTime.now().toLocalDate(),
+                    venue = "Test Venue",
+                    totalSeats = 100,
+                    availableSeats = 50
+                )
+                val availableStatus = TestDataFixture.createSeatStatusType()
+                val seats = listOf(
+                    Seat(1L, scheduleId, "A1", "NORMAL", BigDecimal("100000"), availableStatus),
+                    Seat(2L, scheduleId, "A2", "NORMAL", BigDecimal("100000"), availableStatus)
+                )
+                
+                every { concertScheduleRepository.findById(scheduleId) } returns schedule
+                every { seatRepository.findByScheduleId(scheduleId) } returns seats
+                
+                // when
+                val result = seatService.getSeatLayout(scheduleId)
+                
+                // then
+                result shouldNotBe null
+                result.size shouldBe 2
+                result.forEach { seat ->
+                    seat.statusCode shouldBe "LAYOUT"
+                }
+            }
+        }
+    }
+    
+    describe("validateSeatAvailability") {
+        context("예약 가능한 좌석을 검증할 때") {
+            it("예외가 발생하지 않아야 한다") {
+                // given
+                val seatId = 1L
+                val seat = mockk<Seat>()
+                
+                every { seatRepository.findById(seatId) } returns seat
+                every { seat.isAvailable() } returns true
+                
+                // when & then
+                seatService.validateSeatAvailability(seatId)
+                
+                verify { seat.isAvailable() }
+            }
+        }
+        
+        context("예약 불가능한 좌석을 검증할 때") {
+            it("IllegalStateException이 발생해야 한다") {
+                // given
+                val seatId = 1L
+                val seat = mockk<Seat>()
+                
+                every { seatRepository.findById(seatId) } returns seat
+                every { seat.isAvailable() } returns false
+                
+                // when & then
+                shouldThrow<IllegalStateException> {
+                    seatService.validateSeatAvailability(seatId)
+                }
+            }
+        }
+    }
+    
+    describe("reserveSeat") {
+        context("예약 가능한 좌석을 예약할 때") {
+            it("좌석을 예약 상태로 변경해야 한다") {
+                // given
+                val seatId = 1L
+                val availableStatus = TestDataFixture.createSeatStatusType()
+                val reservedStatus = TestDataFixture.createSeatStatusType(
+                    code = TestDataConstants.SeatStatusType.RESERVED.code,
+                    name = TestDataConstants.SeatStatusType.RESERVED.name,
+                    description = TestDataConstants.SeatStatusType.RESERVED.description
+                )
+                val seat = mockk<Seat>(relaxed = true)
+                
+                every { seatRepository.findById(seatId) } returns seat
+                every { seat.isAvailable() } returns true
+                every { seatStatusTypePojoRepository.getReservedStatus() } returns reservedStatus
+                every { seat.reserve(reservedStatus) } returns Unit
+                every { seatRepository.save(seat) } returns seat
+                
+                // when
+                val result = seatService.reserveSeat(seatId)
+                
+                // then
+                result shouldNotBe null
+                verify { seat.reserve(reservedStatus) }
+                verify { seatRepository.save(seat) }
+            }
+        }
+        
+        context("이미 예약된 좌석을 예약할 때") {
+            it("IllegalStateException이 발생해야 한다") {
+                // given
+                val seatId = 1L
+                val seat = mockk<Seat>()
+                
+                every { seatRepository.findById(seatId) } returns seat
+                every { seat.isAvailable() } returns false
+                
+                // when & then
+                shouldThrow<IllegalStateException> {
+                    seatService.reserveSeat(seatId)
+                }
+            }
+        }
+    }
+    
+    describe("releaseSeat") {
+        context("예약된 좌석을 해제할 때") {
+            it("좌석을 사용 가능 상태로 변경해야 한다") {
+                // given
+                val seatId = 1L
+                val availableStatus = TestDataFixture.createSeatStatusType()
+                val seat = mockk<Seat>(relaxed = true)
+                
+                every { seatRepository.findById(seatId) } returns seat
+                every { seat.isReserved() } returns true
+                every { seatStatusTypePojoRepository.getAvailableStatus() } returns availableStatus
+                every { seat.release(availableStatus) } returns Unit
+                every { seatRepository.save(seat) } returns seat
+                
+                // when
+                val result = seatService.releaseSeat(seatId)
+                
+                // then
+                result shouldNotBe null
+                verify { seat.release(availableStatus) }
+                verify { seatRepository.save(seat) }
+            }
+        }
+        
+        context("예약 상태가 아닌 좌석을 해제할 때") {
+            it("IllegalStateException이 발생해야 한다") {
+                // given
+                val seatId = 1L
+                val seat = mockk<Seat>()
+                
+                every { seatRepository.findById(seatId) } returns seat
+                every { seat.isReserved() } returns false
+                
+                // when & then
+                shouldThrow<IllegalStateException> {
+                    seatService.releaseSeat(seatId)
+                }
+            }
+        }
+        
+        context("존재하지 않는 좌석을 해제할 때") {
+            it("SeatNotFoundException이 발생해야 한다") {
+                // given
+                val seatId = 999L
+                
+                every { seatRepository.findById(seatId) } returns null
+                
+                // when & then
+                shouldThrow<SeatNotFoundException> {
+                    seatService.releaseSeat(seatId)
+                }
+            }
+        }
+    }
 })

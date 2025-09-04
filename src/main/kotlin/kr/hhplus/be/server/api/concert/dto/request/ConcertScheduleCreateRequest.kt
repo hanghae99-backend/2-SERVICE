@@ -12,7 +12,7 @@ data class ConcertScheduleCreateRequest(
 ) {
     init {
         require(concertId > 0) { "콘서트 ID는 0보다 커야 합니다" }
-        require(concertDate.isAfter(LocalDate.now().minusDays(1))) { "콘서트 날짜는 오늘 이후여야 합니다" }
+        require(concertDate.isAfter(LocalDate.now())) { "콘서트 날짜는 오늘 이후여야 합니다" }
         require(venue.isNotBlank()) { "공연장 이름은 필수입니다" }
     }
 }

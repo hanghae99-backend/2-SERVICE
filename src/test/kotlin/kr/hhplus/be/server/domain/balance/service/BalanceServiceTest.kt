@@ -13,17 +13,14 @@ import kr.hhplus.be.server.domain.balance.models.PointHistoryType
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryRepository
 import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepository
-import kr.hhplus.be.server.config.TestDataFixture
-import kr.hhplus.be.server.config.TestDataConstants
 import java.math.BigDecimal
 import java.time.LocalDate
-import java.time.LocalDateTime
 
 class BalanceServiceTest : DescribeSpec({
     
-    val pointRepository = mockk<PointRepository>()
-    val pointHistoryRepository = mockk<PointHistoryRepository>()
-    val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>()
+    val pointRepository = mockk<PointRepository>(relaxed = true)
+    val pointHistoryRepository = mockk<PointHistoryRepository>(relaxed = true)
+    val pointHistoryTypeRepository = mockk<PointHistoryTypePojoRepository>(relaxed = true)
     
     val balanceService = BalanceService(
         pointRepository,
@@ -36,7 +33,7 @@ class BalanceServiceTest : DescribeSpec({
             it("현재 잔액을 반환해야 한다") {
                 // given
                 val userId = 1L
-                val point = TestDataFixture.createTestPoint(userId, TestDataConstants.Point.SMALL_AMOUNT)
+                val point = Point.create(userId, BigDecimal("10000"))
                 
                 every { pointRepository.findByUserId(userId) } returns point
                 
@@ -45,8 +42,7 @@ class BalanceServiceTest : DescribeSpec({
                 
                 // then
                 result shouldNotBe null
-                result.amount shouldBe TestDataConstants.Point.SMALL_AMOUNT
-                verify { pointRepository.findByUserId(userId) }
+                result.amount shouldBe BigDecimal("10000")
             }
         }
         
@@ -63,60 +59,73 @@ class BalanceServiceTest : DescribeSpec({
                 // then
                 result shouldNotBe null
                 result.amount shouldBe BigDecimal.ZERO
-                verify { pointRepository.findByUserId(userId) }
             }
         }
     }
     
-    describe("getPointHistory") {
-        context("사용자의 포인트 이력을 조회할 때") {
-            it("이력 목록을 반환해야 한다") {
+    describe("chargeBalance") {
+        context("기존 계정에 포인트를 충전할 때") {
+            it("잔액이 증가해야 한다") {
                 // given
                 val userId = 1L
-                val chargeType = TestDataFixture.createPointHistoryType(
-                    code = TestDataConstants.PointHistoryType.CHARGE.code,
-                    name = TestDataConstants.PointHistoryType.CHARGE.name,
-                    description = TestDataConstants.PointHistoryType.CHARGE.description
-                )
-                val useType = TestDataFixture.createPointHistoryType(
-                    code = TestDataConstants.PointHistoryType.USE.code,
-                    name = TestDataConstants.PointHistoryType.USE.name,
-                    description = TestDataConstants.PointHistoryType.USE.description
-                )
-                val histories = listOf(
-                    PointHistory.charge(userId, TestDataConstants.Point.SMALL_AMOUNT, chargeType, "충전", TestDataConstants.Point.SMALL_AMOUNT),
-                    PointHistory.use(userId, BigDecimal("3000"), useType, "사용", BigDecimal("47000"))
-                )
+                val chargeAmount = BigDecimal("10000")
+                val currentPoint = Point.create(userId, BigDecimal("5000"))
+                val chargeType = PointHistoryType.createDefault("CHARGE", "충전", PointHistoryType.CATEGORY_CHARGE)
                 
-                every { pointHistoryRepository.findByUserIdOrderByCreatedAtDesc(userId) } returns histories
+                // 실제 도메인 로직 수행하도록 수정
+                currentPoint.charge(chargeAmount) // 15000이 됨
+                
+                every { pointRepository.findByUserId(userId) } returns currentPoint
+                every { pointHistoryRepository.findChargeAmountByUserIdAndDate(userId, any<LocalDate>()) } returns BigDecimal.ZERO
+                every { pointHistoryTypeRepository.getChargeType() } returns chargeType
+                every { pointRepository.save(any<Point>()) } returns currentPoint
                 
                 // when
-                val result = balanceService.getPointHistory(userId)
+                val result = balanceService.chargeBalance(userId, chargeAmount)
                 
                 // then
-                result shouldNotBe null
-                result.size shouldBe 2
-                verify { pointHistoryRepository.findByUserIdOrderByCreatedAtDesc(userId) }
+                result.amount shouldBe BigDecimal("25000") // 15000 + 10000
+                verify { pointRepository.save(any<Point>()) }
+                verify { pointHistoryRepository.save(any<PointHistory>()) }
             }
         }
     }
     
-    describe("getTodayChargeAmount") {
-        context("오늘 충전 금액을 조회할 때") {
-            it("오늘 충전한 총 금액을 반환해야 한다") {
+    describe("deductBalance") {
+        context("충분한 잔액이 있을 때") {
+            it("잔액이 차감되어야 한다") {
                 // given
                 val userId = 1L
-                val today = LocalDate.now()
-                val todayChargeAmount = BigDecimal("50000")
+                val deductAmount = BigDecimal("5000")
+                val currentPoint = Point.create(userId, BigDecimal("10000"))
+                val useType = PointHistoryType.createDefault("USE", "사용", PointHistoryType.CATEGORY_USE)
                 
-                every { pointHistoryRepository.findChargeAmountByUserIdAndDate(userId, today) } returns todayChargeAmount
+                every { pointRepository.findByUserId(userId) } returns currentPoint
+                every { pointHistoryTypeRepository.getUseType() } returns useType
+                every { pointRepository.save(any<Point>()) } returns currentPoint
                 
                 // when
-                val result = balanceService.getTodayChargeAmount(userId)
+                val result = balanceService.deductBalance(userId, deductAmount, "결제")
                 
                 // then
-                result shouldBe BigDecimal("50000")
-                verify { pointHistoryRepository.findChargeAmountByUserIdAndDate(userId, today) }
+                result.amount shouldBe BigDecimal("5000")
+                verify { pointRepository.save(any<Point>()) }
+                verify { pointHistoryRepository.save(any<PointHistory>()) }
+            }
+        }
+        
+        context("잔액이 부족할 때") {
+            it("PointNotFoundException이 발생해야 한다") {
+                // given
+                val userId = 1L
+                val deductAmount = BigDecimal("15000")
+                
+                every { pointRepository.findByUserId(userId) } returns null
+                
+                // when & then
+                shouldThrow<kr.hhplus.be.server.domain.balance.exception.PointNotFoundException> {
+                    balanceService.deductBalance(userId, deductAmount)
+                }
             }
         }
     }

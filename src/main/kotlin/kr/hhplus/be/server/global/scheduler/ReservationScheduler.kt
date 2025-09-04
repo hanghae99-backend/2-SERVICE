@@ -87,13 +87,13 @@ class ReservationScheduler(
     }
 
 
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedDelay = 120000, initialDelay = 30000)
     fun cleanupExpiredTokens() {
         distributedLock.executeWithLock(
             lockKey = "scheduler:token:cleanup",
             strategy = LockStrategy.PUB_SUB,
-            lockTimeoutMs = 55000L,
-            waitTimeoutMs = 5000L
+            lockTimeoutMs = 60000L,
+            waitTimeoutMs = 2000L
         ) {
             val startTime = System.currentTimeMillis()
             activeTokenService.removeExpiredTokens()

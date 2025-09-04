@@ -40,9 +40,9 @@ class PaymentService(
     @LockGuard(
         key = "'payment:reservation:' + #reservationId",
         strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 5000L,
-        retryIntervalMs = 100L,
-        maxRetryCount = 30
+        waitTimeoutMs = 2000L,
+        retryIntervalMs = 50L,
+        maxRetryCount = 10
     )
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun processPayment(userId: Long, reservationId: Long, token: String, amount: BigDecimal): PaymentDto {

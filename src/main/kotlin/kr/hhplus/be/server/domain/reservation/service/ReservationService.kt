@@ -43,7 +43,7 @@ class ReservationService(
     @LockGuard(
         key = "'seat:' + #seatId",
         strategy = LockStrategy.PUB_SUB,
-        waitTimeoutMs = 8000L
+        waitTimeoutMs = 2000L
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun createReservation(userId: Long, concertId: Long, seatId: Long): Reservation {

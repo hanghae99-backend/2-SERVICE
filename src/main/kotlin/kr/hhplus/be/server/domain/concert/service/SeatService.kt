@@ -72,7 +72,7 @@ class SeatService(
     @LockGuard(
         key = "'seat:' + #seatId",
         strategy = LockStrategy.PUB_SUB,
-        waitTimeoutMs = 3000L
+        waitTimeoutMs = 2000L
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun reserveSeat(seatId: Long): SeatDto {
@@ -92,7 +92,7 @@ class SeatService(
     @LockGuard(
         key = "'seat:' + #seatId",
         strategy = LockStrategy.PUB_SUB,
-        waitTimeoutMs = 3000L
+        waitTimeoutMs = 2000L
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun confirmSeat(seatId: Long): SeatDto {
@@ -107,7 +107,7 @@ class SeatService(
     @LockGuard(
         key = "'seat:' + #seatId",
         strategy = LockStrategy.PUB_SUB,
-        waitTimeoutMs = 3000L
+        waitTimeoutMs = 2000L
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun releaseSeat(seatId: Long): SeatDto {

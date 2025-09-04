@@ -317,39 +317,63 @@ class DistributedLock(
     }
     
     private fun tryAcquireLock(key: String, value: String, timeoutMs: Long): Boolean {
-        return redisTemplate?.let { template ->
-            val result = template.opsForValue()
-                .setIfAbsent(key, value, Duration.ofMillis(timeoutMs))
-            result ?: false
-        } ?: false
+        return try {
+            redisTemplate?.let { template ->
+                val result = template.opsForValue()
+                    .setIfAbsent(key, value, Duration.ofMillis(timeoutMs))
+                result ?: false
+            } ?: false
+        } catch (e: Exception) {
+            logger.warn("Redis 락 획득 중 오류 발생: key=$key, error=${e.message}")
+            false
+        }
     }
     
     private fun releaseLock(key: String, value: String) {
-        try {
-            redisTemplate?.let { template ->
-                val script = """
-                    if redis.call("get", KEYS[1]) == ARGV[1] then
-                        redis.call("del", KEYS[1])
-                        redis.call("publish", "lock:release:" .. KEYS[1], "released")
-                        return 1
-                    else
-                        return 0
-                    end
-                """.trimIndent()
+        var retryCount = 0
+        val maxRetries = 3
+        
+        while (retryCount < maxRetries) {
+            try {
+                val result = redisTemplate?.let { template ->
+                    val script = """
+                        if redis.call("get", KEYS[1]) == ARGV[1] then
+                            redis.call("del", KEYS[1])
+                            redis.call("publish", "lock:release:" .. KEYS[1], "released")
+                            return 1
+                        else
+                            return 0
+                        end
+                    """.trimIndent()
+                    
+                    template.execute<Long?> { connection ->
+                        connection.eval(
+                            script.toByteArray(),
+                            org.springframework.data.redis.connection.ReturnType.INTEGER,
+                            1,
+                            key.toByteArray(),
+                            value.toByteArray()
+                        ) as? Long
+                    }
+                } ?: 0L
                 
-                template.execute<Long?> { connection ->
-                    connection.eval(
-                        script.toByteArray(),
-                        org.springframework.data.redis.connection.ReturnType.INTEGER,
-                        1,
-                        key.toByteArray(),
-                        value.toByteArray()
-                    ) as? Long
+                if (result != null && result > 0) {
+                    break // 성공적으로 해제됨
+                } else if (retryCount == 0) {
+                    logger.debug("락이 이미 해제되었거나 다른 스레드에 의해 소유됨: $key")
+                    break // 락이 이미 없거나 소유권이 없음 - 정상 상황
+                }
+                
+            } catch (e: Exception) {
+                logger.warn("락 해제 중 오류 발생 (시도 ${retryCount + 1}/$maxRetries): key=$key, error=${e.message}")
+                retryCount++
+                
+                if (retryCount < maxRetries) {
+                    Thread.sleep(50L * retryCount) // 재시도 전 대기
+                } else {
+                    logger.error("락 해제 최종 실패: $key - 수동 정리 필요할 수 있음")
                 }
             }
-            
-        } catch (e: Exception) {
-            logger.warn("Failed to release lock: $key", e)
         }
     }
     

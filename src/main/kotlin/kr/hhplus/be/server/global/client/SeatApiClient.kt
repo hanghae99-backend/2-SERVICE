@@ -6,8 +6,10 @@ import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.HttpMethod
+import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestTemplate
+import org.springframework.web.client.HttpClientErrorException
 
 @Component
 open class SeatApiClient(
@@ -16,64 +18,34 @@ open class SeatApiClient(
     private val baseUrl: String
 ) {
     private val logger = KotlinLogging.logger {}
+    
 
     open fun getSeatInfo(seatId: Long): SeatDto {
-        try {
-            val response = restTemplate.exchange(
-                "$baseUrl/internal/seats/$seatId",
-                HttpMethod.GET,
-                null,
-                object : ParameterizedTypeReference<CommonApiResponse<SeatDto>>() {}
-            )
-            
-            if (response.statusCode.is2xxSuccessful && response.body != null) {
-                return response.body!!.data!!
-            } else {
-                throw RuntimeException("좌석 정보 조회 실패 - HTTP ${response.statusCode}")
-            }
-        } catch (e: Exception) {
-            logger.error(e) { "좌석 정보 조회 실패 - seatId: $seatId" }
-            throw e
-        }
+        val response = HttpClientUtil.get(
+            restTemplate,
+            "$baseUrl/internal/seats/$seatId",
+            object : ParameterizedTypeReference<CommonApiResponse<SeatDto>>() {},
+            "좌석 정보 조회 - seatId: $seatId"
+        )
+        return response.data ?: throw RuntimeException("좌석 정보가 없습니다")
     }
 
     open fun reserveSeat(seatId: Long): CommonApiResponse<*> {
-        try {
-            val response = restTemplate.exchange(
-                "$baseUrl/internal/seats/$seatId/reserve",
-                HttpMethod.POST,
-                null,
-                CommonApiResponse::class.java
-            )
-            
-            if (response.statusCode.is2xxSuccessful && response.body != null) {
-                return response.body!!
-            } else {
-                throw RuntimeException("좌석 예약 실패 - HTTP ${response.statusCode}")
-            }
-        } catch (e: Exception) {
-            logger.error(e) { "좌석 예약 실패 - seatId: $seatId" }
-            throw e
-        }
+        return HttpClientUtil.postWithRetry(
+            restTemplate,
+            "$baseUrl/internal/seats/$seatId/reserve",
+            null,
+            CommonApiResponse::class.java,
+            "좌석 예약 - seatId: $seatId"
+        )
     }
 
     open fun validateSeatAvailability(seatId: Long): CommonApiResponse<*> {
-        try {
-            val response = restTemplate.exchange(
-                "$baseUrl/internal/seats/$seatId/validate",
-                HttpMethod.GET,
-                null,
-                CommonApiResponse::class.java
-            )
-            
-            if (response.statusCode.is2xxSuccessful && response.body != null) {
-                return response.body!!
-            } else {
-                throw RuntimeException("좌석 가용성 검증 실패 - HTTP ${response.statusCode}")
-            }
-        } catch (e: Exception) {
-            logger.error(e) { "좌석 가용성 검증 실패 - seatId: $seatId" }
-            throw e
-        }
+        return HttpClientUtil.get(
+            restTemplate,
+            "$baseUrl/internal/seats/$seatId/validate",
+            CommonApiResponse::class.java,
+            "좌석 가용성 검증 - seatId: $seatId"
+        )
     }
 }

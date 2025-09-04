@@ -47,9 +47,13 @@ class LockGuardAspect(
                 
                 result
             }
+        } catch (e: ConcurrentAccessException) {
+            val failTime = System.currentTimeMillis()
+            logger.error("❌ 분산락 획득 실패 - 키: $lockKeys, 총 시간: ${failTime - startTime}ms, 에러: ${e.message}")
+            throw e
         } catch (e: Exception) {
             val failTime = System.currentTimeMillis()
-            logger.error("❌ 분산락 실패 - 키: $lockKeys, 총 시간: ${failTime - startTime}ms, 에러: ${e.javaClass.simpleName}: ${e.message}")
+            logger.warn("⚠️ 비즈니스 로직 실패 (락 성공) - 키: $lockKeys, 총 시간: ${failTime - startTime}ms, 에러: ${e.javaClass.simpleName}: ${e.message}")
             throw e
         } finally {
             val totalTime = System.currentTimeMillis()

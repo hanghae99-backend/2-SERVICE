@@ -15,7 +15,7 @@ const reservationResponseTime = new Trend('reservation_event_response_time');
 const BASE_URL = 'http://localhost:8080';
 
 // HTTP 연결 안정성 설정
-const HTTP_TIMEOUT = '10s';
+const HTTP_TIMEOUT = '30s';
 const MAX_RETRIES = 2;
 
 // 테스트 시나리오 옵션
@@ -159,8 +159,8 @@ function generateValidSeat() {
 }
 
 function generateAmount() {
-    // 모든 좌석이 10만원으로 고정
-    return 100000;
+    // 모든 좌석이 5만원으로 고정 (테스트용으로 가격 인하)
+    return 50000;
 }
 
 // 1. 토큰 이벤트 발행 테스트
@@ -235,6 +235,21 @@ export function reservationPaymentEventTest() {
             console.log(`사용자 생성 실패로 예약/결제 테스트 중단: userId=${userId}`);
             return;
         }
+    }
+    
+    // 0단계: 사용자 잔액 충전 (충분한 테스트 잔액 확보)
+    const chargeAmount = 500000; // 50만원 충전
+    const chargePayload = JSON.stringify({ 
+        userId: userId, 
+        amount: chargeAmount 
+    });
+    const chargeParams = { headers: { 'Content-Type': 'application/json' } };
+    
+    const chargeResponse = http.post(`${BASE_URL}/api/v1/balance/charge`, chargePayload, chargeParams);
+    if (chargeResponse.status === 201) {
+        console.log(`잔액 충전 성공: userId=${userId}, amount=${chargeAmount}`);
+    } else {
+        console.log(`잔액 충전 실패: userId=${userId}, status=${chargeResponse.status} - 기존 잔액으로 진행`);
     }
     
     // 1단계: 토큰 발급

@@ -5,9 +5,12 @@ import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
 import kr.hhplus.be.server.global.client.ConcertDataPlatformClient
 import mu.KotlinLogging
 import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.kafka.annotation.RetryableTopic
+import org.springframework.kafka.retrytopic.TopicSuffixingStrategy
 import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.messaging.handler.annotation.Header
 import org.springframework.messaging.handler.annotation.Payload
+import org.springframework.retry.annotation.Backoff
 import org.springframework.stereotype.Component
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -18,6 +21,11 @@ class PaymentEventConsumer(
     private val logger = KotlinLogging.logger {}
     private val processedCount = AtomicInteger(0)
     
+    @RetryableTopic(
+        attempts = "3",
+        backoff = Backoff(delay = 1000, multiplier = 2.0),
+        topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE
+    )
     @KafkaListener(
         topics = ["payment-events"],
         groupId = "payment-consumer",
@@ -45,33 +53,23 @@ class PaymentEventConsumer(
     }
     
     private fun handlePaymentCompleted(event: PaymentCompletedEvent, partition: Int, offset: Long) {
-        try {
-            concertDataPlatformClient.sendPaymentData(
-                paymentId = event.paymentId,
-                userId = event.userId,
-                reservationId = event.reservationId,
-                amount = event.amount,
-                operationType = "PAYMENT_COMPLETED"
-            )
-        } catch (e: Exception) {
-            logger.error(e) { "결제 완료 이벤트 처리 실패: paymentId=${event.paymentId}" }
-            throw e
-        }
+        concertDataPlatformClient.sendPaymentData(
+            paymentId = event.paymentId,
+            userId = event.userId,
+            reservationId = event.reservationId,
+            amount = event.amount,
+            operationType = "PAYMENT_COMPLETED"
+        )
     }
     
     private fun handlePaymentFailed(event: PaymentFailedEvent, partition: Int, offset: Long) {
-        try {
-            concertDataPlatformClient.sendPaymentData(
-                paymentId = event.paymentId,
-                userId = event.userId,
-                reservationId = event.reservationId,
-                amount = event.amount ?: java.math.BigDecimal.ZERO,
-                operationType = "PAYMENT_FAILED"
-            )
-        } catch (e: Exception) {
-            logger.error(e) { "결제 실패 이벤트 처리 실패: paymentId=${event.paymentId}" }
-            throw e
-        }
+        concertDataPlatformClient.sendPaymentData(
+            paymentId = event.paymentId,
+            userId = event.userId,
+            reservationId = event.reservationId,
+            amount = event.amount ?: java.math.BigDecimal.ZERO,
+            operationType = "PAYMENT_FAILED"
+        )
     }
     
     fun getProcessedCount(): Int = processedCount.get()

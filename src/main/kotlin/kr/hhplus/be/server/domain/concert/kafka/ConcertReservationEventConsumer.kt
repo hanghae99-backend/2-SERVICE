@@ -6,9 +6,12 @@ import kr.hhplus.be.server.domain.concert.service.ConcertService
 import kr.hhplus.be.server.domain.concert.service.SeatService
 import mu.KotlinLogging
 import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.kafka.annotation.RetryableTopic
+import org.springframework.kafka.retrytopic.TopicSuffixingStrategy
 import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.messaging.handler.annotation.Header
 import org.springframework.messaging.handler.annotation.Payload
+import org.springframework.retry.annotation.Backoff
 import org.springframework.stereotype.Component
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -20,6 +23,11 @@ class ConcertReservationEventConsumer(
     private val logger = KotlinLogging.logger {}
     private val processedCount = AtomicInteger(0)
     
+    @RetryableTopic(
+        attempts = "3",
+        backoff = Backoff(delay = 1000, multiplier = 2.0),
+        topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE
+    )
     @KafkaListener(
         topics = ["reservation-events"],
         groupId = "concert-consumer",
@@ -47,21 +55,11 @@ class ConcertReservationEventConsumer(
     }
     
     private fun handleReservationCreated(event: ReservationCreatedEvent, partition: Int, offset: Long) {
-        try {
-            concertService.incrementPopularity(event.concertId)
-        } catch (e: Exception) {
-            logger.error(e) { "콘서트 인기도 증가 실패: concertId=${event.concertId}" }
-            throw e
-        }
+        concertService.incrementPopularity(event.concertId)
     }
     
     private fun handleReservationCancelled(event: ReservationCancelledEvent, partition: Int, offset: Long) {
-        try {
-            seatService.releaseSeat(event.seatId)
-            concertService.decrementPopularity(event.concertId)
-        } catch (e: Exception) {
-            logger.error(e) { "예약 취소 처리 실패: seatId=${event.seatId}" }
-            throw e
-        }
+        seatService.releaseSeat(event.seatId)
+        concertService.decrementPopularity(event.concertId)
     }
 }

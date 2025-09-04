@@ -4,9 +4,12 @@ import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
 import kr.hhplus.be.server.domain.balance.service.BalanceService
 import mu.KotlinLogging
 import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.kafka.annotation.RetryableTopic
+import org.springframework.kafka.retrytopic.TopicSuffixingStrategy
 import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.messaging.handler.annotation.Header
 import org.springframework.messaging.handler.annotation.Payload
+import org.springframework.retry.annotation.Backoff
 import org.springframework.stereotype.Component
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -17,6 +20,11 @@ class BalancePaymentEventConsumer(
     private val logger = KotlinLogging.logger {}
     private val processedCount = AtomicInteger(0)
     
+    @RetryableTopic(
+        attempts = "3",
+        backoff = Backoff(delay = 1000, multiplier = 2.0),
+        topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE
+    )
     @KafkaListener(
         topics = ["payment-events"],
         groupId = "balance-payment-consumer",
@@ -48,17 +56,11 @@ class BalancePaymentEventConsumer(
     private fun handleBalanceRestore(event: PaymentFailedEvent, partition: Int, offset: Long) {
         logger.info { "결제 실패로 인한 잔고 복구: userId=${event.userId}, amount=${event.amount}, partition=$partition, offset=$offset" }
         
-        try {
-            if (event.needsBalanceRestore && event.amount != null) {
-                balanceService.restoreBalance(event.userId, event.amount, "결제 실패로 인한 잔고 복구")
-                logger.info { "잔고 복구 완료: userId=${event.userId}, amount=${event.amount}" }
-            } else {
-                logger.debug { "잔고 복구 불필요: userId=${event.userId}, needsRestore=${event.needsBalanceRestore}" }
-            }
-            
-        } catch (e: Exception) {
-            logger.error(e) { "잔고 복구 실패: userId=${event.userId}, amount=${event.amount}" }
-            throw e
+        if (event.needsBalanceRestore && event.amount != null) {
+            balanceService.restoreBalance(event.userId, event.amount, "결제 실패로 인한 잔고 복구")
+            logger.info { "잔고 복구 완료: userId=${event.userId}, amount=${event.amount}" }
+        } else {
+            logger.debug { "잔고 복구 불필요: userId=${event.userId}, needsRestore=${event.needsBalanceRestore}" }
         }
     }
     

@@ -2,7 +2,6 @@ package kr.hhplus.be.server.domain.payment.kafka
 
 import kr.hhplus.be.server.domain.payment.event.PaymentCompletedEvent
 import kr.hhplus.be.server.domain.payment.event.PaymentFailedEvent
-import kr.hhplus.be.server.global.client.ConcertDataPlatformClient
 import mu.KotlinLogging
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.annotation.RetryableTopic
@@ -15,9 +14,7 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.atomic.AtomicInteger
 
 @Component
-class PaymentEventConsumer(
-    private val concertDataPlatformClient: ConcertDataPlatformClient
-) {
+class PaymentEventConsumer {
     private val logger = KotlinLogging.logger {}
     private val processedCount = AtomicInteger(0)
     
@@ -53,23 +50,13 @@ class PaymentEventConsumer(
     }
     
     private fun handlePaymentCompleted(event: PaymentCompletedEvent, partition: Int, offset: Long) {
-        concertDataPlatformClient.sendPaymentData(
-            paymentId = event.paymentId,
-            userId = event.userId,
-            reservationId = event.reservationId,
-            amount = event.amount,
-            operationType = "PAYMENT_COMPLETED"
-        )
+        logger.info { "💳 결제 완료 이벤트 처리: paymentId=${event.paymentId}, userId=${event.userId}" }
+        // 필요한 경우 추가 결제 완료 후처리 로직 구현
     }
     
     private fun handlePaymentFailed(event: PaymentFailedEvent, partition: Int, offset: Long) {
-        concertDataPlatformClient.sendPaymentData(
-            paymentId = event.paymentId,
-            userId = event.userId,
-            reservationId = event.reservationId,
-            amount = event.amount ?: java.math.BigDecimal.ZERO,
-            operationType = "PAYMENT_FAILED"
-        )
+        logger.info { "💳 결제 실패 이벤트 처리: paymentId=${event.paymentId}, userId=${event.userId}" }
+        // 필요한 경우 추가 결제 실패 후처리 로직 구현
     }
     
     fun getProcessedCount(): Int = processedCount.get()

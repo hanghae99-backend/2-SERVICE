@@ -1,7 +1,7 @@
 package kr.hhplus.be.server.domain.payment.service
 
 import kr.hhplus.be.server.global.extension.orElseThrow
-import org.springframework.context.ApplicationEventPublisher
+import kr.hhplus.be.server.domain.payment.kafka.PaymentEventProducer
 import kr.hhplus.be.server.api.payment.dto.PaymentDto
 import kr.hhplus.be.server.domain.payment.models.Payment
 import kr.hhplus.be.server.domain.payment.event.PaymentCompletedEvent
@@ -27,9 +27,10 @@ import java.math.BigDecimal
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val paymentStatusTypeRepository: PaymentStatusTypePojoRepository,
-    private val applicationEventPublisher: ApplicationEventPublisher,
+    private val paymentEventProducer: PaymentEventProducer,
     private val balanceApiClient: kr.hhplus.be.server.global.client.BalanceApiClient,
-    private val reservationApiClient: kr.hhplus.be.server.global.client.ReservationApiClient
+    private val reservationApiClient: kr.hhplus.be.server.global.client.ReservationApiClient,
+    private val activeTokenService: kr.hhplus.be.server.domain.auth.service.ActiveTokenService
 ) {
     
     companion object {
@@ -39,13 +40,18 @@ class PaymentService(
     @LockGuard(
         key = "'payment:reservation:' + #reservationId",
         strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 5000L,
-        retryIntervalMs = 100L,
-        maxRetryCount = 30
+        waitTimeoutMs = 2000L,
+        retryIntervalMs = 50L,
+        maxRetryCount = 10
     )
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun processPayment(userId: Long, reservationId: Long, token: String, amount: BigDecimal): PaymentDto {
         logger.info("결제 프로세스 시작 - userId: {}, reservationId: {}, amount: {}", userId, reservationId, amount)
+        
+        // 토큰 검증
+        if (!activeTokenService.isTokenActive(token)) {
+            throw IllegalArgumentException("유효하지 않은 토큰입니다")
+        }
         
         try {
             val payment = createReservationPayment(userId, reservationId, amount)
@@ -71,7 +77,7 @@ class PaymentService(
             paymentEntity.updateStatus(completedStatus)
             val completedPayment = paymentRepository.save(paymentEntity)
             
-            applicationEventPublisher.publishEvent(PaymentCompletedEvent(
+            paymentEventProducer.sendPaymentCompletedEvent(PaymentCompletedEvent(
                 paymentId = completedPayment.paymentId,
                 userId = userId,
                 reservationId = reservationId,
@@ -97,7 +103,7 @@ class PaymentService(
             
             val failedPayment = createFailedPayment(userId, reservationId, amount, e.message ?: "알 수 없는 오류")
             
-            applicationEventPublisher.publishEvent(PaymentFailedEvent(
+            paymentEventProducer.sendPaymentFailedEvent(PaymentFailedEvent(
                 paymentId = failedPayment.paymentId,
                 userId = userId,
                 reservationId = reservationId,

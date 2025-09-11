@@ -67,6 +67,18 @@ class ConcertStatsService(
         updateTrendingScore(concertId, 1.0)
     }
     
+    fun decrementViewCount(concertId: Long) {
+        val currentCount = redisTemplate.opsForHash<String, String>()
+            .get(VIEW_COUNT_KEY, concertId.toString())?.toLongOrNull() ?: 0L
+        
+        if (currentCount > 0) {
+            redisTemplate.opsForHash<String, String>()
+                .increment(VIEW_COUNT_KEY, concertId.toString(), -1)
+            updatePopularityScore(concertId)
+            updateTrendingScore(concertId, -0.5)
+        }
+    }
+    
     private fun buildPopularConcertDtos(concertIds: List<Long>): List<PopularConcertDto> {
         if (concertIds.isEmpty()) return emptyList()
         

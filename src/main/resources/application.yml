@@ -56,6 +56,32 @@ spring:
       host: localhost
       port: 16379
 
+  kafka:
+    bootstrap-servers: localhost:19092
+    consumer:
+      group-id: token-activation-consumer
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "kr.hhplus.be.server.domain.auth.models,kr.hhplus.be.server.domain.reservation.event,kr.hhplus.be.server.domain.payment.event"
+        request.timeout.ms: 30000
+        session.timeout.ms: 10000
+      max-poll-records: 10
+      fetch-max-wait: 1000
+      enable-auto-commit: true
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        request.timeout.ms: 30000
+    admin:
+      properties:
+        bootstrap.servers: localhost:19092
+        request.timeout.ms: 30000
+        connections.max.idle.ms: 30000
+        retries: 3
+
 concert:
   default-seats-per-schedule: 50
   max-seats-per-schedule: 1000
@@ -66,10 +92,9 @@ concert:
   max-concert-duration-minutes: 480
   min-schedule-advance-hours: 1
   queue:
-    max-active-tokens: 100
     token-expiry-minutes: 5
-    waiting-time-multiplier: 2
-    tokens-per-minute: 10
+    kafka:
+      enabled: true
 
 cache:
   key-prefix: "concert-service:"

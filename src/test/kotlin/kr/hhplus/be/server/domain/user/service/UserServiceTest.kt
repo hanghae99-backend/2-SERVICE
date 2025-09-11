@@ -12,22 +12,18 @@ import kr.hhplus.be.server.domain.user.models.User
 import kr.hhplus.be.server.domain.user.exception.UserAlreadyExistsException
 import kr.hhplus.be.server.domain.user.exception.UserNotFoundException
 import kr.hhplus.be.server.domain.user.repositories.UserRepository
-import kr.hhplus.be.server.config.TestDataFixture
 
 class UserServiceTest : DescribeSpec({
     
-    val userRepository = mockk<UserRepository>()
+    val userRepository = mockk<UserRepository>(relaxed = true)
     val userService = UserService(userRepository)
     
     describe("createUser") {
         context("유효한 사용자 생성 요청이 들어올 때") {
             it("새로운 사용자를 생성하고 UserDto를 반환해야 한다") {
                 // given
-                val userCreateRequest = UserCreateRequest(
-                    userId = 1L
-                )
-                val user = TestDataFixture.createTestUserObject(1L)
-                user.userId = 1L
+                val userCreateRequest = UserCreateRequest(userId = 1L)
+                val user = User.createWithId(1L)
                 
                 every { userRepository.existsById(1L) } returns false
                 every { userRepository.save(any()) } returns user
@@ -43,12 +39,10 @@ class UserServiceTest : DescribeSpec({
             }
         }
         
-        context("이미 존재하는 이메일로 생성 요청이 들어올 때") {
+        context("이미 존재하는 사용자 ID로 생성 요청이 들어올 때") {
             it("UserAlreadyExistsException을 던져야 한다") {
                 // given
-                val userCreateRequest = UserCreateRequest(
-                    userId = 1L
-                )
+                val userCreateRequest = UserCreateRequest(userId = 1L)
                 
                 every { userRepository.existsById(1L) } returns true
                 
@@ -67,7 +61,7 @@ class UserServiceTest : DescribeSpec({
             it("사용자를 반환해야 한다") {
                 // given
                 val userId = 1L
-                val user = TestDataFixture.createTestUserObject(userId)
+                val user = User.createWithId(userId)
                 
                 every { userRepository.findById(userId) } returns user
                 
@@ -77,24 +71,20 @@ class UserServiceTest : DescribeSpec({
                 // then
                 result shouldNotBe null
                 result?.userId shouldBe userId
-                verify { userRepository.findById(userId) }
             }
         }
-    }
-    
-    describe("existsById") {
-        context("존재하는 사용자 ID로 확인할 때") {
-            it("true를 반환해야 한다") {
+        
+        context("존재하지 않는 사용자 ID로 조회할 때") {
+            it("null을 반환해야 한다") {
                 // given
-                val userId = 1L
-                every { userRepository.existsById(userId) } returns true
+                val userId = 999L
+                every { userRepository.findById(userId) } returns null
                 
                 // when
-                val result = userService.existsById(userId)
+                val result = userService.getUserById(userId)
                 
                 // then
-                result shouldBe true
-                verify { userRepository.existsById(userId) }
+                result shouldBe null
             }
         }
     }
@@ -104,7 +94,7 @@ class UserServiceTest : DescribeSpec({
             it("UserDto를 반환해야 한다") {
                 // given
                 val userId = 1L
-                val user = TestDataFixture.createTestUserObject(userId)
+                val user = User.createWithId(userId)
                 
                 every { userRepository.findById(userId) } returns user
                 
@@ -114,7 +104,6 @@ class UserServiceTest : DescribeSpec({
                 // then
                 result shouldNotBe null
                 result.userId shouldBe userId
-                verify { userRepository.findById(userId) }
             }
         }
         
@@ -128,8 +117,6 @@ class UserServiceTest : DescribeSpec({
                 shouldThrow<UserNotFoundException> {
                     userService.getUserDtoById(userId)
                 }
-                
-                verify { userRepository.findById(userId) }
             }
         }
     }

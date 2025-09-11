@@ -6,7 +6,7 @@ import kr.hhplus.be.server.domain.reservation.repositories.ReservationStatusType
 import kr.hhplus.be.server.api.reservation.dto.ReservationDto
 import kr.hhplus.be.server.domain.reservation.event.ReservationCancelledEvent
 import kr.hhplus.be.server.domain.reservation.event.ReservationCreatedEvent
-import org.springframework.context.ApplicationEventPublisher
+import kr.hhplus.be.server.domain.reservation.kafka.ReservationEventProducer
 import kr.hhplus.be.server.domain.reservation.exception.ReservationNotFoundException
 import kr.hhplus.be.server.domain.reservation.exception.ReservationAccessDeniedException
 import kr.hhplus.be.server.global.lock.LockGuard
@@ -23,16 +23,27 @@ import java.time.LocalDateTime
 class ReservationService(
     private val reservationRepository: ReservationRepository,
     private val statusRepository: ReservationStatusTypePojoRepository,
-    private val applicationEventPublisher: ApplicationEventPublisher,
-    private val seatApiClient: kr.hhplus.be.server.global.client.SeatApiClient
+    private val reservationEventProducer: ReservationEventProducer,
+    private val seatApiClient: kr.hhplus.be.server.global.client.SeatApiClient,
+    private val activeTokenService: kr.hhplus.be.server.domain.auth.service.ActiveTokenService
 ) {
     
     private val logger = LoggerFactory.getLogger(ReservationService::class.java)
     
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    fun createReservation(userId: Long, concertId: Long, seatId: Long, token: String): Reservation {
+        // 토큰 검증
+        if (!activeTokenService.isTokenActive(token)) {
+            throw IllegalArgumentException("유효하지 않은 토큰입니다")
+        }
+        
+        return createReservation(userId, concertId, seatId)
+    }
+    
     @LockGuard(
         key = "'seat:' + #seatId",
         strategy = LockStrategy.PUB_SUB,
-        waitTimeoutMs = 8000L
+        waitTimeoutMs = 2000L
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun createReservation(userId: Long, concertId: Long, seatId: Long): Reservation {
@@ -45,7 +56,7 @@ class ReservationService(
             createReservationWithSeatInfo(userId, concertId, seatId, seatInfo.seatNumber, seatInfo.price)
         } catch (e: Exception) {
             logger.error("예약 생성 실패 - seatId: $seatId", e)
-            applicationEventPublisher.publishEvent(ReservationCancelledEvent(
+            reservationEventProducer.sendReservationCancelledEvent(ReservationCancelledEvent(
                 userId = userId,
                 concertId = concertId,
                 seatId = seatId,
@@ -55,7 +66,7 @@ class ReservationService(
             throw e
         }
 
-        applicationEventPublisher.publishEvent(ReservationCreatedEvent(
+        reservationEventProducer.sendReservationCreatedEvent(ReservationCreatedEvent(
             reservationId = reservation.reservationId,
             userId = reservation.userId,
             concertId = reservation.concertId,
@@ -84,6 +95,16 @@ class ReservationService(
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
+    fun cancelReservationByUser(reservationId: Long, userId: Long, cancelReason: String?, token: String): Reservation {
+        // 토큰 검증
+        if (!activeTokenService.isTokenActive(token)) {
+            throw IllegalArgumentException("유효하지 않은 토큰입니다")
+        }
+        
+        return cancelReservationByUser(reservationId, userId, cancelReason)
+    }
+    
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun cancelReservationByUser(reservationId: Long, userId: Long, cancelReason: String?): Reservation {
         val reservation = reservationRepository.findById(reservationId)
             ?: throw ReservationNotFoundException(reservationId)
@@ -107,7 +128,7 @@ class ReservationService(
         reservation.cancel(statusRepository.getCancelledStatus())
         val savedReservation = reservationRepository.save(reservation)
         
-        applicationEventPublisher.publishEvent(ReservationCancelledEvent(
+        reservationEventProducer.sendReservationCancelledEvent(ReservationCancelledEvent(
             reservationId = savedReservation.reservationId,
             userId = savedReservation.userId,
             concertId = savedReservation.concertId,

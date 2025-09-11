@@ -7,18 +7,18 @@ INSERT INTO users (user_id, created_at, updated_at) VALUES
                                                         (7, NOW(), NOW()), (8, NOW(), NOW()), (9, NOW(), NOW()),
                                                         (10, NOW(), NOW());
 
--- 포인트 초기 잔액 (updated_at 필드 추가)
+-- 포인트 초기 잔액 (updated_at 필드 추가) - 테스트용으로 모든 사용자 충분한 잔액 제공
 INSERT INTO point (user_id, amount, last_updated, created_at, updated_at) VALUES
-                                                                              (1, 500000.00, NOW(), NOW(), NOW()),
-                                                                              (2, 300000.00, NOW(), NOW(), NOW()),
-                                                                              (3, 800000.00, NOW(), NOW(), NOW()),
-                                                                              (4, 150000.00, NOW(), NOW(), NOW()),
-                                                                              (5, 750000.00, NOW(), NOW(), NOW()),
-                                                                              (6, 400000.00, NOW(), NOW(), NOW()),
-                                                                              (7, 600000.00, NOW(), NOW(), NOW()),
-                                                                              (8, 250000.00, NOW(), NOW(), NOW()),
-                                                                              (9, 900000.00, NOW(), NOW(), NOW()),
-                                                                              (10, 350000.00, NOW(), NOW(), NOW());
+                                                                              (1, 1000000.00, NOW(), NOW(), NOW()),
+                                                                              (2, 1000000.00, NOW(), NOW(), NOW()),
+                                                                              (3, 1000000.00, NOW(), NOW(), NOW()),
+                                                                              (4, 1000000.00, NOW(), NOW(), NOW()),
+                                                                              (5, 1000000.00, NOW(), NOW(), NOW()),
+                                                                              (6, 1000000.00, NOW(), NOW(), NOW()),
+                                                                              (7, 1000000.00, NOW(), NOW(), NOW()),
+                                                                              (8, 1000000.00, NOW(), NOW(), NOW()),
+                                                                              (9, 1000000.00, NOW(), NOW(), NOW()),
+                                                                              (10, 1000000.00, NOW(), NOW(), NOW());
 
 -- 포인트 히스토리 타입
 INSERT INTO point_history_type (code, name, description, is_active, category, sort_order, affects_balance, sign, created_at, updated_at) VALUES
@@ -27,16 +27,16 @@ INSERT INTO point_history_type (code, name, description, is_active, category, so
 
 -- 포인트 히스토리
 INSERT INTO point_history (user_id, amount, type_code, description, created_at, updated_at) VALUES
-                                                                                                (1, 500000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
-                                                                                                (2, 300000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
-                                                                                                (3, 800000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
-                                                                                                (4, 150000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
-                                                                                                (5, 750000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
-                                                                                                (6, 400000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
-                                                                                                (7, 600000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
-                                                                                                (8, 250000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
-                                                                                                (9, 900000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
-                                                                                                (10, 350000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW());
+                                                                                                (1, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (2, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (3, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (4, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (5, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (6, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (7, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (8, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (9, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW()),
+                                                                                                (10, 1000000.00, 'CHARGE', '초기 포인트 충전', NOW(), NOW());
 
 -- 콘서트 데이터
 INSERT INTO concert (title, artist, is_active, created_at, updated_at) VALUES

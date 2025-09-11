@@ -33,7 +33,7 @@ open class ConcertDataPlatformClient(
                 operationType = operationType
             )
             
-            val apiUrl = "$baseUrl/internal/test/mock/data-platform/reservations"
+            val apiUrl = "$baseUrl/api/test/mock/data-platform/reservations"
             
             logger.info { "🚀 데이터 플랫폼 전송 시작 - $operationType: reservationId=$reservationId" }
             
@@ -71,7 +71,7 @@ open class ConcertDataPlatformClient(
                 operationType = operationType
             )
             
-            val apiUrl = "$baseUrl/internal/test/mock/data-platform/payments"
+            val apiUrl = "$baseUrl/api/test/mock/data-platform/payments"
             
             logger.info { "🚀 데이터 플랫폼 결제 정보 전송 시작 - $operationType: paymentId=$paymentId" }
             

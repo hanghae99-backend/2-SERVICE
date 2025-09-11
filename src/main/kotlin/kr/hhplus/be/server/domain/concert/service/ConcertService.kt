@@ -16,7 +16,8 @@ import java.time.LocalDate
 class ConcertService(
     private val concertRepository: ConcertRepository,
     private val concertScheduleRepository: ConcertScheduleRepository,
-    private val seatRepository: SeatRepository
+    private val seatRepository: SeatRepository,
+    private val concertStatsService: ConcertStatsService
 ) {
     
     @Cacheable(value = ["concerts:available"], key = "#startDate.toString() + ':' + #endDate.toString()")
@@ -72,6 +73,14 @@ class ConcertService(
         return schedules.map { schedule ->
             ConcertWithScheduleDto.from(concert, schedule)
         }
+    }
+    
+    fun incrementPopularity(concertId: Long) {
+        concertStatsService.incrementViewCount(concertId)
+    }
+    
+    fun decrementPopularity(concertId: Long) {
+        concertStatsService.decrementViewCount(concertId)
     }
     
 }

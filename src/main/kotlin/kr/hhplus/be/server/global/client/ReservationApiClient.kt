@@ -15,28 +15,15 @@ open class ReservationApiClient(
 ) {
     private val logger = KotlinLogging.logger {}
 
-    /**
-     * 예약 확정 API 호출
-     */
     open fun confirmReservation(reservationId: Long, paymentId: Long): CommonApiResponse<*> {
         val request = ReservationConfirmRequest(paymentId = paymentId)
         
-        try {
-            val response = restTemplate.exchange(
-                "$baseUrl/internal/reservations/$reservationId/confirm",
-                org.springframework.http.HttpMethod.PUT,
-                org.springframework.http.HttpEntity(request),
-                CommonApiResponse::class.java
-            )
-            
-            if (response.statusCode.is2xxSuccessful && response.body != null) {
-                return response.body!!
-            } else {
-                throw RuntimeException("예약 확정 실패 - HTTP ${response.statusCode}")
-            }
-        } catch (e: Exception) {
-            logger.error(e) { "예약 확정 실패 - reservationId: $reservationId" }
-            throw e
-        }
+        return HttpClientUtil.put(
+            restTemplate,
+            "$baseUrl/internal/reservations/$reservationId/confirm",
+            request,
+            CommonApiResponse::class.java,
+            "예약 확정 - reservationId: $reservationId"
+        )
     }
 }

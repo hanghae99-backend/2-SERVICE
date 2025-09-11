@@ -1,7 +1,6 @@
 package kr.hhplus.be.server.global.scheduler
 
-import kr.hhplus.be.server.domain.auth.service.TokenManager
-import kr.hhplus.be.server.domain.auth.service.QueueService
+import kr.hhplus.be.server.domain.auth.service.ActiveTokenService
 import kr.hhplus.be.server.domain.reservation.service.ReservationService
 import kr.hhplus.be.server.domain.reservation.service.SelloutRankingService
 import org.springframework.context.ApplicationEventPublisher
@@ -20,8 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @ConditionalOnProperty(name = ["app.scheduler.enabled"], havingValue = "true", matchIfMissing = true)
 class ReservationScheduler(
     private val reservationService: ReservationService,
-    private val tokenManager: TokenManager,
-    private val queueService: QueueService,
+    private val activeTokenService: ActiveTokenService,
     private val selloutRankingService: SelloutRankingService,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val distributedLock: DistributedLock
@@ -88,31 +86,17 @@ class ReservationScheduler(
         }
     }
 
-    @Scheduled(fixedRate = 10000)
-    fun activateTokens() {
-        distributedLock.executeWithLock(
-            lockKey = "scheduler:token:activate",
-            strategy = LockStrategy.PUB_SUB,
-            lockTimeoutMs = 8000L,
-            waitTimeoutMs = 2000L
-        ) {
-            val startTime = System.currentTimeMillis()
-            queueService.processNext()
-            val elapsed = System.currentTimeMillis() - startTime
-            logger.info("🚀 토큰 활성화 완료 ({}ms)", elapsed)
-        }
-    }
 
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedDelay = 120000, initialDelay = 30000)
     fun cleanupExpiredTokens() {
         distributedLock.executeWithLock(
             lockKey = "scheduler:token:cleanup",
             strategy = LockStrategy.PUB_SUB,
-            lockTimeoutMs = 55000L,
-            waitTimeoutMs = 5000L
+            lockTimeoutMs = 60000L,
+            waitTimeoutMs = 2000L
         ) {
             val startTime = System.currentTimeMillis()
-            tokenManager.cleanupExpiredTokens()
+            activeTokenService.removeExpiredTokens()
             val elapsed = System.currentTimeMillis() - startTime
             logger.info("🧹 만료 토큰 정리 완료 ({}ms)", elapsed)
         }

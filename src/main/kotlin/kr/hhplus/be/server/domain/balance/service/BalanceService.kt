@@ -44,9 +44,9 @@ class BalanceService(
     @LockGuard(
         key = "'balance:' + #userId",
         strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 3000L,
-        retryIntervalMs = 100L,
-        maxRetryCount = 30
+        waitTimeoutMs = 2000L,
+        retryIntervalMs = 50L,
+        maxRetryCount = 10
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
@@ -64,9 +64,9 @@ class BalanceService(
     @LockGuard(
         key = "'balance:' + #userId",
         strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 3000L,
-        retryIntervalMs = 100L,
-        maxRetryCount = 30
+        waitTimeoutMs = 1500L,
+        retryIntervalMs = 50L,
+        maxRetryCount = 10
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
@@ -84,9 +84,9 @@ class BalanceService(
     @LockGuard(
         key = "'balance:' + #userId",
         strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 3000L,
-        retryIntervalMs = 100L,
-        maxRetryCount = 30
+        waitTimeoutMs = 2000L,
+        retryIntervalMs = 50L,
+        maxRetryCount = 10
     )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId

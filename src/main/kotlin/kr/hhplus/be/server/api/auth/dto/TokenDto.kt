@@ -50,10 +50,10 @@ data class TokenIssueDetail(
     val userId: Long,
     
     @Schema(description = "대기 순서", example = "5")
-    val queuePosition: Int,
+    val queuePosition: Int?,
     
     @Schema(description = "예상 대기 시간 (분)", example = "10")
-    val estimatedWaitingTime: Int,
+    val estimatedWaitingTime: Int?,
     
     @Schema(description = "토큰 발급 시간")
     val issuedAt: LocalDateTime
@@ -64,8 +64,8 @@ data class TokenIssueDetail(
             status: String,
             message: String,
             userId: Long,
-            queuePosition: Int,
-            estimatedWaitingTime: Int,
+            queuePosition: Int?,
+            estimatedWaitingTime: Int?,
             issuedAt: LocalDateTime = LocalDateTime.now()
         ): TokenIssueDetail {
             return TokenIssueDetail(

@@ -3,19 +3,31 @@ import { check, sleep } from 'k6';
 import { Trend } from 'k6/metrics';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
+const host = 'http://localhost:8080';
+
 export const options = {
     scenarios: {
         concert_reservation_scenario: {
             exec: 'concert_reservation',
-            executor: 'constant-vus',
-            vus: 50,
-            duration: '2m',
+            executor: 'ramping-vus',
+            stages: [
+                { duration: '30s', target: 20 },   // 0 → 20
+                { duration: '30s', target: 50 },   // 20 → 50 (증가)
+                { duration: '30s', target: 50 },    // 50 유지
+                { duration: '30s', target: 20 },   // 50 → 20 (감소)
+                { duration: '30s', target: 0 },    // 20 → 0
+            ],
         }
     },
     thresholds: {
         http_req_duration: ['p(95)<500'],
         http_req_failed: ['rate<0.1'],
     },
+    ext: {
+        loadimpact: {
+            name: "Concert Reservation Load Test"
+        }
+    }
 };
 
 export function setup() {
@@ -42,8 +54,6 @@ const scenarioTagName = Object.freeze({
     4: "4_예약",
     5: "5_결제"
 });
-
-const host = 'http://localhost:8080';
 
 export function concert_reservation() {
     // 실제 존재하는 사용자 ID 1~10 중에서 선택
@@ -72,6 +82,12 @@ export function concert_reservation() {
     chargeBalance(defaultParam, 3, userId);
 
     // 4. 예약
+    if (concertInfo.soldOut) {
+        console.log(`4_예약: SKIP - 매진으로 인한 건너뛰기`);
+        console.log(`5_결제: SKIP - 매진으로 인한 건너뛰기`);
+        return;
+    }
+    
     const reservationId = createReservation(defaultParam, 4, userId, concertId, seatId, token);
     if (!reservationId) return;
 
@@ -139,8 +155,8 @@ function getConcertSchedules(defaultParam, scenarioNum) {
         return null;
     }
 
-    // 좌석 조회
-    const seatsRes = http.get(`${host}/api/v1/concerts/${concertId}/schedules/${scheduleId}/seats`, params);
+    // 좌석 조회 (예약 가능한 좌석만)
+    const seatsRes = http.get(`${host}/api/v1/concerts/${concertId}/schedules/${scheduleId}/seats?availableOnly=true`, params);
     
     if (seatsRes.status !== 200) {
         console.log(`1_좌석_조회: FAIL - ${seatsRes.status}`);
@@ -149,8 +165,14 @@ function getConcertSchedules(defaultParam, scenarioNum) {
 
     const seats = JSON.parse(seatsRes.body).data;
     if (!seats || seats.length === 0) {
-        console.log('1_스케줄_조회: FAIL - 좌석 없음');
-        return null;
+        console.log(`1_스케줄_조회: SUCCESS - 매진 (Concert:${concertId}, Schedule:${scheduleId})`);
+        // 매진된 경우 성공으로 처리하고 더미 데이터로 나머지 시나리오 진행
+        return { 
+            concertId, 
+            scheduleId, 
+            seatId: -1,  // 매진 표시용 더미 ID
+            soldOut: true 
+        };
     }
 
     const randomSeat = seats[Math.floor(Math.random() * seats.length)];
@@ -165,7 +187,7 @@ function getConcertSchedules(defaultParam, scenarioNum) {
     }
 
     console.log(`1_스케줄_조회: SUCCESS - Concert:${concertId}, Schedule:${scheduleId}, Seat:${seatId}`);
-    sleep(1);
+    sleep(Math.random() * 0.5 + 0.1);
     
     return { concertId, scheduleId, seatId };
 }
@@ -196,7 +218,7 @@ function issueToken(defaultParam, scenarioNum, userId) {
     const token = response.data.token;
     
     console.log(`2_토큰_발급: SUCCESS - ${token}`);
-    sleep(1);
+    sleep(Math.random() * 0.3 + 0.1);
     return token;
 }
 
@@ -219,7 +241,7 @@ function chargeBalance(defaultParam, scenarioNum, userId) {
     check(res, { 'balance charge success': (r) => isSuccess });
     
     console.log(`3_포인트_충전: ${isSuccess ? 'SUCCESS' : 'FAIL'} - ${res.status}`);
-    sleep(1);
+    sleep(Math.random() * 0.3 + 0.1);
 }
 
 // scenario_4: 예약
@@ -260,14 +282,17 @@ function createReservation(defaultParam, scenarioNum, userId, concertId, seatId,
         console.log(`4_예약: FAIL - ${res.status}`);
     }
     
-    sleep(1);
+    sleep(Math.random() * 0.4 + 0.1);
     return reservationId;
 }
 
 // scenario_5: 결제
 function processPayment(defaultParam, scenarioNum, userId, reservationId, token) {
+    const params = getHeadersWithTags(defaultParam, scenarioNum);
+    
     if (!reservationId) {
         console.log(`5_결제: SKIP - 예약 실패로 인한 건너뛰기`);
+        check(null, { 'payment skipped due to reservation failure': () => false });
         return;
     }
 
@@ -275,13 +300,13 @@ function processPayment(defaultParam, scenarioNum, userId, reservationId, token)
     const reservationRes = http.get(`${host}/api/v1/reservations/${reservationId}`);
     if (reservationRes.status !== 200) {
         console.log(`5_결제: FAIL - 예약 정보 조회 실패`);
+        check(reservationRes, { 'payment reservation lookup failed': () => false });
         return;
     }
     
     const reservation = JSON.parse(reservationRes.body).data;
     const seatId = reservation.seatId;
 
-    const params = getHeadersWithTags(defaultParam, scenarioNum);
     const startTime = new Date();
     
     const paymentRequest = {
@@ -315,7 +340,7 @@ function processPayment(defaultParam, scenarioNum, userId, reservationId, token)
         console.log(`5_결제: FAIL - ${res.status}`);
     }
     
-    sleep(1);
+    sleep(Math.random() * 0.4 + 0.1);
 }
 
 function getHeadersWithTags(defaultParam, scenarioNum) {

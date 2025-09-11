@@ -48,6 +48,9 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-web")
+	
+	// Prometheus metrics
+	implementation("io.micrometer:micrometer-registry-prometheus")
 
 	// Jackson JSR310 (Java 8 Time)
 	implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")

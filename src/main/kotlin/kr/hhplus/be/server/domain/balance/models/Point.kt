@@ -31,6 +31,9 @@ class Point(
     @Column(name = "last_updated", nullable = false)
     var lastUpdated: LocalDateTime = LocalDateTime.now(),
 
+    @Version
+    var version: Int = 0
+
 ) : BaseEntity() {
 
     companion object {

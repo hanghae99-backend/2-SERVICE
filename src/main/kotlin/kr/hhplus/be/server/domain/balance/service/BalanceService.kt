@@ -9,8 +9,8 @@ import kr.hhplus.be.server.domain.balance.repositories.PointHistoryTypePojoRepos
 import kr.hhplus.be.server.domain.balance.repositories.PointRepository
 import kr.hhplus.be.server.domain.balance.rules.BalanceBusinessRules
 import kr.hhplus.be.server.domain.user.aop.ValidateUserId
-import kr.hhplus.be.server.global.lock.LockGuard
-import kr.hhplus.be.server.global.lock.LockStrategy
+import org.springframework.orm.ObjectOptimisticLockingFailureException
+import kotlin.random.Random
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
@@ -41,33 +41,32 @@ class BalanceService(
         return pointHistoryRepository.findChargeAmountByUserIdAndDate(userId, today) ?: BigDecimal.ZERO
     }
     
-    @LockGuard(
-        key = "'balance:' + #userId",
-        strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 2000L,
-        retryIntervalMs = 50L,
-        maxRetryCount = 10
-    )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun chargeBalance(userId: Long, amount: BigDecimal): Point {
-        validateChargeAmountInTransaction(userId, amount)
-        
-        val currentPoint = getOrCreatePoint(userId)
-        currentPoint.charge(amount)
-        val savedPoint = pointRepository.save(currentPoint)
-        
-        saveChargeHistory(userId, amount)
-        return savedPoint
+        return chargeBalanceWithRetry(userId, amount, 0)
     }
     
-    @LockGuard(
-        key = "'balance:' + #userId",
-        strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 1500L,
-        retryIntervalMs = 50L,
-        maxRetryCount = 10
-    )
+    private fun chargeBalanceWithRetry(userId: Long, amount: BigDecimal, retryCount: Int): Point {
+        try {
+            validateChargeAmountInTransaction(userId, amount)
+            
+            val currentPoint = getOrCreatePoint(userId)
+            currentPoint.charge(amount)
+            val savedPoint = pointRepository.save(currentPoint)
+            
+            saveChargeHistory(userId, amount)
+            return savedPoint
+        } catch (e: ObjectOptimisticLockingFailureException) {
+            if (retryCount < 3) {
+                Thread.sleep(Random.nextLong(10, 50))
+                return chargeBalanceWithRetry(userId, amount, retryCount + 1)
+            } else {
+                throw e
+            }
+        }
+    }
+    
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun deductBalance(userId: Long, amount: BigDecimal, description: String = "포인트 사용"): Point {
@@ -81,13 +80,6 @@ class BalanceService(
         return savedPoint
     }
     
-    @LockGuard(
-        key = "'balance:' + #userId",
-        strategy = LockStrategy.SPIN,
-        waitTimeoutMs = 2000L,
-        retryIntervalMs = 50L,
-        maxRetryCount = 10
-    )
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     @ValidateUserId
     fun restoreBalance(userId: Long, amount: BigDecimal, description: String): Point {

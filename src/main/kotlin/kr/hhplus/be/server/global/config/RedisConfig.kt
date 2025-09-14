@@ -35,6 +35,11 @@ class RedisConfig {
             val typeValidator = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubTypeIsArray()
                 .allowIfBaseType("kr.hhplus.be.server.domain")
+                .allowIfBaseType("kr.hhplus.be.server.api")
+                .allowIfBaseType("java.util")
+                .allowIfBaseType("java.lang")
+                .allowIfBaseType("java.time")
+                .allowIfBaseType("java.math")
                 .build()
             
             activateDefaultTyping(typeValidator, ObjectMapper.DefaultTyping.EVERYTHING)
